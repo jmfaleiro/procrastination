@@ -6,36 +6,12 @@
 #include <set>
 #include <iostream>
 
-#define NUM_OPTS 8
+#define NUM_OPTS 9
 
 // Use this class to parse command line arguments for our particular experiment
 // scenario. 
 class ExperimentInfo {    
 
-    // Period between txns that force substantiation. 'f' means that we have one
-    // every 'f' txns. 
-    int m_substantiate_period;
-    
-    // Number of worker threads. 
-    int m_num_workers;
-
-    // Number of elements in the read set. 
-    int m_read_set_size;
-    
-    // Number of elements in the write set. 
-    int m_write_set_size;
-    
-    // The total number of records under consideration. 
-    int m_num_records;
-    
-    // Number of txns to evaluate for this experiment.
-    int m_num_txns;
-    
-    // Max length of txn chain before we force a substantiation. Need this for
-    // "steady state" behavior. 
-    int m_substantiate_threshold;
-
-    int m_num_runs;
     
 
     void argError(struct option* long_options, int count) {
@@ -58,12 +34,13 @@ public:
             {"num_txns", required_argument, NULL, 5},
             {"sub_threshold", required_argument, NULL, 6},
             {"num_runs", required_argument, NULL, 7},
+            {"output_file", required_argument, NULL, 8},
             { NULL, no_argument, NULL, 8}
     };
 
 
         std::set<int> args_received;
-        int opt, index;
+        int index;
         while (getopt_long_only(argc, argv, "", long_options, &index) != -1) {
             
             // Make sure that we only ever get a single argument for a 
@@ -76,31 +53,34 @@ public:
             }
             switch (index) {
             case 0:
-                m_substantiate_period = atoi(optarg);
+                substantiate_period = atoi(optarg);
                 break;
             case 1:
-                m_num_workers = atoi(optarg);
+                num_workers = atoi(optarg);
                 break;
             case 2:
-                m_read_set_size = atoi(optarg);
+                read_set_size = atoi(optarg);
                 break;
             case 3:
-                m_write_set_size = atoi(optarg);
+                write_set_size = atoi(optarg);
                 break;
             case 4:
-                m_num_records = atoi(optarg);
+                num_records = atoi(optarg);
                 break;
             case 5:
-                m_num_txns = atoi(optarg);
+                num_txns = atoi(optarg);
                 break;
             case 6:
-                m_substantiate_threshold = atoi(optarg);
+                substantiate_threshold = atoi(optarg);
                 break;
             case 7:
-                m_num_runs = atoi(optarg);
+                num_runs = atoi(optarg);
+                break;
+            case 8:
+                output_file = optarg;
                 break;
             default:
-                argError(long_options, NUM_OPTS);                
+                argError(long_options, NUM_OPTS);
             }
         }
         
@@ -109,5 +89,43 @@ public:
                 argError(long_options, NUM_OPTS);
             }
         }
+        
+        // Allocate cpu_set_t's for binding threads. 
+        // XXX: The scheduler is single threaded so we have just one for now. 
+        worker_bindings = new cpu_set_t[num_workers];
+        scheduler_bindings = new cpu_set_t[1];
     }
+
+    // Binding information for scheduler+worker threads. 
+    cpu_set_t* worker_bindings;
+    cpu_set_t* scheduler_bindings;
+
+    // Period between txns that force substantiation. 'f' means that we have one
+    // every 'f' txns. 
+    int substantiate_period;
+    
+    // Number of worker threads. 
+    int num_workers;
+
+
+    // Number of elements in the read set. 
+    int read_set_size;
+    
+    // Number of elements in the write set. 
+    int write_set_size;
+    
+    // The total number of records under consideration. 
+    int num_records;
+    
+    // Number of txns to evaluate for this experiment.
+    int num_txns;
+    
+    // Max length of txn chain before we force a substantiation. Need this for
+    // "steady state" behavior. 
+    int substantiate_threshold;
+    
+    char* output_file;
+
+    int num_runs;
+
 };

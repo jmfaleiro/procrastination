@@ -90,7 +90,6 @@ class LazyScheduler {
   
 public:
   LazyScheduler(uint64_t num_records, 
-                uint64_t num_subst,
                 AtomicQueue<Action*>* input,
                 AtomicQueue<Action*>* output,
                 cpu_set_t* binding,

@@ -33,7 +33,6 @@ LazyScheduler::depIndex(Action* action, int record, bool* is_write) {
 
 
 LazyScheduler::LazyScheduler(uint64_t num_records, 
-                             uint64_t num_subst,
                              AtomicQueue<Action*>* worker_input,
                              AtomicQueue<Action*>* worker_output,
                              cpu_set_t* binding_info,
@@ -50,8 +49,7 @@ LazyScheduler::LazyScheduler(uint64_t num_records,
   m_num_records = (int)num_records;
   m_num_waiting = 0;
   m_num_inflight = 0;
-  
-  m_subst = num_subst;
+
   m_num_txns = 0;
 }
 
