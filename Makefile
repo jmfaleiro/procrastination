@@ -1,5 +1,5 @@
 CFLAGS=-O3 -Wall -Wextra -g
-LIBS=-lnuma -lpthread -lprotobuf
+LIBS=-lnuma -lpthread -lprotobuf -lrt
 
 HEADERS=$(wildcard src/*.h)
 PROTO=$(wildcard proto/*.proto)
