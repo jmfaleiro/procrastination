@@ -70,7 +70,7 @@ initWorkers(Worker** workers,
             int num_records) {
     
     int *records = new int[num_records];
-    for (uint64_t i = 0; i < num_records; ++i) {
+    for (int i = 0; i < num_records; ++i) {
         records[i] = 1;
     }
 
@@ -104,11 +104,10 @@ timespec wait(int num_waits,
     // Wait for all non-lazy transactions to finish. 
     Action* done_txn;
     while (num_waits-- > 0) {
-        
+
         // Wait for the scheduler to finish processing a txn. 
         while (!scheduler_output->Pop(&done_txn)) 
-            do_pause();
-        
+            ;
     }
     
     // Measure the curren time and return the time elapsed.
@@ -128,6 +127,7 @@ void write_answers(ExperimentInfo* info, timespec time_taken) {
 int initialize(ExperimentInfo* info, 
                AtomicQueue<Action*>** output,
                LazyScheduler** scheduler) {
+    init_cpuinfo();
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
     CPU_SET(79, &my_binding);
@@ -146,7 +146,7 @@ int initialize(ExperimentInfo* info,
                           info->write_set_size, 
                           info->num_records,
                           info->substantiate_period);
-    buildDependencies(&gen, info->num_txns, scheduler_input, NULL);
+    int waits = buildDependencies(&gen, info->num_txns, scheduler_input, NULL);
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
@@ -165,8 +165,10 @@ int initialize(ExperimentInfo* info,
                                &info->scheduler_bindings[0],
                                scheduler_input,
                                scheduler_output);
-
     (*scheduler)->startThread();
+    
+    *output = scheduler_output;
+    return waits;
 }
 
 

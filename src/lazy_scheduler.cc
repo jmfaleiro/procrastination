@@ -121,7 +121,6 @@ void* LazyScheduler::schedulerFunction(void* arg) {
 
 // Add the given action to the dependency graph. 
 void LazyScheduler::addGraph(Action* action) {
-    
     action->set_state(STICKY);
 
     // Iterate through this action's read set and write set, find the 
@@ -295,7 +294,7 @@ uint64_t LazyScheduler::substantiate(Action* start) {
 void LazyScheduler::finishTxn(Action* action) {
     assert(action->state() == PROCESSING);
     assert(m_num_inflight > 0);
-
+    
     // Do some bookkeeping. 
     action->set_state(SUBSTANTIATED); 
     action->set_end_time(rdtsc());
@@ -323,6 +322,9 @@ void LazyScheduler::finishTxn(Action* action) {
 
     // If this was a forced materialization, communicate it with the client. x
     if (action->materialize()) {
+        //        ++m_num_txns;
+        //        std::cout << m_num_txns << "\n";
+
         m_log_output->Push(action);
     }
 }
