@@ -12,9 +12,28 @@
 #include "atomic.h"
 #include <iostream> 
 #include <fstream>
+#include <time.h>
+#include <algorithm>
+#include <sstream>
+#include <string>
 
 std::vector<Action*>* last_txn_map = NULL;
 std::vector<int>* value_map = NULL;
+using namespace std;
+
+timespec diff_time(timespec start, timespec end) 
+{
+    timespec temp;
+    if ((end.tv_nsec - start.tv_nsec) < 0) {
+        temp.tv_sec = end.tv_sec;
+        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    }
+    else {
+        temp.tv_sec = end.tv_sec-start.tv_sec;
+        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+}
 
 
 void buildDependenciesManual(AtomicQueue<Action*>* input_queue, 
@@ -153,12 +172,17 @@ buildDependencies(WorkloadGenerator* generator,
             ++to_wait;
         }
     }
-    std::cout << "Wait for: " << to_wait << "\n";
     return to_wait;
 }
 
 void
-wait(int num_txns, AtomicQueue<Action*>* output_queue) {
+wait(LazyScheduler* sched, 
+     int num_txns, 
+     AtomicQueue<Action*>* output_queue, 
+     timespec start_time,
+     int freq,
+     int num_threads) {
+
     uint64_t materialized = 0;
     uint64_t time_total = 0;
     uint64_t time_exec = 0;
@@ -171,14 +195,34 @@ wait(int num_txns, AtomicQueue<Action*>* output_queue) {
         while (!output_queue->Pop(&action))
             ;
         materialized += action->closure();
-        time_total += action->end_time() - action->start_time();
-        time_exec += action->end_time() - action->exec_start_time();
+        //        time_total += action->end_time() - action->start_time();
+        //        time_exec += action->end_time() - action->exec_start_time();
         //        std::cout << num_txns << "\n";
     }
+    timespec end_time;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
+    timespec diff = diff_time(start_time, end_time);
     
+    uint64_t* times;
+    int num_times = sched->getTimes(&times);
+    std::sort(times, times+num_times);
+
     std::cout << "Txns done: " << materialized << "\n";
-    std::cout << "Time elapsed: " << time_total << "\n";
-    std::cout << "Time executed: " << time_exec << "\n";
+    std::cout << "Time: " << diff.tv_sec << "." << diff.tv_nsec << "ns.\n";
+    
+    ofstream myfile; 
+    stringstream ss;
+    ss << freq << "_" << num_threads << ".txt";    
+    string output_file = ss.str();
+    myfile.open(output_file.c_str(), std::fstream::out);
+    for (int i = 0; i < num_times; ++i) {
+        myfile << i << " " << times[i] << "\n";
+    }
+    myfile.close();
+
+    //    std::cout << "Txns done: " << materialized << "\n";
+    //    std::cout << "Time elapsed: " << time_total << "\n";
+    //    std::cout << "Time executed: " << time_exec << "\n";
     exit(-1);
 }
 /*
@@ -256,8 +300,10 @@ initWorkers(int start_index,
 }
 
 Worker**
-initialize(int num_reads, 
-           int num_writes, 
+initialize(int freq,
+           int num_workers,
+           int num_reads, 
+           int num_writes,           
            uint64_t num_records, 
            int num_actions) {
 
@@ -283,7 +329,7 @@ initialize(int num_reads,
   AtomicQueue<Action*>* sched_output = new AtomicQueue<Action*>();
 
 
-  WorkloadGenerator work_gen(num_reads, num_writes, num_records, 100);
+  WorkloadGenerator work_gen(num_reads, num_writes, num_records, freq);
   int num_waits = 1;
 
   num_waits = buildDependencies(&work_gen, 
@@ -295,7 +341,6 @@ initialize(int num_reads,
   //    buildDependenciesManual(sched_queue, store, num_records);
 
   // Number of worker threads for this particular experiment. 
-  int num_workers = 9;
   init_cpuinfo();
 
   
@@ -323,8 +368,12 @@ initialize(int num_reads,
   sched->startThread();
   sched->startScheduler();
   
+  
+  
   //  processTxns(100000, input_queue, output_queue, &store);
-  wait(num_waits, sched_output);
+  timespec start_time;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_time);
+  wait(sched, num_waits, sched_output, start_time, freq, num_workers);
   /*
 
   buildSimple(sched, num_actions, sched_queue, &store);
@@ -340,8 +389,12 @@ initialize(int num_reads,
   return workers;
 }
 
+
 int
 main(int argc, char** argv) {
-  initialize(10, 10, 10000000, 10000);  
+    int freq = atoi(argv[1]);
+    int num_workers = atoi(argv[2]);
+
+    initialize(freq, num_workers, 10, 10, 10000000, 100000);  
   exit(-1);
 }

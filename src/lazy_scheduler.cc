@@ -55,6 +55,11 @@ LazyScheduler::LazyScheduler(uint64_t num_records,
   m_num_txns = 0;
 }
 
+int LazyScheduler::getTimes(uint64_t** ret) {
+    *ret = m_times;
+    return m_times_ptr;
+}
+
 void* LazyScheduler::schedulerFunction(void* arg) {
     LazyScheduler* sched = (LazyScheduler*)arg;
     pin_thread(sched->m_binding_info);
@@ -66,8 +71,9 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     }
 
     sched->m_dependents = new tr1::unordered_map<Action*, list<Action*>*> ();
-    sched->m_to_resolve = new tr1::unordered_map<Action*, int> ();
-
+    sched->m_to_resolve = new tr1::unordered_map<Action*, int> ();    
+    sched->m_times = new uint64_t[1000000];
+    sched->m_times_ptr = 0;
 
     xchgq(&(sched->m_start_flag), 1);
 
@@ -86,6 +92,8 @@ void* LazyScheduler::schedulerFunction(void* arg) {
             
             while (done_txns->Pop(&action)) {
                 sched->finishTxn(action);
+                (sched->m_times)[(sched->m_times_ptr)++] = 
+                    action->end_time() - action->exec_start_time();
             }
 
             /*
@@ -142,7 +150,6 @@ void LazyScheduler::addGraph(Action* action) {
   if (action->materialize()) {
       action->set_start_time(rdtsc());
       substantiate(action);
-      action->set_exec_start_time(rdtsc());
   }
 }
 
@@ -274,6 +281,7 @@ uint64_t LazyScheduler::substantiate(Action* start) {
     if (action->num_dependencies() == 0) {
         ++m_num_inflight;
         assert(action->state() == ANALYZING);
+        action->set_exec_start_time(rdtsc());
         action->set_state(PROCESSING);
         m_worker_input->Push(action);
     }
@@ -292,6 +300,7 @@ void LazyScheduler::finishTxn(Action* action) {
 
     // Do some bookkeeping. 
     action->set_state(SUBSTANTIATED); 
+    action->set_end_time(rdtsc());
     m_num_inflight -= 1;
 
     // Each dependent now has one less dependency. 
@@ -303,6 +312,7 @@ void LazyScheduler::finishTxn(Action* action) {
         
         // Check if it's ready to run. 
         if (old_value == 1) {
+            action->set_exec_start_time(rdtsc());
             dep->set_state(PROCESSING);
             m_worker_input->Push(dep);
             m_num_waiting -= 1;
@@ -315,7 +325,6 @@ void LazyScheduler::finishTxn(Action* action) {
 
     // If this was a forced materialization, communicate it with the client. x
     if (action->materialize()) {
-        action->set_end_time(rdtsc());
         m_log_output->Push(action);
     }
 }

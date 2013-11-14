@@ -8,6 +8,7 @@
 #include <numa.h>
 #include <tr1/unordered_map>
 #include <list>
+#include <vector>
 
 #include "atomic.h"
 
@@ -42,7 +43,9 @@ class LazyScheduler {
 
     int m_num_waiting;
     int m_num_inflight;
-
+    
+    uint64_t* m_times;
+    int m_times_ptr;
     
     cpu_set_t* m_binding_info;
     
@@ -106,6 +109,8 @@ public:
   
   // Start the scheduler thread. 
   virtual void startThread();  
+  
+  virtual int getTimes(uint64_t** ret);
 };
 
 #endif // LAZY_SCHEDULER_H
