@@ -160,11 +160,12 @@ int initialize(ExperimentInfo* info,
     
     // Create a scheduler thread. 
     *scheduler = new LazyScheduler(info->num_records, 
-                               worker_input,
-                               worker_output,
-                               &info->scheduler_bindings[0],
-                               scheduler_input,
-                               scheduler_output);
+                                   info->substantiate_threshold,
+                                   worker_input,
+                                   worker_output,
+                                   &info->scheduler_bindings[0],
+                                   scheduler_input,
+                                   scheduler_output);
     (*scheduler)->startThread();
     
     *output = scheduler_output;

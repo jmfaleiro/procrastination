@@ -12,8 +12,6 @@
 // scenario. 
 class ExperimentInfo {    
 
-    
-
     void argError(struct option* long_options, int count) {
         std::cout << "lazy_db expects the following args (all are required):\n";
         for (int i = 0; i < count; ++i) {

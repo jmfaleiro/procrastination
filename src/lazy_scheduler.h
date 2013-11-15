@@ -19,6 +19,11 @@
 
 using namespace std;
 
+struct Heuristic {
+    Action* last_txn;
+    int chain_length;
+};
+
 class LazyScheduler {
 
     volatile uint64_t m_run_flag;
@@ -52,7 +57,8 @@ class LazyScheduler {
     // Time in cycles elapsed in substantiation, and number of txns completed.
     uint64_t m_subst;
     uint64_t m_num_txns;
-
+    
+    int m_max_chain;
 
   // Free list of struct queue_elems to use to communicate with workers. 
   ElementStore *store;
@@ -60,7 +66,7 @@ class LazyScheduler {
   volatile struct queue_elem* m_free_elems;
 
   // Last txns to touch a given record.
-  vector<Action*>* m_last_txns;
+  vector<struct Heuristic>* m_last_txns;
 
   // Queue of actions to process.
   AtomicQueue<Action*>* m_worker_input;
@@ -90,6 +96,7 @@ class LazyScheduler {
   
 public:
   LazyScheduler(uint64_t num_records, 
+                int max_chain,
                 AtomicQueue<Action*>* input,
                 AtomicQueue<Action*>* output,
                 cpu_set_t* binding,

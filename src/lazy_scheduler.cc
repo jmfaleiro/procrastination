@@ -33,6 +33,7 @@ LazyScheduler::depIndex(Action* action, int record, bool* is_write) {
 
 
 LazyScheduler::LazyScheduler(uint64_t num_records, 
+                             int max_chain,
                              AtomicQueue<Action*>* worker_input,
                              AtomicQueue<Action*>* worker_output,
                              cpu_set_t* binding_info,
@@ -51,6 +52,8 @@ LazyScheduler::LazyScheduler(uint64_t num_records,
   m_num_inflight = 0;
 
   m_num_txns = 0;
+
+  m_max_chain = max_chain;
 }
 
 int LazyScheduler::getTimes(uint64_t** ret) {
@@ -61,11 +64,17 @@ int LazyScheduler::getTimes(uint64_t** ret) {
 void* LazyScheduler::schedulerFunction(void* arg) {
     LazyScheduler* sched = (LazyScheduler*)arg;
     pin_thread(sched->m_binding_info);
+    
+    struct Heuristic empty;
+    empty.last_txn = NULL;
+    empty.chain_length = 0;
 
     sched->store = new ElementStore(1000000);
-    sched->m_last_txns = new vector<Action*>(sched->m_num_records, NULL);
+    sched->m_last_txns = 
+        new vector<struct Heuristic>(sched->m_num_records, empty);
     for (int i = 0; i < sched->m_num_records; ++i) {
-        assert((*(sched->m_last_txns))[i] == NULL);
+        (*(sched->m_last_txns))[i].last_txn = NULL;
+        (*(sched->m_last_txns))[i].chain_length = 0;
     }
 
     sched->m_dependents = new tr1::unordered_map<Action*, list<Action*>*> ();
@@ -129,20 +138,43 @@ void LazyScheduler::addGraph(Action* action) {
     int num_writes = action->writeset_size();
 
   // Go through the read set. 
+    bool force_materialize = action->materialize();
   for (int i = 0; i < num_reads; ++i) {
     int record = action->readset(i);
-    Action* last_txn = (*m_last_txns)[record];
+    Action* last_txn = (*m_last_txns)[record].last_txn;
     action->add_read_deps((uint64_t)last_txn);
-    (*m_last_txns)[record] = action;
+    (*m_last_txns)[record].last_txn = action;
+    
+    // Increment the length of the chain corresponding to this record, check if 
+    // it exceeds our threshold value. 
+    (*m_last_txns)[record].chain_length += 1;
+    force_materialize |= (*m_last_txns)[record].chain_length > m_max_chain;
   }
 
   // Go through the write set. 
   for (int i = 0; i < num_writes; ++i) {
     int record = action->writeset(i);    
-    Action* last_txn = (*m_last_txns)[record];
+    Action* last_txn = (*m_last_txns)[record].last_txn;
     action->add_write_deps((uint64_t)last_txn);
-    (*m_last_txns)[record] = action;    
+    (*m_last_txns)[record].last_txn = action;
+
+    // Increment the length of the chain corresponding to this record, check if 
+    // it exceeds our threshold value. 
+    (*m_last_txns)[record].chain_length += 1;
+    force_materialize |= (*m_last_txns)[record].chain_length > m_max_chain;    
   }  
+  
+  if (force_materialize) {
+      for (int i = 0; i < num_reads; ++i) {
+          int record = action->readset(i);
+          (*m_last_txns)[record].chain_length = 0;
+      }
+      for (int i = 0; i < num_writes; ++i) {
+          int record = action->writeset(i);
+          (*m_last_txns)[record].chain_length = 0;
+      }
+      action->set_materialize(true);
+  }
 
   if (action->materialize()) {
       action->set_start_time(rdtsc());
