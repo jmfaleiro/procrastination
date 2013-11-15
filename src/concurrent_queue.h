@@ -118,6 +118,7 @@ public:
 		  }
 
                   if (block) {
+                      do_pause();
                       continue;
                   }
                   else {
@@ -296,8 +297,10 @@ public:
   
   void
   returnElem(volatile struct queue_elem* elem) {
-	free_list_end->m_next = elem;
-	elem->m_next = NULL;
+      free_list_end->m_next = elem;
+      free_list_end = elem;
+      elem->m_next = NULL;
+      elem->m_data = 0;
   }
 };
 

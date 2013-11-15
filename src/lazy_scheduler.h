@@ -10,8 +10,6 @@
 #include <list>
 #include <vector>
 
-#include "atomic.h"
-
 #include "action_int.pb.h"
 #include "concurrent_queue.h"
 #include "cpuinfo.h"
@@ -69,16 +67,16 @@ class LazyScheduler {
   vector<struct Heuristic>* m_last_txns;
 
   // Queue of actions to process.
-  AtomicQueue<Action*>* m_worker_input;
+  ConcurrentQueue* m_worker_input;
 
   // Queue of completed actions. 
-  AtomicQueue<Action*>* m_worker_output;
+  ConcurrentQueue* m_worker_output;
   
   // Queue from log.
-  AtomicQueue<Action*>* m_log_input;
+  ConcurrentQueue* m_log_input;
 
   // Output queue for scheduer. 
-  AtomicQueue<Action*>* m_log_output;
+  ConcurrentQueue* m_log_output;
   
   virtual void processWrite(Action* action, int index, deque<Action*>* queue);
   virtual void processRead(Action* action, int index, deque<Action*>* queue);
@@ -90,6 +88,9 @@ class LazyScheduler {
 
   // Clean up after a transaction is done.
   virtual void finishTxn(Action* action);
+  
+  // Dispatch a transaction to a worker for processing. 
+  virtual void run_txn(Action* action);
 
   // Scheduler thread function.
   static void* schedulerFunction(void* arg);
@@ -97,11 +98,11 @@ class LazyScheduler {
 public:
   LazyScheduler(uint64_t num_records, 
                 int max_chain,
-                AtomicQueue<Action*>* input,
-                AtomicQueue<Action*>* output,
+                ConcurrentQueue* input,
+                ConcurrentQueue* output,
                 cpu_set_t* binding,
-                AtomicQueue<Action*>* sched_input,
-                AtomicQueue<Action*>* sched_output);
+                ConcurrentQueue* sched_input,
+                ConcurrentQueue* sched_output);
   
   // Add the action to the dependency graph. We add dependencies on the 
   // actions it depends on, and also update the m_last_txns table. 

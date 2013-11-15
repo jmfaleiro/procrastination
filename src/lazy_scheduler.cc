@@ -34,11 +34,11 @@ LazyScheduler::depIndex(Action* action, int record, bool* is_write) {
 
 LazyScheduler::LazyScheduler(uint64_t num_records, 
                              int max_chain,
-                             AtomicQueue<Action*>* worker_input,
-                             AtomicQueue<Action*>* worker_output,
+                             ConcurrentQueue* worker_input,
+                             ConcurrentQueue* worker_output,
                              cpu_set_t* binding_info,
-                             AtomicQueue<Action*>* sched_input,
-                             AtomicQueue<Action*>* sched_output) {
+                             ConcurrentQueue* sched_input,
+                             ConcurrentQueue* sched_output) {
 
     m_worker_input = worker_input;
     
@@ -77,22 +77,19 @@ void* LazyScheduler::schedulerFunction(void* arg) {
         (*(sched->m_last_txns))[i].chain_length = 0;
     }
 
-    sched->m_dependents = new tr1::unordered_map<Action*, list<Action*>*> ();
-    sched->m_to_resolve = new tr1::unordered_map<Action*, int> ();    
     sched->m_times = new uint64_t[1000000];
     sched->m_times_ptr = 0;
 
     xchgq(&(sched->m_start_flag), 1);
-
-    AtomicQueue<Action*>* incoming_txns = sched->m_log_input;
-    AtomicQueue<Action*>* done_txns = sched->m_worker_output;
-
-    uint64_t external = 0;
+    
+    ConcurrentQueue* incoming_txns = sched->m_log_input;
+    ConcurrentQueue* done_txns = sched->m_worker_output;
 
     Action* action = NULL;
     while (true) {        
         if (sched->m_run_flag) {
-
+            
+            /*
             if (incoming_txns->Pop(&action)) {
                 sched->addGraph(action);
             }
@@ -102,8 +99,9 @@ void* LazyScheduler::schedulerFunction(void* arg) {
                 (sched->m_times)[(sched->m_times_ptr)++] = 
                     action->end_time() - action->exec_start_time();
             }
+            */
 
-            /*
+
             // First see if we have a new transaction to process.             
             volatile struct queue_elem* new_input;
             if ((new_input = incoming_txns->Dequeue(false)) != NULL) {
@@ -114,15 +112,15 @@ void* LazyScheduler::schedulerFunction(void* arg) {
                 new_input->m_next = sched->m_free_elems;
                 sched->m_free_elems = new_input;
                 new_input->m_data = 0;
-                ++external;
             }
             
             volatile struct queue_elem* done_action;
             while ((done_action = done_txns->Dequeue(false)) != NULL) {
                 action = (Action*)(done_action->m_data);
+                sched->store->returnElem(done_action);
                 sched->finishTxn(action);
             }
-            */
+
         }
     }
     return NULL;
@@ -163,20 +161,8 @@ void LazyScheduler::addGraph(Action* action) {
     (*m_last_txns)[record].chain_length += 1;
     force_materialize |= (*m_last_txns)[record].chain_length > m_max_chain;    
   }  
-  
-  if (force_materialize) {
-      for (int i = 0; i < num_reads; ++i) {
-          int record = action->readset(i);
-          (*m_last_txns)[record].chain_length = 0;
-      }
-      for (int i = 0; i < num_writes; ++i) {
-          int record = action->writeset(i);
-          (*m_last_txns)[record].chain_length = 0;
-      }
-      action->set_materialize(true);
-  }
 
-  if (action->materialize()) {
+  if (action->materialize() || force_materialize) {
       action->set_start_time(rdtsc());
       substantiate(action);
   }
@@ -271,6 +257,13 @@ void LazyScheduler::processWrite(Action* action,
     action->set_num_dependencies(cur_count + new_dependencies);
 }
 
+void LazyScheduler::run_txn(Action* to_run) {
+    assert(to_run->state() == ANALYZING);
+    to_run->set_state(PROCESSING);
+    volatile struct queue_elem* to_enq = store->getNew();
+    to_enq->m_data = (uint64_t)to_run;
+    m_worker_input->Enqueue(to_enq);
+}
 
 uint64_t LazyScheduler::substantiate(Action* start) {
     uint64_t size_closure = 0;
@@ -309,10 +302,8 @@ uint64_t LazyScheduler::substantiate(Action* start) {
     // Safe to run the action if it doesn't have any dependencies. 
     if (action->num_dependencies() == 0) {
         ++m_num_inflight;
-        assert(action->state() == ANALYZING);
         action->set_exec_start_time(rdtsc());
-        action->set_state(PROCESSING);
-        m_worker_input->Push(action);
+        run_txn(action);
     }
     else {
         ++m_num_waiting;
@@ -324,6 +315,9 @@ uint64_t LazyScheduler::substantiate(Action* start) {
 
 // Mark the dependents as having completed. 
 void LazyScheduler::finishTxn(Action* action) {
+    if (action->state() != PROCESSING) {
+        std::cout << action->state() << "\n";
+    }
     assert(action->state() == PROCESSING);
     assert(m_num_inflight > 0);
     
@@ -342,8 +336,7 @@ void LazyScheduler::finishTxn(Action* action) {
         // Check if it's ready to run. 
         if (old_value == 1) {
             action->set_exec_start_time(rdtsc());
-            dep->set_state(PROCESSING);
-            m_worker_input->Push(dep);
+            run_txn(dep);
             m_num_waiting -= 1;
             m_num_inflight += 1;
         }
@@ -351,13 +344,30 @@ void LazyScheduler::finishTxn(Action* action) {
 
     // If there are no more inflight txns, there can be no more waiters!
     assert((m_num_inflight != 0) || (m_num_waiting == 0));
+    
+    int num_reads = action->readset_size();
+    int num_writes = action->writeset_size();
+    for (int i = 0; i < num_reads; ++i) {
+        int record = action->readset(i);        
+        (*m_last_txns)[record].chain_length -= 1;
+    }
+    for (int i = 0; i < num_writes; ++i) {
+        int record = action->writeset(i);        
+        (*m_last_txns)[record].chain_length -= 1;
+    }
 
     // If this was a forced materialization, communicate it with the client. x
     if (action->materialize()) {
         //        ++m_num_txns;
         //        std::cout << m_num_txns << "\n";
+        
+        // Grab an element from our free list of elements to use. 
+        volatile struct queue_elem* to_use = m_free_elems;
+        m_free_elems = m_free_elems->m_next;
+        to_use->m_data = (uint64_t)action;
+        to_use->m_next = NULL;
 
-        m_log_output->Push(action);
+        m_log_output->Enqueue(to_use);
     }
 }
 

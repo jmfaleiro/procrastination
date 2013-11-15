@@ -40,19 +40,15 @@ timespec diff_time(timespec start, timespec end)
 int
 buildDependencies(WorkloadGenerator* generator,
                   int num_actions,
-                  AtomicQueue<Action*>* input_queue,
+                  ConcurrentQueue* input_queue,
                   ElementStore* store) {
     int to_wait = 0;
     for (int i = 0; i < num_actions; ++i) {
         Action* gen = generator->genNext();
-
-        input_queue->Push(gen);
-
-        /*
         volatile struct queue_elem* to_use = store->getNew();
         to_use->m_data = (uint64_t)gen;
         input_queue->Enqueue(to_use);
-        */
+
         if (gen->materialize()) {
             ++to_wait;
         }
@@ -65,8 +61,8 @@ initWorkers(Worker** workers,
             int start_index, 
             int num_workers, 
             cpu_set_t* bindings,
-            AtomicQueue<Action*>* input_queue,
-            AtomicQueue<Action*>* output_queue,
+            ConcurrentQueue* input_queue,
+            ConcurrentQueue* output_queue,
             int num_records) {
     
     int *records = new int[num_records];
@@ -94,7 +90,8 @@ initWorkers(Worker** workers,
 // Returns the time elapsed in processing a given workload. 
 timespec wait(int num_waits, 
               LazyScheduler* sched,
-              AtomicQueue<Action*>* scheduler_output) {
+              ConcurrentQueue* scheduler_output,
+              ElementStore* store) {
     timespec start_time, end_time;
     sched->startScheduler();
     
@@ -106,8 +103,8 @@ timespec wait(int num_waits,
     while (num_waits-- > 0) {
 
         // Wait for the scheduler to finish processing a txn. 
-        while (!scheduler_output->Pop(&done_txn)) 
-            ;
+        volatile struct queue_elem* recv = scheduler_output->Dequeue(true);
+        store->returnElem(recv);        
     }
     
     // Measure the curren time and return the time elapsed.
@@ -125,28 +122,32 @@ void write_answers(ExperimentInfo* info, timespec time_taken) {
 
 
 int initialize(ExperimentInfo* info, 
-               AtomicQueue<Action*>** output,
-               LazyScheduler** scheduler) {
+               ConcurrentQueue** output,
+               LazyScheduler** scheduler,
+               ElementStore** store) {
+
     init_cpuinfo();
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
     CPU_SET(79, &my_binding);
-    
+    *store = new ElementStore(2000000);
+
     // Initialize queues for threads to talk to each other.
     // For worker <==> scheduler interactions. 
-    AtomicQueue<Action*>* worker_input = new AtomicQueue<Action*>();
-    AtomicQueue<Action*>* worker_output = new AtomicQueue<Action*>();
+    ConcurrentQueue* worker_input = new ConcurrentQueue((*store)->getNew());
+    ConcurrentQueue* worker_output = new ConcurrentQueue((*store)->getNew());
     
     // For scheduler <==> client interactions.
-    AtomicQueue<Action*>* scheduler_input = new AtomicQueue<Action*>();
-    AtomicQueue<Action*>* scheduler_output = new AtomicQueue<Action*>();    
+    ConcurrentQueue* scheduler_input = new ConcurrentQueue((*store)->getNew());
+    ConcurrentQueue* scheduler_output = new ConcurrentQueue((*store)->getNew());
     
     // Create a workload generator and generate txns to process. 
     WorkloadGenerator gen(info->read_set_size, 
                           info->write_set_size, 
                           info->num_records,
                           info->substantiate_period);
-    int waits = buildDependencies(&gen, info->num_txns, scheduler_input, NULL);
+    int waits = 
+        buildDependencies(&gen, info->num_txns, scheduler_input, *store);
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
@@ -174,10 +175,11 @@ int initialize(ExperimentInfo* info,
 
 
 void run_experiment(ExperimentInfo* info) {
-    AtomicQueue<Action*>* scheduler_output;
+    ConcurrentQueue* scheduler_output;
     LazyScheduler* sched;
-    int num_waits = initialize(info, &scheduler_output, &sched);
-    timespec exec_time = wait(num_waits, sched, scheduler_output);
+    ElementStore* store;
+    int num_waits = initialize(info, &scheduler_output, &sched, &store);
+    timespec exec_time = wait(num_waits, sched, scheduler_output, store);
     write_answers(info, exec_time);
 }
 

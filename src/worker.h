@@ -8,13 +8,11 @@
 #include <pthread.h>
 #include <numa.h>
 
-#include "atomic.h"
-
 class Worker {
   
   // Queues with which to communicate with the coordinator thread. 
-  AtomicQueue<Action*>* m_input_queue;
-  AtomicQueue<Action*>* m_output_queue;
+  ConcurrentQueue* m_input_queue;
+  ConcurrentQueue* m_output_queue;
 
   // The "database" of records. 
   // XXX: Switch this to something more generic for later on. 
@@ -34,8 +32,8 @@ class Worker {
   static void* workerFunction(void* arg);
 
  public:
-  Worker(AtomicQueue<Action*>* input, 
-         AtomicQueue<Action*>* output, 
+  Worker(ConcurrentQueue* input, 
+         ConcurrentQueue* output, 
          cpu_set_t* binding_info,
          int* records);
   
