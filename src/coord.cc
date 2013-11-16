@@ -3,7 +3,8 @@
 #include "cpuinfo.h"
 #include "concurrent_queue.h"
 #include "action_int.pb.h"
-#include "workload_generator.h"
+#include "normal_generator.h"
+#include "uniform_generator.h"
 #include "experiment_info.h"
 
 #include <numa.h>
@@ -129,7 +130,7 @@ int initialize(ExperimentInfo* info,
     init_cpuinfo();
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(79, &my_binding);
+    CPU_SET(2, &my_binding);
     *store = new ElementStore(2000000);
 
     // Initialize queues for threads to talk to each other.
@@ -142,12 +143,22 @@ int initialize(ExperimentInfo* info,
     ConcurrentQueue* scheduler_output = new ConcurrentQueue((*store)->getNew());
     
     // Create a workload generator and generate txns to process. 
-    WorkloadGenerator gen(info->read_set_size, 
-                          info->write_set_size, 
-                          info->num_records,
-                          info->substantiate_period);
+    WorkloadGenerator* gen;
+    if (info->is_normal) {
+        gen = new NormalGenerator(info->read_set_size,
+                                  info->write_set_size,
+                                  info->num_records,
+                                  info->substantiate_period,
+                                  info->std_dev);
+    }
+    else {
+        gen = new UniformGenerator(info->read_set_size,
+                                   info->write_set_size,
+                                   info->num_records,
+                                   info->substantiate_period);
+    }
     int waits = 
-        buildDependencies(&gen, info->num_txns, scheduler_input, *store);
+        buildDependencies(gen, info->num_txns, scheduler_input, *store);
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];

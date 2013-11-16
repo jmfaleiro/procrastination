@@ -6,7 +6,7 @@
 #include <set>
 #include <iostream>
 
-#define NUM_OPTS 9
+#define NUM_OPTS 10
 
 // Use this class to parse command line arguments for our particular experiment
 // scenario. 
@@ -23,7 +23,7 @@ class ExperimentInfo {
 public:
     ExperimentInfo(int argc, char** argv) {
 
-    struct option long_options[] = {
+        struct option long_options[] = {
             {"period", required_argument, NULL, 0},
             {"num_workers", required_argument, NULL, 1},
             {"num_reads", required_argument, NULL, 2},
@@ -33,9 +33,12 @@ public:
             {"sub_threshold", required_argument, NULL, 6},
             {"num_runs", required_argument, NULL, 7},
             {"output_file", required_argument, NULL, 8},
-            { NULL, no_argument, NULL, 8}
-    };
-
+            {"normal", required_argument, NULL, 9},
+            { NULL, no_argument, NULL, 10}
+        };
+        
+        is_normal = false;
+        std_dev = -1;
 
         std::set<int> args_received;
         int index;
@@ -77,14 +80,20 @@ public:
             case 8:
                 output_file = optarg;
                 break;
+            case 9:
+                is_normal = true;
+                std_dev = atoi(optarg);
+                break;
             default:
                 argError(long_options, NUM_OPTS);
             }
         }
         
         for (int i = 0; i < NUM_OPTS; ++i) {
-            if (args_received.find(i) == args_received.end()) {
-                argError(long_options, NUM_OPTS);
+            if (i != 9) {
+                if (args_received.find(i) == args_received.end()) {
+                    argError(long_options, NUM_OPTS);
+                }
             }
         }
         
@@ -93,7 +102,7 @@ public:
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[1];
     }
-
+    
     // Binding information for scheduler+worker threads. 
     cpu_set_t* worker_bindings;
     cpu_set_t* scheduler_bindings;
@@ -122,8 +131,16 @@ public:
     // "steady state" behavior. 
     int substantiate_threshold;
     
+    // File in which to dump results. 
+    // XXX: We're only going to dump throughput for now.. 
     char* output_file;
 
+    // Number of times to repeat our experiment. 
     int num_runs;
-
+    
+    // Should we generate a normal distribution?
+    bool is_normal;
+    
+    // Standard deviation of our normal distribution. 
+    int std_dev;
 };

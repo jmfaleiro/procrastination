@@ -1,4 +1,4 @@
-CFLAGS=-O3 -Wall -Wextra -g
+CFLAGS=-O3 -Wall -Wextra -g -std=c++0x
 LIBS=-lnuma -lpthread -lprotobuf -lrt
 
 HEADERS=$(wildcard src/*.h)
@@ -14,7 +14,7 @@ TARGET=build/lazy_db
 
 all: $(TARGET)
 
-dev: CFLAGS = -g -Wall -Isrc -Wall -Wextra
+dev: CFLAGS = -g -Wall -Isrc -Wall -Wextra -std=c++0x
 dev: all
 
 $(TARGET): build $(OBJECTS)
