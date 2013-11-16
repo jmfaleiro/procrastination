@@ -1,6 +1,0 @@
-
-#include "workload_generator.h"
-
-class UniformGenerator : public WorkloadGenerator {
-
-};
