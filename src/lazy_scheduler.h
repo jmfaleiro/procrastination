@@ -41,7 +41,6 @@ class LazyScheduler {
     tr1::unordered_map<Action*, list<Action*>*>* m_dependents;
     tr1::unordered_map<Action*, int>* m_to_resolve;
     
-
     int m_num_records;
 
     int m_num_waiting;
@@ -104,6 +103,8 @@ public:
                 ConcurrentQueue* sched_input,
                 ConcurrentQueue* sched_output);
   
+  virtual void waitFinished();
+  
   // Add the action to the dependency graph. We add dependencies on the 
   // actions it depends on, and also update the m_last_txns table. 
   virtual void addGraph(Action* action);
@@ -116,6 +117,8 @@ public:
   
   // Start the scheduler thread. 
   virtual void startThread();  
+
+  virtual int numDone();
   
   virtual int getTimes(uint64_t** ret);
 };

@@ -52,7 +52,7 @@ LazyScheduler::LazyScheduler(uint64_t num_records,
   m_num_inflight = 0;
 
   m_num_txns = 0;
-
+  
   m_max_chain = max_chain;
 }
 
@@ -113,6 +113,9 @@ void* LazyScheduler::schedulerFunction(void* arg) {
                 sched->m_free_elems = new_input;
                 new_input->m_data = 0;
             }
+            else if (sched->m_num_inflight == 0) {
+                xchgq(&(sched->m_start_flag), 0);
+            }
             
             volatile struct queue_elem* done_action;
             while ((done_action = done_txns->Dequeue(false)) != NULL) {
@@ -120,6 +123,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
                 sched->store->returnElem(done_action);
                 sched->finishTxn(action);
             }
+            
 
         }
     }
@@ -146,7 +150,7 @@ void LazyScheduler::addGraph(Action* action) {
     // Increment the length of the chain corresponding to this record, check if 
     // it exceeds our threshold value. 
     (*m_last_txns)[record].chain_length += 1;
-    force_materialize |= (*m_last_txns)[record].chain_length > m_max_chain;
+    force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;
   }
 
   // Go through the write set. 
@@ -159,11 +163,12 @@ void LazyScheduler::addGraph(Action* action) {
     // Increment the length of the chain corresponding to this record, check if 
     // it exceeds our threshold value. 
     (*m_last_txns)[record].chain_length += 1;
-    force_materialize |= (*m_last_txns)[record].chain_length > m_max_chain;    
+    force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;    
   }  
 
   if (action->materialize() || force_materialize) {
-      action->set_start_time(rdtsc());
+      //      ++m_num_txns;
+      //      action->set_start_time(rdtsc());
       substantiate(action);
   }
 }
@@ -313,6 +318,10 @@ uint64_t LazyScheduler::substantiate(Action* start) {
   return 0;
 }
 
+int LazyScheduler::numDone() {
+    return m_num_txns;
+}
+
 // Mark the dependents as having completed. 
 void LazyScheduler::finishTxn(Action* action) {
     if (action->state() != PROCESSING) {
@@ -322,6 +331,7 @@ void LazyScheduler::finishTxn(Action* action) {
     assert(m_num_inflight > 0);
     
     // Do some bookkeeping. 
+    ++m_num_txns;
     action->set_state(SUBSTANTIATED); 
     action->set_end_time(rdtsc());
     m_num_inflight -= 1;
@@ -381,6 +391,11 @@ LazyScheduler::stopScheduler() {
   xchgq(&m_run_flag, 0);
 }
 
+void
+LazyScheduler::waitFinished() {
+    while (m_start_flag == 1)
+        ;
+}
 
 void
 LazyScheduler::startThread() {

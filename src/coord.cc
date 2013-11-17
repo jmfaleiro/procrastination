@@ -6,6 +6,7 @@
 #include "normal_generator.h"
 #include "uniform_generator.h"
 #include "experiment_info.h"
+#include "machine.h"
 
 #include <numa.h>
 #include <pthread.h>
@@ -27,7 +28,7 @@ timespec diff_time(timespec start, timespec end)
 {
     timespec temp;
     if ((end.tv_nsec - start.tv_nsec) < 0) {
-        temp.tv_sec = end.tv_sec;
+        temp.tv_sec = end.tv_sec - start.tv_sec - 1;
         temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
     }
     else {
@@ -65,10 +66,10 @@ initWorkers(Worker** workers,
             ConcurrentQueue* input_queue,
             ConcurrentQueue* output_queue,
             int num_records) {
-    
-    int *records = new int[num_records];
+    numa_set_strict(1);
+    int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records);
     for (int i = 0; i < num_records; ++i) {
-        records[i] = 1;
+        records[i*CACHE_LINE] = 1;
     }
 
   for (int i = 0; i < num_workers; ++i) {
@@ -97,7 +98,7 @@ timespec wait(int num_waits,
     sched->startScheduler();
     
     // Start measuring time elapsed. 
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_time);    
+    clock_gettime(CLOCK_REALTIME, &start_time);    
 
     // Wait for all non-lazy transactions to finish. 
     Action* done_txn;
@@ -109,7 +110,9 @@ timespec wait(int num_waits,
     }
     
     // Measure the curren time and return the time elapsed.
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);        
+    clock_gettime(CLOCK_REALTIME, &end_time);        
+    sched->waitFinished();
+    
     return diff_time(start_time, end_time);
 }
 
@@ -121,17 +124,36 @@ void write_answers(ExperimentInfo* info, timespec time_taken) {
     output_file.close();
 }
 
+void write_latencies(Worker* worker, int num_values) {
+    ofstream output_file;
+    output_file.open("latencies.txt", ios::out);
+    
+    int empty;
+    uint64_t* times = worker->getTimes(&empty);
+    num_values = num_values > 1000000? 1000000 : num_values;
+    sort(times, times + num_values);
+
+    double diff = 1.0 / (double)(num_values);
+    double cur = 0.0;
+
+    for (int i = 0; i < num_values; ++i) {
+        output_file << cur << " " << times[i] << "\n";
+        cur += diff;
+    }
+    output_file.close();
+}
 
 int initialize(ExperimentInfo* info, 
                ConcurrentQueue** output,
                LazyScheduler** scheduler,
-               ElementStore** store) {
+               ElementStore** store,
+               Worker** worker) {
 
     init_cpuinfo();
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
     CPU_SET(2, &my_binding);
-    *store = new ElementStore(2000000);
+    *store = new ElementStore(20000000);
 
     // Initialize queues for threads to talk to each other.
     // For worker <==> scheduler interactions. 
@@ -179,7 +201,7 @@ int initialize(ExperimentInfo* info,
                                    scheduler_input,
                                    scheduler_output);
     (*scheduler)->startThread();
-    
+    *worker = workers[0];
     *output = scheduler_output;
     return waits;
 }
@@ -189,9 +211,13 @@ void run_experiment(ExperimentInfo* info) {
     ConcurrentQueue* scheduler_output;
     LazyScheduler* sched;
     ElementStore* store;
-    int num_waits = initialize(info, &scheduler_output, &sched, &store);
+    Worker* worker;
+    int num_waits = 
+        initialize(info, &scheduler_output, &sched, &store, &worker);
     timespec exec_time = wait(num_waits, sched, scheduler_output, store);
+    std::cout << sched->numDone() << "\n";
     write_answers(info, exec_time);
+    write_latencies(worker, sched->numDone());
 }
 
 int

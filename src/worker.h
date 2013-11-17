@@ -13,6 +13,9 @@ class Worker {
   // Queues with which to communicate with the coordinator thread. 
   ConcurrentQueue* m_input_queue;
   ConcurrentQueue* m_output_queue;
+  
+  uint64_t* m_txn_latencies;
+  int m_num_values;
 
   // The "database" of records. 
   // XXX: Switch this to something more generic for later on. 
@@ -37,6 +40,9 @@ class Worker {
          cpu_set_t* binding_info,
          int* records);
   
+  // Get the completion times for txns. 
+  uint64_t* getTimes(int* num_vals);
+
   // Start processing elements from the input queue. 
   void startWorker();
   
