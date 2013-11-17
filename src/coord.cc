@@ -124,12 +124,12 @@ void write_answers(ExperimentInfo* info, timespec time_taken) {
     output_file.close();
 }
 
-void write_latencies(Worker* worker, int num_values) {
+void write_latencies(Worker* worker) {
     ofstream output_file;
     output_file.open("latencies.txt", ios::out);
     
-    int empty;
-    uint64_t* times = worker->getTimes(&empty);
+    int num_values;
+    uint64_t* times = worker->getTimes(&num_values);
     num_values = num_values > 1000000? 1000000 : num_values;
     sort(times, times + num_values);
 
@@ -217,7 +217,7 @@ void run_experiment(ExperimentInfo* info) {
     timespec exec_time = wait(num_waits, sched, scheduler_output, store);
     std::cout << sched->numDone() << "\n";
     write_answers(info, exec_time);
-    write_latencies(worker, sched->numDone());
+    write_latencies(worker);
 }
 
 int

@@ -1,6 +1,6 @@
 #include "worker.h"
 #include "machine.h"
-
+#include "lazy_scheduler.h"
 
 // For the microbenchmarks, read the values of the records in the read set and 
 // then add the sum to each of the records in the writeset. 
@@ -55,6 +55,7 @@ void* Worker::workerFunction(void* arg) {
       (worker->m_txn_latencies)[i] = 0;
   }  
 
+  worker->m_num_values = 0;
   uint64_t num_done = 0;
   Action* action;
   while (true) {
@@ -63,15 +64,16 @@ void* Worker::workerFunction(void* arg) {
             to_proc->m_next = NULL;
 
             action = (Action*)(to_proc->m_data);
+            assert(action->state() == PROCESSING);
             volatile uint64_t start = rdtsc();
+
             ProcessAction(action, worker->m_records);
             volatile uint64_t end = rdtsc();
+            output_queue->Enqueue(to_proc);
             (worker->m_txn_latencies)[(worker->m_num_values) % 1000000] = 
                 end - start;
             worker->m_num_values += 1;
-            output_queue->Enqueue(to_proc);
 
-            //            std::cout << worker->m_num_values << "\n";
             /*
             volatile struct queue_elem* to_use = input_queue->Dequeue(true);
             to_use->m_next = NULL;

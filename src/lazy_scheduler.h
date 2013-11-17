@@ -22,19 +22,21 @@ struct Heuristic {
     int chain_length;
 };
 
+
+enum TxnState {
+    STICKY = 0,
+    ANALYZING = 1,
+    PROCESSING = 2,
+    SUBSTANTIATED = 3,
+};
+
+
 class LazyScheduler {
 
     volatile uint64_t m_run_flag;
     volatile uint64_t m_start_flag;    
     
     pthread_t m_scheduler_thread;
-
-    enum TxnState {
-        STICKY = 0,
-        ANALYZING = 1,
-        PROCESSING = 2,
-        SUBSTANTIATED = 3,
-    };
     
     set<Action*>* m_starts; 
     
