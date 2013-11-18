@@ -10,6 +10,8 @@
 #include <iostream>
 
 #include "util.h"
+#include "machine.h"
+
 
 #define CACHE_PAD 64
 #define PAD(t)								\
@@ -17,6 +19,8 @@
 	       t v;							\
 	       char __p[CACHE_PAD + (sizeof(t) / CACHE_PAD) * CACHE_PAD];	\
 	}
+
+
 
 
 // 
@@ -29,6 +33,61 @@ struct queue_elem {
   uint64_t m_data;						// Pointer to data (app specific).
   volatile struct queue_elem* m_next;
 } __attribute__((aligned(64)));
+
+
+class SimpleQueue {
+    uint64_t* m_values;
+    uint64_t m_size;
+    volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_head;    
+    volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_tail;    
+
+ public:
+    SimpleQueue(uint64_t* values, int size) {
+        m_values = values;
+        m_size = (uint64_t)size;
+        m_head = 0;
+        m_tail = 0;
+    }
+    
+    bool Enqueue(uint64_t data) {
+        if (m_head == m_tail + m_size) {
+            return false;
+        }
+        else {
+            int index = m_head & (m_size-1);
+            m_values[index] = data;
+            fetch_and_increment(&m_head);
+            return true;
+        }
+    }
+    
+    void EnqueueBlocking(uint64_t data) {
+        while (m_head == m_tail + m_size) 
+            ;
+        int index = m_head & (m_size - 1);
+        m_values[index] = data;
+        fetch_and_increment(&m_head);
+    }
+    
+    uint64_t DequeueBlocking() {
+        while (m_head == m_tail) 
+            ;
+        uint64_t ret = m_values[(m_tail % m_size)];
+        fetch_and_increment(&m_tail);
+        return ret;
+    }
+
+    bool Dequeue(uint64_t* value) {
+        if (m_head == m_tail) {
+            return false;
+        }
+        else {
+            *value = m_values[(m_tail % m_size)];
+            fetch_and_increment(&m_tail);
+            return true;
+        }
+    }
+};
 
 class ConcurrentQueue {
 

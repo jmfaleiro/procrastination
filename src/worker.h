@@ -11,11 +11,13 @@
 class Worker {
   
   // Queues with which to communicate with the coordinator thread. 
-  ConcurrentQueue* m_input_queue;
-  ConcurrentQueue* m_output_queue;
+  SimpleQueue* m_input_queue;
+  SimpleQueue* m_output_queue;
   
   uint64_t* m_txn_latencies;
   int m_num_values;
+
+  int m_queue_size;
 
   // The "database" of records. 
   // XXX: Switch this to something more generic for later on. 
@@ -35,8 +37,7 @@ class Worker {
   static void* workerFunction(void* arg);
 
  public:
-  Worker(ConcurrentQueue* input, 
-         ConcurrentQueue* output, 
+  Worker(int queue_size,
          cpu_set_t* binding_info,
          int* records);
   
@@ -50,7 +51,7 @@ class Worker {
   void stopWorker();
   
   // Start the worker thread. 
-  void startThread();
+  void startThread(SimpleQueue** input, SimpleQueue** output);
   
   // Wait for the newly allocated thread to signal before returning. 
   void waitForStart();

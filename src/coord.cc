@@ -42,14 +42,12 @@ timespec diff_time(timespec start, timespec end)
 int
 buildDependencies(WorkloadGenerator* generator,
                   int num_actions,
-                  ConcurrentQueue* input_queue,
-                  ElementStore* store) {
+                  SimpleQueue* input_queue) {
+
     int to_wait = 0;
     for (int i = 0; i < num_actions; ++i) {
         Action* gen = generator->genNext();
-        volatile struct queue_elem* to_use = store->getNew();
-        to_use->m_data = (uint64_t)gen;
-        input_queue->Enqueue(to_use);
+        input_queue->EnqueueBlocking((uint64_t)gen);
 
         if (gen->materialize()) {
             ++to_wait;
@@ -63,8 +61,8 @@ initWorkers(Worker** workers,
             int start_index, 
             int num_workers, 
             cpu_set_t* bindings,
-            ConcurrentQueue* input_queue,
-            ConcurrentQueue* output_queue,
+            SimpleQueue** input_queue,
+            SimpleQueue** output_queue,
             int num_records) {
     numa_set_strict(1);
     int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records);
@@ -80,11 +78,10 @@ initWorkers(Worker** workers,
 	CPU_SET(cpu_id, &bindings[i]);
 	
 	// Start the worker. 
-	workers[i] = new Worker(input_queue, 
-                                output_queue, 
+	workers[i] = new Worker(1 << 14,
                                 &bindings[i], 
                                 records);
-	workers[i]->startThread();	
+	workers[i]->startThread(&input_queue[i], &output_queue[i]);	
 	workers[i]->startWorker();
   }
 }
@@ -92,8 +89,8 @@ initWorkers(Worker** workers,
 // Returns the time elapsed in processing a given workload. 
 timespec wait(int num_waits, 
               LazyScheduler* sched,
-              ConcurrentQueue* scheduler_output,
-              ElementStore* store) {
+              SimpleQueue* scheduler_output) {
+         
     timespec start_time, end_time;
     sched->startScheduler();
     
@@ -101,18 +98,16 @@ timespec wait(int num_waits,
     clock_gettime(CLOCK_REALTIME, &start_time);    
 
     // Wait for all non-lazy transactions to finish. 
-    Action* done_txn;
     while (num_waits-- > 0) {
 
         // Wait for the scheduler to finish processing a txn. 
-        volatile struct queue_elem* recv = scheduler_output->Dequeue(true);
-        store->returnElem(recv);        
+        volatile uint64_t ptr;
+        ptr = scheduler_output->DequeueBlocking();        
     }
     
     // Measure the curren time and return the time elapsed.
-    clock_gettime(CLOCK_REALTIME, &end_time);        
     sched->waitFinished();
-    
+    clock_gettime(CLOCK_REALTIME, &end_time);            
     return diff_time(start_time, end_time);
 }
 
@@ -144,25 +139,37 @@ void write_latencies(Worker* worker) {
 }
 
 int initialize(ExperimentInfo* info, 
-               ConcurrentQueue** output,
+               SimpleQueue** output,
                LazyScheduler** scheduler,
-               ElementStore** store,
                Worker** worker) {
 
     init_cpuinfo();
+    numa_set_strict(1);
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(2, &my_binding);
-    *store = new ElementStore(20000000);
+    CPU_SET(11, &my_binding);
 
-    // Initialize queues for threads to talk to each other.
-    // For worker <==> scheduler interactions. 
-    ConcurrentQueue* worker_input = new ConcurrentQueue((*store)->getNew());
-    ConcurrentQueue* worker_output = new ConcurrentQueue((*store)->getNew());
-    
-    // For scheduler <==> client interactions.
-    ConcurrentQueue* scheduler_input = new ConcurrentQueue((*store)->getNew());
-    ConcurrentQueue* scheduler_output = new ConcurrentQueue((*store)->getNew());
+    SimpleQueue** worker_inputs = 
+        (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
+
+    SimpleQueue** worker_outputs = 
+        (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
+
+    // Data for input/output queues. 
+    uint64_t sched_size = (1 << 24);
+    uint64_t* sched_input_data = 
+        (uint64_t*)malloc(sizeof(uint64_t)*sched_size);
+    uint64_t* sched_output_data = 
+        (uint64_t*)malloc(sizeof(uint64_t)*sched_size);
+
+    assert(sched_input_data != NULL);
+    assert(sched_output_data != NULL);
+
+    // Create the queues. 
+    SimpleQueue* scheduler_input = 
+        new SimpleQueue(sched_input_data, sched_size);
+    SimpleQueue* scheduler_output = 
+        new SimpleQueue(sched_output_data, sched_size);
     
     // Create a workload generator and generate txns to process. 
     WorkloadGenerator* gen;
@@ -180,7 +187,7 @@ int initialize(ExperimentInfo* info,
                                    info->substantiate_period);
     }
     int waits = 
-        buildDependencies(gen, info->num_txns, scheduler_input, *store);
+        buildDependencies(gen, info->num_txns, scheduler_input);
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
@@ -188,15 +195,16 @@ int initialize(ExperimentInfo* info,
                 1,
                 info->num_workers, 
                 info->worker_bindings,
-                worker_input,
-                worker_output,
+                worker_inputs,
+                worker_outputs,
                 info->num_records);
     
     // Create a scheduler thread. 
-    *scheduler = new LazyScheduler(info->num_records, 
+    *scheduler = new LazyScheduler(info->num_workers, 
+                                   info->num_records, 
                                    info->substantiate_threshold,
-                                   worker_input,
-                                   worker_output,
+                                   worker_inputs,
+                                   worker_outputs,
                                    &info->scheduler_bindings[0],
                                    scheduler_input,
                                    scheduler_output);
@@ -208,13 +216,12 @@ int initialize(ExperimentInfo* info,
 
 
 void run_experiment(ExperimentInfo* info) {
-    ConcurrentQueue* scheduler_output;
+    SimpleQueue* scheduler_output;
     LazyScheduler* sched;
-    ElementStore* store;
     Worker* worker;
     int num_waits = 
-        initialize(info, &scheduler_output, &sched, &store, &worker);
-    timespec exec_time = wait(num_waits, sched, scheduler_output, store);
+        initialize(info, &scheduler_output, &sched, &worker);
+    timespec exec_time = wait(num_waits, sched, scheduler_output);
     std::cout << sched->numDone() << "\n";
     write_answers(info, exec_time);
     write_latencies(worker);

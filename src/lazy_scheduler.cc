@@ -32,17 +32,19 @@ LazyScheduler::depIndex(Action* action, int record, bool* is_write) {
 }
 
 
-LazyScheduler::LazyScheduler(uint64_t num_records, 
+LazyScheduler::LazyScheduler(int num_workers,
+                             int num_records, 
                              int max_chain,
-                             ConcurrentQueue* worker_input,
-                             ConcurrentQueue* worker_output,
+                             SimpleQueue** worker_inputs,
+                             SimpleQueue** worker_outputs,
                              cpu_set_t* binding_info,
-                             ConcurrentQueue* sched_input,
-                             ConcurrentQueue* sched_output) {
+                             SimpleQueue* sched_input,
+                             SimpleQueue* sched_output) {
 
-    m_worker_input = worker_input;
+    m_worker_input = worker_inputs;
+    m_num_workers = num_workers;
     
-  m_worker_output = worker_output;
+  m_worker_output = worker_outputs;
   m_binding_info = binding_info;
   m_log_input = sched_input;
   m_log_output = sched_output;
@@ -54,6 +56,7 @@ LazyScheduler::LazyScheduler(uint64_t num_records,
   m_num_txns = 0;
   
   m_max_chain = max_chain;
+  m_last_used = 0;
 }
 
 int LazyScheduler::getTimes(uint64_t** ret) {
@@ -82,49 +85,20 @@ void* LazyScheduler::schedulerFunction(void* arg) {
 
     xchgq(&(sched->m_start_flag), 1);
     
-    ConcurrentQueue* incoming_txns = sched->m_log_input;
-    ConcurrentQueue* done_txns = sched->m_worker_output;
-
-    Action* action = NULL;
+    SimpleQueue* incoming_txns = sched->m_log_input;
+        Action* action = NULL;
     while (true) {        
         if (sched->m_run_flag) {
-            
-            /*
-            if (incoming_txns->Pop(&action)) {
+            uint64_t to_process;
+            if (incoming_txns->Dequeue(&to_process)) {
+                action = (Action*)to_process;
                 sched->addGraph(action);
-            }
-            
-            while (done_txns->Pop(&action)) {
-                sched->finishTxn(action);
-                (sched->m_times)[(sched->m_times_ptr)++] = 
-                    action->end_time() - action->exec_start_time();
-            }
-            */
-
-
-            // First see if we have a new transaction to process.             
-            volatile struct queue_elem* new_input;
-            if ((new_input = incoming_txns->Dequeue(false)) != NULL) {
-                action = (Action*)(new_input->m_data);
-                sched->addGraph(action);
-
-                // Add new_input to the free list.
-                new_input->m_next = sched->m_free_elems;
-                sched->m_free_elems = new_input;
-                new_input->m_data = 0;
             }
             else if (sched->m_num_inflight == 0) {
                 xchgq(&(sched->m_start_flag), 0);
             }
             
-            volatile struct queue_elem* done_action;
-            while ((done_action = done_txns->Dequeue(false)) != NULL) {
-                action = (Action*)(done_action->m_data);
-                sched->store->returnElem(done_action);
-                sched->finishTxn(action);
-            }
-            
-
+            sched->cleanup_txns();
         }
     }
     return NULL;
@@ -262,12 +236,26 @@ void LazyScheduler::processWrite(Action* action,
     action->set_num_dependencies(cur_count + new_dependencies);
 }
 
+void LazyScheduler::cleanup_txns() {
+    for (int i = 0; i < m_num_workers; ++i) {
+        uint64_t done_ptr;
+        while (m_worker_output[i]->Dequeue(&done_ptr)) {
+            finishTxn((Action*)done_ptr);
+        }
+    }
+}
+
 void LazyScheduler::run_txn(Action* to_run) {
     assert(to_run->state() == ANALYZING);
     to_run->set_state(PROCESSING);
-    volatile struct queue_elem* to_enq = store->getNew();
-    to_enq->m_data = (uint64_t)to_run;
-    m_worker_input->Enqueue(to_enq);
+
+    while (true) {
+        m_last_used = (m_last_used + 1) % m_num_workers;
+        SimpleQueue* queue = m_worker_input[m_last_used];
+        if (queue->Enqueue((uint64_t)to_run)) {
+            break;
+        }
+    }
 }
 
 uint64_t LazyScheduler::substantiate(Action* start) {
@@ -370,14 +358,8 @@ void LazyScheduler::finishTxn(Action* action) {
     if (action->materialize()) {
         //        ++m_num_txns;
         //        std::cout << m_num_txns << "\n";
-        
-        // Grab an element from our free list of elements to use. 
-        volatile struct queue_elem* to_use = m_free_elems;
-        m_free_elems = m_free_elems->m_next;
-        to_use->m_data = (uint64_t)action;
-        to_use->m_next = NULL;
-
-        m_log_output->Enqueue(to_use);
+        bool done = m_log_output->Enqueue((uint64_t)action);
+        assert(done);
     }
 }
 

@@ -59,6 +59,9 @@ class LazyScheduler {
     
     int m_max_chain;
 
+    int m_num_workers;
+    int m_last_used;
+
   // Free list of struct queue_elems to use to communicate with workers. 
   ElementStore *store;
 
@@ -68,16 +71,16 @@ class LazyScheduler {
   vector<struct Heuristic>* m_last_txns;
 
   // Queue of actions to process.
-  ConcurrentQueue* m_worker_input;
+  SimpleQueue** m_worker_input;
 
   // Queue of completed actions. 
-  ConcurrentQueue* m_worker_output;
+  SimpleQueue** m_worker_output;
   
   // Queue from log.
-  ConcurrentQueue* m_log_input;
+  SimpleQueue* m_log_input;
 
   // Output queue for scheduer. 
-  ConcurrentQueue* m_log_output;
+  SimpleQueue* m_log_output;
   
   virtual void processWrite(Action* action, int index, deque<Action*>* queue);
   virtual void processRead(Action* action, int index, deque<Action*>* queue);
@@ -95,15 +98,18 @@ class LazyScheduler {
 
   // Scheduler thread function.
   static void* schedulerFunction(void* arg);
+
+  virtual void cleanup_txns();
   
 public:
-  LazyScheduler(uint64_t num_records, 
+  LazyScheduler(int num_workers, 
+                int num_records, 
                 int max_chain,
-                ConcurrentQueue* input,
-                ConcurrentQueue* output,
+                SimpleQueue** input,
+                SimpleQueue** output,
                 cpu_set_t* binding,
-                ConcurrentQueue* sched_input,
-                ConcurrentQueue* sched_output);
+                SimpleQueue* sched_input,
+                SimpleQueue* sched_output);
   
   virtual void waitFinished();
   
