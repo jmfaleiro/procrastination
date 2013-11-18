@@ -78,7 +78,7 @@ initWorkers(Worker** workers,
 	CPU_SET(cpu_id, &bindings[i]);
 	
 	// Start the worker. 
-	workers[i] = new Worker(1 << 14,
+	workers[i] = new Worker(1 << 24,
                                 &bindings[i], 
                                 records);
 	workers[i]->startThread(&input_queue[i], &output_queue[i]);	
@@ -96,18 +96,13 @@ timespec wait(int num_waits,
     
     // Start measuring time elapsed. 
     clock_gettime(CLOCK_REALTIME, &start_time);    
-
-    // Wait for all non-lazy transactions to finish. 
-    while (num_waits-- > 0) {
-
-        // Wait for the scheduler to finish processing a txn. 
-        volatile uint64_t ptr;
-        ptr = scheduler_output->DequeueBlocking();        
-    }
     
-    // Measure the curren time and return the time elapsed.
-    sched->waitFinished();
-    clock_gettime(CLOCK_REALTIME, &end_time);            
+    uint64_t to_wait = sched->waitFinished();
+    while (to_wait-- > 0) {
+        volatile uint64_t ptr;
+        ptr = scheduler_output->DequeueBlocking();
+    }    
+    clock_gettime(CLOCK_REALTIME, &end_time);    
     return diff_time(start_time, end_time);
 }
 
@@ -147,7 +142,7 @@ int initialize(ExperimentInfo* info,
     numa_set_strict(1);
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(11, &my_binding);
+    CPU_SET(2, &my_binding);
 
     SimpleQueue** worker_inputs = 
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
@@ -158,9 +153,9 @@ int initialize(ExperimentInfo* info,
     // Data for input/output queues. 
     uint64_t sched_size = (1 << 24);
     uint64_t* sched_input_data = 
-        (uint64_t*)malloc(sizeof(uint64_t)*sched_size);
+        (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
     uint64_t* sched_output_data = 
-        (uint64_t*)malloc(sizeof(uint64_t)*sched_size);
+        (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
 
     assert(sched_input_data != NULL);
     assert(sched_output_data != NULL);
@@ -168,8 +163,6 @@ int initialize(ExperimentInfo* info,
     // Create the queues. 
     SimpleQueue* scheduler_input = 
         new SimpleQueue(sched_input_data, sched_size);
-    SimpleQueue* scheduler_output = 
-        new SimpleQueue(sched_output_data, sched_size);
     
     // Create a workload generator and generate txns to process. 
     WorkloadGenerator* gen;
@@ -204,13 +197,14 @@ int initialize(ExperimentInfo* info,
                                    info->num_records, 
                                    info->substantiate_threshold,
                                    worker_inputs,
-                                   worker_outputs,
+                                   NULL,
                                    &info->scheduler_bindings[0],
                                    scheduler_input,
-                                   scheduler_output);
+                                   NULL);
+
     (*scheduler)->startThread();
     *worker = workers[0];
-    *output = scheduler_output;
+    *output = worker_outputs[0];
     return waits;
 }
 

@@ -19,6 +19,8 @@ using namespace std;
 
 struct Heuristic {
     Action* last_txn;
+    int index;
+    bool is_write;
     int chain_length;
 };
 
@@ -82,8 +84,8 @@ class LazyScheduler {
   // Output queue for scheduer. 
   SimpleQueue* m_log_output;
   
-  virtual void processWrite(Action* action, int index, deque<Action*>* queue);
-  virtual void processRead(Action* action, int index, deque<Action*>* queue);
+  virtual void processWrite(Action* action, int index);
+  virtual void processRead(Action* action, int index);
 
   virtual int depIndex(Action* action, int record, bool* is_write);
   
@@ -111,7 +113,7 @@ public:
                 SimpleQueue* sched_input,
                 SimpleQueue* sched_output);
   
-  virtual void waitFinished();
+  virtual uint64_t waitFinished();
   
   // Add the action to the dependency graph. We add dependencies on the 
   // actions it depends on, and also update the m_last_txns table. 

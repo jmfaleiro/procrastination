@@ -75,14 +75,18 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     sched->store = new ElementStore(1000000);
     sched->m_last_txns = 
         new vector<struct Heuristic>(sched->m_num_records, empty);
+
     for (int i = 0; i < sched->m_num_records; ++i) {
         (*(sched->m_last_txns))[i].last_txn = NULL;
         (*(sched->m_last_txns))[i].chain_length = 0;
+        (*(sched->m_last_txns))[i].index = 0;
+        (*(sched->m_last_txns))[i].is_write = false;
     }
 
     sched->m_times = new uint64_t[1000000];
     sched->m_times_ptr = 0;
 
+    sched->m_num_txns = 0;
     xchgq(&(sched->m_start_flag), 1);
     
     SimpleQueue* incoming_txns = sched->m_log_input;
@@ -94,11 +98,9 @@ void* LazyScheduler::schedulerFunction(void* arg) {
                 action = (Action*)to_process;
                 sched->addGraph(action);
             }
-            else if (sched->m_num_inflight == 0) {
+            else {
                 xchgq(&(sched->m_start_flag), 0);
-            }
-            
-            sched->cleanup_txns();
+            }            
         }
     }
     return NULL;
@@ -106,6 +108,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
 
 // Add the given action to the dependency graph. 
 void LazyScheduler::addGraph(Action* action) {
+
     action->set_state(STICKY);
 
     // Iterate through this action's read set and write set, find the 
@@ -113,127 +116,115 @@ void LazyScheduler::addGraph(Action* action) {
     int num_reads = action->readset_size();
     int num_writes = action->writeset_size();
 
-  // Go through the read set. 
-    bool force_materialize = action->materialize();
-  for (int i = 0; i < num_reads; ++i) {
-    int record = action->readset(i);
-    Action* last_txn = (*m_last_txns)[record].last_txn;
-    action->add_read_deps((uint64_t)last_txn);
-    (*m_last_txns)[record].last_txn = action;
-    
-    // Increment the length of the chain corresponding to this record, check if 
-    // it exceeds our threshold value. 
-    (*m_last_txns)[record].chain_length += 1;
-    force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;
+    // Go through the read set. 
+    bool force_materialize = false;
+    for (int i = 0; i < num_reads; ++i) {
+        int record = action->readset(i);
+
+        // Keep the information about the previous txn around. 
+        action->add_read_deps((uint64_t)(*m_last_txns)[record].last_txn);
+        action->add_read_indices((*m_last_txns)[record].index);
+        action->add_read_dep_types((*m_last_txns)[record].is_write);
+
+        // Update the heuristic information. 
+        (*m_last_txns)[record].last_txn = action;
+        (*m_last_txns)[record].index = i;
+        (*m_last_txns)[record].is_write = false;
+        
+        // Increment the length of the chain corresponding to this record, 
+        // check if it exceeds our threshold value. 
+        (*m_last_txns)[record].chain_length = 
+            (1 + (*m_last_txns)[record].chain_length) % m_max_chain;
+        force_materialize |= 
+            ((*m_last_txns)[record].chain_length == 0);
   }
 
   // Go through the write set. 
   for (int i = 0; i < num_writes; ++i) {
     int record = action->writeset(i);    
-    Action* last_txn = (*m_last_txns)[record].last_txn;
-    action->add_write_deps((uint64_t)last_txn);
+
+    // Keep the information about the previous txn around. 
+    action->add_write_deps((uint64_t)(*m_last_txns)[record].last_txn);
+    action->add_write_indices((*m_last_txns)[record].index);
+    action->add_write_dep_types((*m_last_txns)[record].is_write);
+
+    // Update the heuristic information. 
     (*m_last_txns)[record].last_txn = action;
+    (*m_last_txns)[record].index = i;
+    (*m_last_txns)[record].is_write = true;
 
     // Increment the length of the chain corresponding to this record, check if 
     // it exceeds our threshold value. 
-    (*m_last_txns)[record].chain_length += 1;
-    force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;    
+    (*m_last_txns)[record].chain_length = 
+        (1 + (*m_last_txns)[record].chain_length) % m_max_chain;
+    force_materialize |= 
+        ((*m_last_txns)[record].chain_length == 0);
   }  
-
-  if (action->materialize() || force_materialize) {
-      //      ++m_num_txns;
-      //      action->set_start_time(rdtsc());
+  
+  if (action->materialize() || force_materialize) {      
       substantiate(action);
   }
 }
 
 void LazyScheduler::processRead(Action* action, 
-                                int readIndex, 
-                                deque<Action*>* queue) {
-    assert(action->state() == ANALYZING);
-    assert(readIndex < action->readset_size());
-    assert(readIndex < action->read_deps_size());
-
-    int num_dependencies = 0;
+                                int readIndex) {
+     
+    assert(action->state() == STICKY);
     
     int record = action->readset(readIndex);
     Action* prev = (Action*)(action->read_deps(readIndex));
+    int index = action->read_indices(readIndex);
+    bool is_write = action->read_dep_types(readIndex);
 
     while (prev != NULL) {
-        Action* start = prev;
-        bool is_write;
-        int index = depIndex(prev, record, &is_write);
 
         if (prev->state() == SUBSTANTIATED) {
             prev = NULL;
         }
         else if (is_write) {
-            assert(prev->writeset(index) == record);
             
             // Start processing the dependency. 
             if (prev->state() == STICKY) {
-                prev->set_state(ANALYZING);
-                queue->push_back(prev);
+                substantiate(prev);
             }
 
-            // Add a dependency. 
-            num_dependencies += 1;
-            prev->add_dependents((uint64_t)action);
-            
             // We can end since this is a write. 
             prev = NULL;
         }
         else {
-            assert(prev->readset(index) == record);
             prev = (Action*)(prev->read_deps(index));
+            is_write = prev->read_dep_types(index);
+            index = prev->read_indices(index);
         }
-        assert(start != prev);
     }
-    assert(num_dependencies == 0 || num_dependencies == 1);
-
-    // Update the number of dependencies. 
-    int count = action->num_dependencies();
-    count += num_dependencies;
-    action->set_num_dependencies(count);
 }
 
 // We break if prev is NULL, or if it is a write
 void LazyScheduler::processWrite(Action* action, 
-                                 int writeIndex,
-                                 deque<Action*>* queue) {
-    assert(action->state() == ANALYZING);
-    assert(writeIndex < action->writeset_size());
-    assert(writeIndex < action->write_deps_size());
-
-    int new_dependencies = 0;
+                                 int writeIndex) {
+                                
+    assert(action->state() == STICKY);
     
     // Get the record and txn this action is dependent on. 
     int record = action->writeset(writeIndex);
     Action* prev = (Action*)action->write_deps(writeIndex);
-    bool read_done = false;
+    bool is_write = action->write_dep_types(writeIndex);
+    int index = action->write_indices(writeIndex);
 
     while (prev != NULL) {
         if (prev->state() != SUBSTANTIATED) {
-            if (prev->state() == STICKY) {
-                prev->set_state(ANALYZING);
-                queue->push_back(prev);
-            }
-            prev->add_dependents((uint64_t)action);
-            new_dependencies += 1;
+            substantiate(prev);
         }
 
-        bool is_write = false;
-        int index = depIndex(prev, record, &is_write);
         if (is_write) {
             prev = NULL;
         }
         else {
             prev = (Action*)(prev->read_deps(index));
+            is_write = prev->read_dep_types(index);
+            index = prev->read_indices(index);
         }
     }
-    
-    int cur_count = action->num_dependencies();
-    action->set_num_dependencies(cur_count + new_dependencies);
 }
 
 void LazyScheduler::cleanup_txns() {
@@ -246,65 +237,28 @@ void LazyScheduler::cleanup_txns() {
 }
 
 void LazyScheduler::run_txn(Action* to_run) {
-    assert(to_run->state() == ANALYZING);
-    to_run->set_state(PROCESSING);
-
-    while (true) {
-        m_last_used = (m_last_used + 1) % m_num_workers;
-        SimpleQueue* queue = m_worker_input[m_last_used];
-        if (queue->Enqueue((uint64_t)to_run)) {
-            break;
-        }
-    }
+    assert(to_run->state() == SUBSTANTIATED);
+    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
+    assert(done);
+    ++m_num_txns;
 }
 
-uint64_t LazyScheduler::substantiate(Action* start) {
-    uint64_t size_closure = 0;
-    
+uint64_t LazyScheduler::substantiate(Action* start) {    
     assert(start->state() == STICKY);
+    int num_reads = start->readset_size();
+    int num_writes = start->writeset_size();
 
-    // Use the search_queue variable to keep track of the list of unprocessed
-    // transactions. First start with the single root we've been asked to 
-    // process.
-    start->set_state(ANALYZING);  
-    deque<Action*> to_analyze;
-    to_analyze.push_front(start);
-    
-  // Iterate throught the search queue until there's nothing more to process 
-  while (!to_analyze.empty()) {
-      Action* action = to_analyze.front();
-      to_analyze.pop_front();
-      
-      // Make sure we've never seen this transaction before. 
-      assert(action->state() == ANALYZING);
-      assert(!action->has_num_dependencies());
-      action->set_num_dependencies(0);
-      size_closure += 1;
-
-    // For each read dependency, get to the last transaction
-    // to write the record which corresponds to this dependency. 
-    int num_reads = action->readset_size();
-    int num_writes = action->writeset_size();
     for (int i = 0; i < num_reads; ++i) {
-        processRead(action, i, &to_analyze);
+        processRead(start, i);
     }
     for (int i = 0; i < num_writes; ++i) {
-        processWrite(action, i, &to_analyze);
+        processWrite(start, i);
     }
-    
-    // Safe to run the action if it doesn't have any dependencies. 
-    if (action->num_dependencies() == 0) {
-        ++m_num_inflight;
-        action->set_exec_start_time(rdtsc());
-        run_txn(action);
-    }
-    else {
-        ++m_num_waiting;
-    }
-  }
-  start->set_closure(size_closure);
-  return 0;
+    start->set_state(SUBSTANTIATED);
+    run_txn(start);
+    return 0;
 }
+
 
 int LazyScheduler::numDone() {
     return m_num_txns;
@@ -312,55 +266,7 @@ int LazyScheduler::numDone() {
 
 // Mark the dependents as having completed. 
 void LazyScheduler::finishTxn(Action* action) {
-    if (action->state() != PROCESSING) {
-        std::cout << action->state() << "\n";
-    }
-    assert(action->state() == PROCESSING);
-    assert(m_num_inflight > 0);
-    
-    // Do some bookkeeping. 
-    ++m_num_txns;
-    action->set_state(SUBSTANTIATED); 
-    action->set_end_time(rdtsc());
-    m_num_inflight -= 1;
-
-    // Each dependent now has one less dependency. 
-    int num_deps = action->dependents_size();
-    for (int i = 0; i < num_deps; ++i) {
-        Action* dep = (Action*)action->dependents(i);        
-        int old_value = dep->num_dependencies();
-        dep->set_num_dependencies(old_value - 1);
-        
-        // Check if it's ready to run. 
-        if (old_value == 1) {
-            action->set_exec_start_time(rdtsc());
-            run_txn(dep);
-            m_num_waiting -= 1;
-            m_num_inflight += 1;
-        }
-    }
-
-    // If there are no more inflight txns, there can be no more waiters!
-    assert((m_num_inflight != 0) || (m_num_waiting == 0));
-    
-    int num_reads = action->readset_size();
-    int num_writes = action->writeset_size();
-    for (int i = 0; i < num_reads; ++i) {
-        int record = action->readset(i);        
-        (*m_last_txns)[record].chain_length -= 1;
-    }
-    for (int i = 0; i < num_writes; ++i) {
-        int record = action->writeset(i);        
-        (*m_last_txns)[record].chain_length -= 1;
-    }
-
-    // If this was a forced materialization, communicate it with the client. x
-    if (action->materialize()) {
-        //        ++m_num_txns;
-        //        std::cout << m_num_txns << "\n";
-        bool done = m_log_output->Enqueue((uint64_t)action);
-        assert(done);
-    }
+    assert(false);
 }
 
 void 
@@ -373,10 +279,11 @@ LazyScheduler::stopScheduler() {
   xchgq(&m_run_flag, 0);
 }
 
-void
+uint64_t
 LazyScheduler::waitFinished() {
     while (m_start_flag == 1)
         ;
+    return m_num_txns;
 }
 
 void

@@ -50,39 +50,53 @@ class SimpleQueue {
     }
     
     bool Enqueue(uint64_t data) {
+        assert(m_head >= m_tail);
         if (m_head == m_tail + m_size) {
             return false;
         }
         else {
-            int index = m_head & (m_size-1);
-            m_values[index] = data;
+            uint64_t index = m_head & (m_size-1);
+            assert(index < m_size);
+            
+            m_values[index*CACHE_LINE] = data;
             fetch_and_increment(&m_head);
             return true;
         }
     }
     
     void EnqueueBlocking(uint64_t data) {
+        assert(m_head >= m_tail);
         while (m_head == m_tail + m_size) 
             ;
-        int index = m_head & (m_size - 1);
-        m_values[index] = data;
+        uint64_t index = m_head & (m_size - 1);
+        assert(index < m_size);
+        assert(index <= ((m_size - 1) << 6));
+        m_values[index*CACHE_LINE] = data;
         fetch_and_increment(&m_head);
     }
     
     uint64_t DequeueBlocking() {
+        assert(m_head >= m_tail);
         while (m_head == m_tail) 
             ;
-        uint64_t ret = m_values[(m_tail % m_size)];
+        uint64_t index = m_tail & (m_size - 1);
+        assert(index < m_size);
+        assert(index <= ((m_size - 1) << 6));
+        uint64_t ret = m_values[index*CACHE_LINE];
         fetch_and_increment(&m_tail);
         return ret;
     }
 
     bool Dequeue(uint64_t* value) {
+        assert(m_head >= m_tail);
         if (m_head == m_tail) {
             return false;
         }
         else {
-            *value = m_values[(m_tail % m_size)];
+            uint64_t index = m_tail & (m_size - 1);            
+            assert(index < m_size);
+            assert(index <= ((m_size - 1) << 6));
+            *value = m_values[index*CACHE_LINE];
             fetch_and_increment(&m_tail);
             return true;
         }

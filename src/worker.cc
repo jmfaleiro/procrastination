@@ -44,15 +44,15 @@ void* Worker::workerFunction(void* arg) {
   // Initialize the input and output queues. 
   int size = worker->m_queue_size;
   uint64_t* input_queue_data = 
-      (uint64_t*)numa_alloc_local(sizeof(uint64_t)*size);
+      (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
   uint64_t* output_queue_data = 
-      (uint64_t*)numa_alloc_local(sizeof(uint64_t)*size);
+      (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
   
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
-  
-  memset(input_queue_data, 0, sizeof(uint64_t) * size);
-  memset(output_queue_data, 0, sizeof(uint64_t) * size);
+
+  memset(input_queue_data, 0, (size));
+  memset(output_queue_data, 0, (size));
 
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
@@ -85,11 +85,11 @@ void* Worker::workerFunction(void* arg) {
             volatile uint64_t start = rdtsc();
             ProcessAction(action, worker->m_records);
             volatile uint64_t end = rdtsc();
-            
-            output_queue->EnqueueBlocking(ptr);
             (worker->m_txn_latencies)[(worker->m_num_values) % 1000000] = 
                 end - start;
             worker->m_num_values += 1;
+            
+            output_queue->EnqueueBlocking(ptr);
 
             /*
             volatile struct queue_elem* to_use = input_queue->Dequeue(true);

@@ -29,29 +29,16 @@ void protobuf_AssignDesc_action_5fint_2eproto() {
       "action_int.proto");
   GOOGLE_CHECK(file != NULL);
   Action_descriptor_ = file->message_type(0);
-  static const int Action_offsets_[23] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, client_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, client_action_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, substantiated_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, backend_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, action_type_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, read_only_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, input_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, output_),
+  static const int Action_offsets_[10] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, readset_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, writeset_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, version_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, disallow_lazy_scheduling_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, state_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, closure_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, start_time_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, exec_start_time_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, end_time_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, delayed_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, read_deps_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, read_indices_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, read_dep_types_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, write_deps_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, dependents_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, num_dependencies_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, write_indices_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, write_dep_types_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Action, materialize_),
   };
   Action_reflection_ =
@@ -95,19 +82,12 @@ void protobuf_AddDesc_action_5fint_2eproto() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-    "\n\020action_int.proto\"\337\003\n\006Action\022\016\n\006client\030"
-    "\001 \001(\t\022\030\n\020client_action_id\030\002 \001(\t\022\025\n\rsubst"
-    "antiated\030\003 \001(\010\022\017\n\007backend\030\013 \001(\t\022\023\n\013actio"
-    "n_type\030\014 \001(\t\022\030\n\tread_only\030\r \001(\010:\005false\022\r"
-    "\n\005input\030\016 \001(\014\022\016\n\006output\030\017 \001(\014\022\017\n\007readset"
-    "\030\025 \003(\005\022\020\n\010writeset\030\026 \003(\005\022\017\n\007version\030\037 \001("
-    "\004\022\'\n\030disallow_lazy_scheduling\030) \001(\010:\005fal"
-    "se\022\r\n\005state\030* \001(\005\022\017\n\007closure\030+ \001(\004\022\022\n\nst"
-    "art_time\030, \001(\004\022\027\n\017exec_start_time\030- \001(\004\022"
-    "\020\n\010end_time\030. \001(\004\022\017\n\007delayed\030/ \001(\010\022\021\n\tre"
-    "ad_deps\0303 \003(\004\022\022\n\nwrite_deps\0304 \003(\004\022\022\n\ndep"
-    "endents\0305 \003(\004\022\030\n\020num_dependencies\0306 \001(\005\022"
-    "\023\n\013materialize\0307 \001(\010", 500);
+    "\n\020action_int.proto\"\324\001\n\006Action\022\017\n\007readset"
+    "\030\001 \003(\005\022\020\n\010writeset\030\002 \003(\005\022\r\n\005state\030\003 \001(\005\022"
+    "\021\n\tread_deps\030\004 \003(\004\022\024\n\014read_indices\030\005 \003(\005"
+    "\022\026\n\016read_dep_types\030\006 \003(\010\022\022\n\nwrite_deps\030\007"
+    " \003(\004\022\025\n\rwrite_indices\030\010 \003(\005\022\027\n\017write_dep"
+    "_types\030\t \003(\010\022\023\n\013materialize\030\n \001(\010", 233);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "action_int.proto", &protobuf_RegisterTypes);
   Action::default_instance_ = new Action();
@@ -126,28 +106,15 @@ struct StaticDescriptorInitializer_action_5fint_2eproto {
 // ===================================================================
 
 #ifndef _MSC_VER
-const int Action::kClientFieldNumber;
-const int Action::kClientActionIdFieldNumber;
-const int Action::kSubstantiatedFieldNumber;
-const int Action::kBackendFieldNumber;
-const int Action::kActionTypeFieldNumber;
-const int Action::kReadOnlyFieldNumber;
-const int Action::kInputFieldNumber;
-const int Action::kOutputFieldNumber;
 const int Action::kReadsetFieldNumber;
 const int Action::kWritesetFieldNumber;
-const int Action::kVersionFieldNumber;
-const int Action::kDisallowLazySchedulingFieldNumber;
 const int Action::kStateFieldNumber;
-const int Action::kClosureFieldNumber;
-const int Action::kStartTimeFieldNumber;
-const int Action::kExecStartTimeFieldNumber;
-const int Action::kEndTimeFieldNumber;
-const int Action::kDelayedFieldNumber;
 const int Action::kReadDepsFieldNumber;
+const int Action::kReadIndicesFieldNumber;
+const int Action::kReadDepTypesFieldNumber;
 const int Action::kWriteDepsFieldNumber;
-const int Action::kDependentsFieldNumber;
-const int Action::kNumDependenciesFieldNumber;
+const int Action::kWriteIndicesFieldNumber;
+const int Action::kWriteDepTypesFieldNumber;
 const int Action::kMaterializeFieldNumber;
 #endif  // !_MSC_VER
 
@@ -167,23 +134,7 @@ Action::Action(const Action& from)
 
 void Action::SharedCtor() {
   _cached_size_ = 0;
-  client_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  client_action_id_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  substantiated_ = false;
-  backend_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  action_type_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  read_only_ = false;
-  input_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  output_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  version_ = GOOGLE_ULONGLONG(0);
-  disallow_lazy_scheduling_ = false;
   state_ = 0;
-  closure_ = GOOGLE_ULONGLONG(0);
-  start_time_ = GOOGLE_ULONGLONG(0);
-  exec_start_time_ = GOOGLE_ULONGLONG(0);
-  end_time_ = GOOGLE_ULONGLONG(0);
-  delayed_ = false;
-  num_dependencies_ = 0;
   materialize_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -193,24 +144,6 @@ Action::~Action() {
 }
 
 void Action::SharedDtor() {
-  if (client_ != &::google::protobuf::internal::kEmptyString) {
-    delete client_;
-  }
-  if (client_action_id_ != &::google::protobuf::internal::kEmptyString) {
-    delete client_action_id_;
-  }
-  if (backend_ != &::google::protobuf::internal::kEmptyString) {
-    delete backend_;
-  }
-  if (action_type_ != &::google::protobuf::internal::kEmptyString) {
-    delete action_type_;
-  }
-  if (input_ != &::google::protobuf::internal::kEmptyString) {
-    delete input_;
-  }
-  if (output_ != &::google::protobuf::internal::kEmptyString) {
-    delete output_;
-  }
   if (this != default_instance_) {
   }
 }
@@ -236,59 +169,20 @@ Action* Action::New() const {
 }
 
 void Action::Clear() {
-  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (has_client()) {
-      if (client_ != &::google::protobuf::internal::kEmptyString) {
-        client_->clear();
-      }
-    }
-    if (has_client_action_id()) {
-      if (client_action_id_ != &::google::protobuf::internal::kEmptyString) {
-        client_action_id_->clear();
-      }
-    }
-    substantiated_ = false;
-    if (has_backend()) {
-      if (backend_ != &::google::protobuf::internal::kEmptyString) {
-        backend_->clear();
-      }
-    }
-    if (has_action_type()) {
-      if (action_type_ != &::google::protobuf::internal::kEmptyString) {
-        action_type_->clear();
-      }
-    }
-    read_only_ = false;
-    if (has_input()) {
-      if (input_ != &::google::protobuf::internal::kEmptyString) {
-        input_->clear();
-      }
-    }
-    if (has_output()) {
-      if (output_ != &::google::protobuf::internal::kEmptyString) {
-        output_->clear();
-      }
-    }
-  }
-  if (_has_bits_[10 / 32] & (0xffu << (10 % 32))) {
-    version_ = GOOGLE_ULONGLONG(0);
-    disallow_lazy_scheduling_ = false;
+  if (_has_bits_[2 / 32] & (0xffu << (2 % 32))) {
     state_ = 0;
-    closure_ = GOOGLE_ULONGLONG(0);
-    start_time_ = GOOGLE_ULONGLONG(0);
-    exec_start_time_ = GOOGLE_ULONGLONG(0);
   }
-  if (_has_bits_[16 / 32] & (0xffu << (16 % 32))) {
-    end_time_ = GOOGLE_ULONGLONG(0);
-    delayed_ = false;
-    num_dependencies_ = 0;
+  if (_has_bits_[9 / 32] & (0xffu << (9 % 32))) {
     materialize_ = false;
   }
   readset_.Clear();
   writeset_.Clear();
   read_deps_.Clear();
+  read_indices_.Clear();
+  read_dep_types_.Clear();
   write_deps_.Clear();
-  dependents_.Clear();
+  write_indices_.Clear();
+  write_dep_types_.Clear();
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
 }
@@ -299,141 +193,14 @@ bool Action::MergePartialFromCodedStream(
   ::google::protobuf::uint32 tag;
   while ((tag = input->ReadTag()) != 0) {
     switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
-      // optional string client = 1;
+      // repeated int32 readset = 1;
       case 1: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_client()));
-          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-            this->client().data(), this->client().length(),
-            ::google::protobuf::internal::WireFormat::PARSE);
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(18)) goto parse_client_action_id;
-        break;
-      }
-      
-      // optional string client_action_id = 2;
-      case 2: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_client_action_id:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_client_action_id()));
-          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-            this->client_action_id().data(), this->client_action_id().length(),
-            ::google::protobuf::internal::WireFormat::PARSE);
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(24)) goto parse_substantiated;
-        break;
-      }
-      
-      // optional bool substantiated = 3;
-      case 3: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_substantiated:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
-                 input, &substantiated_)));
-          set_has_substantiated();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(90)) goto parse_backend;
-        break;
-      }
-      
-      // optional string backend = 11;
-      case 11: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_backend:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_backend()));
-          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-            this->backend().data(), this->backend().length(),
-            ::google::protobuf::internal::WireFormat::PARSE);
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(98)) goto parse_action_type;
-        break;
-      }
-      
-      // optional string action_type = 12;
-      case 12: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_action_type:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_action_type()));
-          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-            this->action_type().data(), this->action_type().length(),
-            ::google::protobuf::internal::WireFormat::PARSE);
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(104)) goto parse_read_only;
-        break;
-      }
-      
-      // optional bool read_only = 13 [default = false];
-      case 13: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_read_only:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
-                 input, &read_only_)));
-          set_has_read_only();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(114)) goto parse_input;
-        break;
-      }
-      
-      // optional bytes input = 14;
-      case 14: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_input:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
-                input, this->mutable_input()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(122)) goto parse_output;
-        break;
-      }
-      
-      // optional bytes output = 15;
-      case 15: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_output:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
-                input, this->mutable_output()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(168)) goto parse_readset;
-        break;
-      }
-      
-      // repeated int32 readset = 21;
-      case 21: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_readset:
           DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
                    ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
-                 2, 168, input, this->mutable_readset())));
+                 1, 8, input, this->mutable_readset())));
         } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
                    == ::google::protobuf::internal::WireFormatLite::
                       WIRETYPE_LENGTH_DELIMITED) {
@@ -443,19 +210,19 @@ bool Action::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(168)) goto parse_readset;
-        if (input->ExpectTag(176)) goto parse_writeset;
+        if (input->ExpectTag(8)) goto parse_readset;
+        if (input->ExpectTag(16)) goto parse_writeset;
         break;
       }
       
-      // repeated int32 writeset = 22;
-      case 22: {
+      // repeated int32 writeset = 2;
+      case 2: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_writeset:
           DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
                    ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
-                 2, 176, input, this->mutable_writeset())));
+                 1, 16, input, this->mutable_writeset())));
         } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
                    == ::google::protobuf::internal::WireFormatLite::
                       WIRETYPE_LENGTH_DELIMITED) {
@@ -465,45 +232,13 @@ bool Action::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(176)) goto parse_writeset;
-        if (input->ExpectTag(248)) goto parse_version;
+        if (input->ExpectTag(16)) goto parse_writeset;
+        if (input->ExpectTag(24)) goto parse_state;
         break;
       }
       
-      // optional uint64 version = 31;
-      case 31: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_version:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, &version_)));
-          set_has_version();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(328)) goto parse_disallow_lazy_scheduling;
-        break;
-      }
-      
-      // optional bool disallow_lazy_scheduling = 41 [default = false];
-      case 41: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_disallow_lazy_scheduling:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
-                 input, &disallow_lazy_scheduling_)));
-          set_has_disallow_lazy_scheduling();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(336)) goto parse_state;
-        break;
-      }
-      
-      // optional int32 state = 42;
-      case 42: {
+      // optional int32 state = 3;
+      case 3: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_state:
@@ -514,98 +249,18 @@ bool Action::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(344)) goto parse_closure;
+        if (input->ExpectTag(32)) goto parse_read_deps;
         break;
       }
       
-      // optional uint64 closure = 43;
-      case 43: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_closure:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, &closure_)));
-          set_has_closure();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(352)) goto parse_start_time;
-        break;
-      }
-      
-      // optional uint64 start_time = 44;
-      case 44: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_start_time:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, &start_time_)));
-          set_has_start_time();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(360)) goto parse_exec_start_time;
-        break;
-      }
-      
-      // optional uint64 exec_start_time = 45;
-      case 45: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_exec_start_time:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, &exec_start_time_)));
-          set_has_exec_start_time();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(368)) goto parse_end_time;
-        break;
-      }
-      
-      // optional uint64 end_time = 46;
-      case 46: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_end_time:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, &end_time_)));
-          set_has_end_time();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(376)) goto parse_delayed;
-        break;
-      }
-      
-      // optional bool delayed = 47;
-      case 47: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_delayed:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
-                 input, &delayed_)));
-          set_has_delayed();
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(408)) goto parse_read_deps;
-        break;
-      }
-      
-      // repeated uint64 read_deps = 51;
-      case 51: {
+      // repeated uint64 read_deps = 4;
+      case 4: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_read_deps:
           DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
                    ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 2, 408, input, this->mutable_read_deps())));
+                 1, 32, input, this->mutable_read_deps())));
         } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
                    == ::google::protobuf::internal::WireFormatLite::
                       WIRETYPE_LENGTH_DELIMITED) {
@@ -615,19 +270,63 @@ bool Action::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(408)) goto parse_read_deps;
-        if (input->ExpectTag(416)) goto parse_write_deps;
+        if (input->ExpectTag(32)) goto parse_read_deps;
+        if (input->ExpectTag(40)) goto parse_read_indices;
         break;
       }
       
-      // repeated uint64 write_deps = 52;
-      case 52: {
+      // repeated int32 read_indices = 5;
+      case 5: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_read_indices:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 1, 40, input, this->mutable_read_indices())));
+        } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
+                   == ::google::protobuf::internal::WireFormatLite::
+                      WIRETYPE_LENGTH_DELIMITED) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 input, this->mutable_read_indices())));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(40)) goto parse_read_indices;
+        if (input->ExpectTag(48)) goto parse_read_dep_types;
+        break;
+      }
+      
+      // repeated bool read_dep_types = 6;
+      case 6: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_read_dep_types:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 1, 48, input, this->mutable_read_dep_types())));
+        } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
+                   == ::google::protobuf::internal::WireFormatLite::
+                      WIRETYPE_LENGTH_DELIMITED) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 input, this->mutable_read_dep_types())));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(48)) goto parse_read_dep_types;
+        if (input->ExpectTag(56)) goto parse_write_deps;
+        break;
+      }
+      
+      // repeated uint64 write_deps = 7;
+      case 7: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_write_deps:
           DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
                    ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 2, 416, input, this->mutable_write_deps())));
+                 1, 56, input, this->mutable_write_deps())));
         } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
                    == ::google::protobuf::internal::WireFormatLite::
                       WIRETYPE_LENGTH_DELIMITED) {
@@ -637,51 +336,57 @@ bool Action::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(416)) goto parse_write_deps;
-        if (input->ExpectTag(424)) goto parse_dependents;
+        if (input->ExpectTag(56)) goto parse_write_deps;
+        if (input->ExpectTag(64)) goto parse_write_indices;
         break;
       }
       
-      // repeated uint64 dependents = 53;
-      case 53: {
+      // repeated int32 write_indices = 8;
+      case 8: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_dependents:
+         parse_write_indices:
           DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 2, 424, input, this->mutable_dependents())));
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 1, 64, input, this->mutable_write_indices())));
         } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
                    == ::google::protobuf::internal::WireFormatLite::
                       WIRETYPE_LENGTH_DELIMITED) {
           DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
-                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
-                 input, this->mutable_dependents())));
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 input, this->mutable_write_indices())));
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(424)) goto parse_dependents;
-        if (input->ExpectTag(432)) goto parse_num_dependencies;
+        if (input->ExpectTag(64)) goto parse_write_indices;
+        if (input->ExpectTag(72)) goto parse_write_dep_types;
         break;
       }
       
-      // optional int32 num_dependencies = 54;
-      case 54: {
+      // repeated bool write_dep_types = 9;
+      case 9: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_num_dependencies:
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
-                 input, &num_dependencies_)));
-          set_has_num_dependencies();
+         parse_write_dep_types:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 1, 72, input, this->mutable_write_dep_types())));
+        } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
+                   == ::google::protobuf::internal::WireFormatLite::
+                      WIRETYPE_LENGTH_DELIMITED) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 input, this->mutable_write_dep_types())));
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(440)) goto parse_materialize;
+        if (input->ExpectTag(72)) goto parse_write_dep_types;
+        if (input->ExpectTag(80)) goto parse_materialize;
         break;
       }
       
-      // optional bool materialize = 55;
-      case 55: {
+      // optional bool materialize = 10;
+      case 10: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
          parse_materialize:
@@ -714,142 +419,62 @@ bool Action::MergePartialFromCodedStream(
 
 void Action::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
-  // optional string client = 1;
-  if (has_client()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->client().data(), this->client().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    ::google::protobuf::internal::WireFormatLite::WriteString(
-      1, this->client(), output);
-  }
-  
-  // optional string client_action_id = 2;
-  if (has_client_action_id()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->client_action_id().data(), this->client_action_id().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    ::google::protobuf::internal::WireFormatLite::WriteString(
-      2, this->client_action_id(), output);
-  }
-  
-  // optional bool substantiated = 3;
-  if (has_substantiated()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBool(3, this->substantiated(), output);
-  }
-  
-  // optional string backend = 11;
-  if (has_backend()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->backend().data(), this->backend().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    ::google::protobuf::internal::WireFormatLite::WriteString(
-      11, this->backend(), output);
-  }
-  
-  // optional string action_type = 12;
-  if (has_action_type()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->action_type().data(), this->action_type().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    ::google::protobuf::internal::WireFormatLite::WriteString(
-      12, this->action_type(), output);
-  }
-  
-  // optional bool read_only = 13 [default = false];
-  if (has_read_only()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBool(13, this->read_only(), output);
-  }
-  
-  // optional bytes input = 14;
-  if (has_input()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBytes(
-      14, this->input(), output);
-  }
-  
-  // optional bytes output = 15;
-  if (has_output()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBytes(
-      15, this->output(), output);
-  }
-  
-  // repeated int32 readset = 21;
+  // repeated int32 readset = 1;
   for (int i = 0; i < this->readset_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteInt32(
-      21, this->readset(i), output);
+      1, this->readset(i), output);
   }
   
-  // repeated int32 writeset = 22;
+  // repeated int32 writeset = 2;
   for (int i = 0; i < this->writeset_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteInt32(
-      22, this->writeset(i), output);
+      2, this->writeset(i), output);
   }
   
-  // optional uint64 version = 31;
-  if (has_version()) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(31, this->version(), output);
-  }
-  
-  // optional bool disallow_lazy_scheduling = 41 [default = false];
-  if (has_disallow_lazy_scheduling()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBool(41, this->disallow_lazy_scheduling(), output);
-  }
-  
-  // optional int32 state = 42;
+  // optional int32 state = 3;
   if (has_state()) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt32(42, this->state(), output);
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(3, this->state(), output);
   }
   
-  // optional uint64 closure = 43;
-  if (has_closure()) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(43, this->closure(), output);
-  }
-  
-  // optional uint64 start_time = 44;
-  if (has_start_time()) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(44, this->start_time(), output);
-  }
-  
-  // optional uint64 exec_start_time = 45;
-  if (has_exec_start_time()) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(45, this->exec_start_time(), output);
-  }
-  
-  // optional uint64 end_time = 46;
-  if (has_end_time()) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(46, this->end_time(), output);
-  }
-  
-  // optional bool delayed = 47;
-  if (has_delayed()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBool(47, this->delayed(), output);
-  }
-  
-  // repeated uint64 read_deps = 51;
+  // repeated uint64 read_deps = 4;
   for (int i = 0; i < this->read_deps_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(
-      51, this->read_deps(i), output);
+      4, this->read_deps(i), output);
   }
   
-  // repeated uint64 write_deps = 52;
+  // repeated int32 read_indices = 5;
+  for (int i = 0; i < this->read_indices_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(
+      5, this->read_indices(i), output);
+  }
+  
+  // repeated bool read_dep_types = 6;
+  for (int i = 0; i < this->read_dep_types_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteBool(
+      6, this->read_dep_types(i), output);
+  }
+  
+  // repeated uint64 write_deps = 7;
   for (int i = 0; i < this->write_deps_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(
-      52, this->write_deps(i), output);
+      7, this->write_deps(i), output);
   }
   
-  // repeated uint64 dependents = 53;
-  for (int i = 0; i < this->dependents_size(); i++) {
-    ::google::protobuf::internal::WireFormatLite::WriteUInt64(
-      53, this->dependents(i), output);
+  // repeated int32 write_indices = 8;
+  for (int i = 0; i < this->write_indices_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(
+      8, this->write_indices(i), output);
   }
   
-  // optional int32 num_dependencies = 54;
-  if (has_num_dependencies()) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt32(54, this->num_dependencies(), output);
+  // repeated bool write_dep_types = 9;
+  for (int i = 0; i < this->write_dep_types_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteBool(
+      9, this->write_dep_types(i), output);
   }
   
-  // optional bool materialize = 55;
+  // optional bool materialize = 10;
   if (has_materialize()) {
-    ::google::protobuf::internal::WireFormatLite::WriteBool(55, this->materialize(), output);
+    ::google::protobuf::internal::WireFormatLite::WriteBool(10, this->materialize(), output);
   }
   
   if (!unknown_fields().empty()) {
@@ -860,148 +485,62 @@ void Action::SerializeWithCachedSizes(
 
 ::google::protobuf::uint8* Action::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
-  // optional string client = 1;
-  if (has_client()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->client().data(), this->client().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        1, this->client(), target);
-  }
-  
-  // optional string client_action_id = 2;
-  if (has_client_action_id()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->client_action_id().data(), this->client_action_id().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        2, this->client_action_id(), target);
-  }
-  
-  // optional bool substantiated = 3;
-  if (has_substantiated()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(3, this->substantiated(), target);
-  }
-  
-  // optional string backend = 11;
-  if (has_backend()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->backend().data(), this->backend().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        11, this->backend(), target);
-  }
-  
-  // optional string action_type = 12;
-  if (has_action_type()) {
-    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
-      this->action_type().data(), this->action_type().length(),
-      ::google::protobuf::internal::WireFormat::SERIALIZE);
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        12, this->action_type(), target);
-  }
-  
-  // optional bool read_only = 13 [default = false];
-  if (has_read_only()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(13, this->read_only(), target);
-  }
-  
-  // optional bytes input = 14;
-  if (has_input()) {
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
-        14, this->input(), target);
-  }
-  
-  // optional bytes output = 15;
-  if (has_output()) {
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
-        15, this->output(), target);
-  }
-  
-  // repeated int32 readset = 21;
+  // repeated int32 readset = 1;
   for (int i = 0; i < this->readset_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
-      WriteInt32ToArray(21, this->readset(i), target);
+      WriteInt32ToArray(1, this->readset(i), target);
   }
   
-  // repeated int32 writeset = 22;
+  // repeated int32 writeset = 2;
   for (int i = 0; i < this->writeset_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
-      WriteInt32ToArray(22, this->writeset(i), target);
+      WriteInt32ToArray(2, this->writeset(i), target);
   }
   
-  // optional uint64 version = 31;
-  if (has_version()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(31, this->version(), target);
-  }
-  
-  // optional bool disallow_lazy_scheduling = 41 [default = false];
-  if (has_disallow_lazy_scheduling()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(41, this->disallow_lazy_scheduling(), target);
-  }
-  
-  // optional int32 state = 42;
+  // optional int32 state = 3;
   if (has_state()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(42, this->state(), target);
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(3, this->state(), target);
   }
   
-  // optional uint64 closure = 43;
-  if (has_closure()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(43, this->closure(), target);
-  }
-  
-  // optional uint64 start_time = 44;
-  if (has_start_time()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(44, this->start_time(), target);
-  }
-  
-  // optional uint64 exec_start_time = 45;
-  if (has_exec_start_time()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(45, this->exec_start_time(), target);
-  }
-  
-  // optional uint64 end_time = 46;
-  if (has_end_time()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(46, this->end_time(), target);
-  }
-  
-  // optional bool delayed = 47;
-  if (has_delayed()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(47, this->delayed(), target);
-  }
-  
-  // repeated uint64 read_deps = 51;
+  // repeated uint64 read_deps = 4;
   for (int i = 0; i < this->read_deps_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
-      WriteUInt64ToArray(51, this->read_deps(i), target);
+      WriteUInt64ToArray(4, this->read_deps(i), target);
   }
   
-  // repeated uint64 write_deps = 52;
+  // repeated int32 read_indices = 5;
+  for (int i = 0; i < this->read_indices_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteInt32ToArray(5, this->read_indices(i), target);
+  }
+  
+  // repeated bool read_dep_types = 6;
+  for (int i = 0; i < this->read_dep_types_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteBoolToArray(6, this->read_dep_types(i), target);
+  }
+  
+  // repeated uint64 write_deps = 7;
   for (int i = 0; i < this->write_deps_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
-      WriteUInt64ToArray(52, this->write_deps(i), target);
+      WriteUInt64ToArray(7, this->write_deps(i), target);
   }
   
-  // repeated uint64 dependents = 53;
-  for (int i = 0; i < this->dependents_size(); i++) {
+  // repeated int32 write_indices = 8;
+  for (int i = 0; i < this->write_indices_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
-      WriteUInt64ToArray(53, this->dependents(i), target);
+      WriteInt32ToArray(8, this->write_indices(i), target);
   }
   
-  // optional int32 num_dependencies = 54;
-  if (has_num_dependencies()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(54, this->num_dependencies(), target);
+  // repeated bool write_dep_types = 9;
+  for (int i = 0; i < this->write_dep_types_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteBoolToArray(9, this->write_dep_types(i), target);
   }
   
-  // optional bool materialize = 55;
+  // optional bool materialize = 10;
   if (has_materialize()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(55, this->materialize(), target);
+    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(10, this->materialize(), target);
   }
   
   if (!unknown_fields().empty()) {
@@ -1014,176 +553,94 @@ void Action::SerializeWithCachedSizes(
 int Action::ByteSize() const {
   int total_size = 0;
   
-  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    // optional string client = 1;
-    if (has_client()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::StringSize(
-          this->client());
-    }
-    
-    // optional string client_action_id = 2;
-    if (has_client_action_id()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::StringSize(
-          this->client_action_id());
-    }
-    
-    // optional bool substantiated = 3;
-    if (has_substantiated()) {
-      total_size += 1 + 1;
-    }
-    
-    // optional string backend = 11;
-    if (has_backend()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::StringSize(
-          this->backend());
-    }
-    
-    // optional string action_type = 12;
-    if (has_action_type()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::StringSize(
-          this->action_type());
-    }
-    
-    // optional bool read_only = 13 [default = false];
-    if (has_read_only()) {
-      total_size += 1 + 1;
-    }
-    
-    // optional bytes input = 14;
-    if (has_input()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::BytesSize(
-          this->input());
-    }
-    
-    // optional bytes output = 15;
-    if (has_output()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::BytesSize(
-          this->output());
-    }
-    
-  }
-  if (_has_bits_[10 / 32] & (0xffu << (10 % 32))) {
-    // optional uint64 version = 31;
-    if (has_version()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::UInt64Size(
-          this->version());
-    }
-    
-    // optional bool disallow_lazy_scheduling = 41 [default = false];
-    if (has_disallow_lazy_scheduling()) {
-      total_size += 2 + 1;
-    }
-    
-    // optional int32 state = 42;
+  if (_has_bits_[2 / 32] & (0xffu << (2 % 32))) {
+    // optional int32 state = 3;
     if (has_state()) {
-      total_size += 2 +
+      total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::Int32Size(
           this->state());
     }
     
-    // optional uint64 closure = 43;
-    if (has_closure()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::UInt64Size(
-          this->closure());
-    }
-    
-    // optional uint64 start_time = 44;
-    if (has_start_time()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::UInt64Size(
-          this->start_time());
-    }
-    
-    // optional uint64 exec_start_time = 45;
-    if (has_exec_start_time()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::UInt64Size(
-          this->exec_start_time());
-    }
-    
   }
-  if (_has_bits_[16 / 32] & (0xffu << (16 % 32))) {
-    // optional uint64 end_time = 46;
-    if (has_end_time()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::UInt64Size(
-          this->end_time());
-    }
-    
-    // optional bool delayed = 47;
-    if (has_delayed()) {
-      total_size += 2 + 1;
-    }
-    
-    // optional int32 num_dependencies = 54;
-    if (has_num_dependencies()) {
-      total_size += 2 +
-        ::google::protobuf::internal::WireFormatLite::Int32Size(
-          this->num_dependencies());
-    }
-    
-    // optional bool materialize = 55;
+  if (_has_bits_[9 / 32] & (0xffu << (9 % 32))) {
+    // optional bool materialize = 10;
     if (has_materialize()) {
-      total_size += 2 + 1;
+      total_size += 1 + 1;
     }
     
   }
-  // repeated int32 readset = 21;
+  // repeated int32 readset = 1;
   {
     int data_size = 0;
     for (int i = 0; i < this->readset_size(); i++) {
       data_size += ::google::protobuf::internal::WireFormatLite::
         Int32Size(this->readset(i));
     }
-    total_size += 2 * this->readset_size() + data_size;
+    total_size += 1 * this->readset_size() + data_size;
   }
   
-  // repeated int32 writeset = 22;
+  // repeated int32 writeset = 2;
   {
     int data_size = 0;
     for (int i = 0; i < this->writeset_size(); i++) {
       data_size += ::google::protobuf::internal::WireFormatLite::
         Int32Size(this->writeset(i));
     }
-    total_size += 2 * this->writeset_size() + data_size;
+    total_size += 1 * this->writeset_size() + data_size;
   }
   
-  // repeated uint64 read_deps = 51;
+  // repeated uint64 read_deps = 4;
   {
     int data_size = 0;
     for (int i = 0; i < this->read_deps_size(); i++) {
       data_size += ::google::protobuf::internal::WireFormatLite::
         UInt64Size(this->read_deps(i));
     }
-    total_size += 2 * this->read_deps_size() + data_size;
+    total_size += 1 * this->read_deps_size() + data_size;
   }
   
-  // repeated uint64 write_deps = 52;
+  // repeated int32 read_indices = 5;
+  {
+    int data_size = 0;
+    for (int i = 0; i < this->read_indices_size(); i++) {
+      data_size += ::google::protobuf::internal::WireFormatLite::
+        Int32Size(this->read_indices(i));
+    }
+    total_size += 1 * this->read_indices_size() + data_size;
+  }
+  
+  // repeated bool read_dep_types = 6;
+  {
+    int data_size = 0;
+    data_size = 1 * this->read_dep_types_size();
+    total_size += 1 * this->read_dep_types_size() + data_size;
+  }
+  
+  // repeated uint64 write_deps = 7;
   {
     int data_size = 0;
     for (int i = 0; i < this->write_deps_size(); i++) {
       data_size += ::google::protobuf::internal::WireFormatLite::
         UInt64Size(this->write_deps(i));
     }
-    total_size += 2 * this->write_deps_size() + data_size;
+    total_size += 1 * this->write_deps_size() + data_size;
   }
   
-  // repeated uint64 dependents = 53;
+  // repeated int32 write_indices = 8;
   {
     int data_size = 0;
-    for (int i = 0; i < this->dependents_size(); i++) {
+    for (int i = 0; i < this->write_indices_size(); i++) {
       data_size += ::google::protobuf::internal::WireFormatLite::
-        UInt64Size(this->dependents(i));
+        Int32Size(this->write_indices(i));
     }
-    total_size += 2 * this->dependents_size() + data_size;
+    total_size += 1 * this->write_indices_size() + data_size;
+  }
+  
+  // repeated bool write_dep_types = 9;
+  {
+    int data_size = 0;
+    data_size = 1 * this->write_dep_types_size();
+    total_size += 1 * this->write_dep_types_size() + data_size;
   }
   
   if (!unknown_fields().empty()) {
@@ -1214,64 +671,17 @@ void Action::MergeFrom(const Action& from) {
   readset_.MergeFrom(from.readset_);
   writeset_.MergeFrom(from.writeset_);
   read_deps_.MergeFrom(from.read_deps_);
+  read_indices_.MergeFrom(from.read_indices_);
+  read_dep_types_.MergeFrom(from.read_dep_types_);
   write_deps_.MergeFrom(from.write_deps_);
-  dependents_.MergeFrom(from.dependents_);
-  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from.has_client()) {
-      set_client(from.client());
-    }
-    if (from.has_client_action_id()) {
-      set_client_action_id(from.client_action_id());
-    }
-    if (from.has_substantiated()) {
-      set_substantiated(from.substantiated());
-    }
-    if (from.has_backend()) {
-      set_backend(from.backend());
-    }
-    if (from.has_action_type()) {
-      set_action_type(from.action_type());
-    }
-    if (from.has_read_only()) {
-      set_read_only(from.read_only());
-    }
-    if (from.has_input()) {
-      set_input(from.input());
-    }
-    if (from.has_output()) {
-      set_output(from.output());
-    }
-  }
-  if (from._has_bits_[10 / 32] & (0xffu << (10 % 32))) {
-    if (from.has_version()) {
-      set_version(from.version());
-    }
-    if (from.has_disallow_lazy_scheduling()) {
-      set_disallow_lazy_scheduling(from.disallow_lazy_scheduling());
-    }
+  write_indices_.MergeFrom(from.write_indices_);
+  write_dep_types_.MergeFrom(from.write_dep_types_);
+  if (from._has_bits_[2 / 32] & (0xffu << (2 % 32))) {
     if (from.has_state()) {
       set_state(from.state());
     }
-    if (from.has_closure()) {
-      set_closure(from.closure());
-    }
-    if (from.has_start_time()) {
-      set_start_time(from.start_time());
-    }
-    if (from.has_exec_start_time()) {
-      set_exec_start_time(from.exec_start_time());
-    }
   }
-  if (from._has_bits_[16 / 32] & (0xffu << (16 % 32))) {
-    if (from.has_end_time()) {
-      set_end_time(from.end_time());
-    }
-    if (from.has_delayed()) {
-      set_delayed(from.delayed());
-    }
-    if (from.has_num_dependencies()) {
-      set_num_dependencies(from.num_dependencies());
-    }
+  if (from._has_bits_[9 / 32] & (0xffu << (9 % 32))) {
     if (from.has_materialize()) {
       set_materialize(from.materialize());
     }
@@ -1298,28 +708,15 @@ bool Action::IsInitialized() const {
 
 void Action::Swap(Action* other) {
   if (other != this) {
-    std::swap(client_, other->client_);
-    std::swap(client_action_id_, other->client_action_id_);
-    std::swap(substantiated_, other->substantiated_);
-    std::swap(backend_, other->backend_);
-    std::swap(action_type_, other->action_type_);
-    std::swap(read_only_, other->read_only_);
-    std::swap(input_, other->input_);
-    std::swap(output_, other->output_);
     readset_.Swap(&other->readset_);
     writeset_.Swap(&other->writeset_);
-    std::swap(version_, other->version_);
-    std::swap(disallow_lazy_scheduling_, other->disallow_lazy_scheduling_);
     std::swap(state_, other->state_);
-    std::swap(closure_, other->closure_);
-    std::swap(start_time_, other->start_time_);
-    std::swap(exec_start_time_, other->exec_start_time_);
-    std::swap(end_time_, other->end_time_);
-    std::swap(delayed_, other->delayed_);
     read_deps_.Swap(&other->read_deps_);
+    read_indices_.Swap(&other->read_indices_);
+    read_dep_types_.Swap(&other->read_dep_types_);
     write_deps_.Swap(&other->write_deps_);
-    dependents_.Swap(&other->dependents_);
-    std::swap(num_dependencies_, other->num_dependencies_);
+    write_indices_.Swap(&other->write_indices_);
+    write_dep_types_.Swap(&other->write_dep_types_);
     std::swap(materialize_, other->materialize_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);

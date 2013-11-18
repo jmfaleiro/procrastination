@@ -10,67 +10,26 @@
 
 
 message Action {
-  // Uniquely identifies the originator of the Action. This may be an end user,
-  // or it may be a Calvin server somewhere. It may even be a 'parent' Action.
-  optional string client = 1;
-
-  // Client-provided unique identifier of this operation. This field should be
-  // set and read only by the client.
-  optional string client_action_id = 2;
-    
-  // If true, the tranasction has already been substantiated. 
-  optional bool substantiated = 3;
-
-  // Specifies the Backend to which the action is directed.
-  optional string backend = 11;
-
-  // Specifies type of action (semantics determined by specified backend).
-  optional string action_type = 12;
-
-  // May be set to true iff this action does not modify the state at all.
-  optional bool read_only = 13 [default = false];
-
-  // Specifies the full semantics of the action being requested. This may be
-  // encoded in ANY way, depending on the interpreter. For example, it may be
-  // an arbitrary serialized protobuf.
-  optional bytes input = 14;
-
-  // Specifies any results returned once the Action was executed.
-  optional bytes output = 15;
-
   // Keys of records READ by the action.
-  repeated int32 readset = 21;
+  repeated int32 readset = 1;
 
   // Keys of records WRITTEN by the action.
-  repeated int32 writeset = 22;
-
-  // Version at which Action was committed to the log.
-  optional uint64 version = 31;
-
-  // If set to true, lazy scheduling of this action is not permitted.
-  optional bool disallow_lazy_scheduling = 41 [default = false];
-  
-
+  repeated int32 writeset = 2;
 
   // STICKY: the action isn't yet being evaluated, PROCESSING: the action has
   // been dispatched to a worker, SUBSTANTIATED: the action is completed. 
 
-  optional int32 state = 42;
-  optional uint64 closure = 43;
-
-  optional uint64 start_time = 44;
-  optional uint64 exec_start_time = 45;
-  optional uint64 end_time = 46;
-
-  optional bool delayed = 47;
+  optional int32 state = 3;
 
   // Miscellaneous data.
-  repeated uint64 read_deps = 51;
-  repeated uint64 write_deps = 52;
-  repeated uint64 dependents = 53;
-  optional int32 num_dependencies = 54;
+  repeated uint64 read_deps = 4;
+  repeated int32 read_indices = 5;
+  repeated bool read_dep_types = 6;
+  
+  repeated uint64 write_deps = 7;
+  repeated int32 write_indices = 8;
+  repeated bool write_dep_types = 9;
 
-
-  optional bool materialize = 55;
+  optional bool materialize = 10;
 }
 
