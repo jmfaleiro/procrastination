@@ -95,14 +95,14 @@ timespec wait(int num_waits,
     sched->startScheduler();
     
     // Start measuring time elapsed. 
-    clock_gettime(CLOCK_REALTIME, &start_time);    
-    
-    uint64_t to_wait = sched->waitFinished();
+    clock_gettime(CLOCK_REALTIME, &start_time);        
+	uint64_t to_wait = sched->waitFinished();    	
     while (to_wait-- > 0) {
         volatile uint64_t ptr;
         ptr = scheduler_output->DequeueBlocking();
     }    
     clock_gettime(CLOCK_REALTIME, &end_time);    
+
     return diff_time(start_time, end_time);
 }
 
@@ -142,7 +142,7 @@ int initialize(ExperimentInfo* info,
     numa_set_strict(1);
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(2, &my_binding);
+    CPU_SET(3, &my_binding);
 
     SimpleQueue** worker_inputs = 
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
@@ -185,7 +185,7 @@ int initialize(ExperimentInfo* info,
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
     initWorkers(workers,
-                1,
+                2,
                 info->num_workers, 
                 info->worker_bindings,
                 worker_inputs,
@@ -193,12 +193,19 @@ int initialize(ExperimentInfo* info,
                 info->num_records);
     
     // Create a scheduler thread. 
-    *scheduler = new LazyScheduler(info->num_workers, 
+    CPU_ZERO(&info->scheduler_bindings[0]);
+    CPU_SET(0, &info->scheduler_bindings[0]);
+	
+    CPU_ZERO(&info->scheduler_bindings[1]);
+    CPU_SET(1, &info->scheduler_bindings[1]);
+	
+    *scheduler = new LazyScheduler(false,
+								   info->num_workers, 
                                    info->num_records, 
                                    info->substantiate_threshold,
                                    worker_inputs,
                                    NULL,
-                                   &info->scheduler_bindings[0],
+                                   info->scheduler_bindings,
                                    scheduler_input,
                                    NULL);
 

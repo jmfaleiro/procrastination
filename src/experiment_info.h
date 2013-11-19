@@ -100,7 +100,7 @@ public:
         // Allocate cpu_set_t's for binding threads. 
         // XXX: The scheduler is single threaded so we have just one for now. 
         worker_bindings = new cpu_set_t[num_workers];
-        scheduler_bindings = new cpu_set_t[1];
+        scheduler_bindings = new cpu_set_t[2];		
     }
     
     // Binding information for scheduler+worker threads. 

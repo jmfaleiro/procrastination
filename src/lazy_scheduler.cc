@@ -5,7 +5,8 @@
 
 using namespace std;
 
-LazyScheduler::LazyScheduler(int num_workers,
+LazyScheduler::LazyScheduler(bool serial, 
+							 int num_workers,
                              int num_records, 
                              int max_chain,
                              SimpleQueue** worker_inputs,
@@ -13,7 +14,8 @@ LazyScheduler::LazyScheduler(int num_workers,
                              cpu_set_t* binding_info,
                              SimpleQueue* sched_input,
                              SimpleQueue* sched_output) {
-
+	
+	m_serial = serial;
     m_worker_input = worker_inputs;
     m_num_workers = num_workers;
     
@@ -32,14 +34,24 @@ LazyScheduler::LazyScheduler(int num_workers,
   m_last_used = 0;
 }
 
-int LazyScheduler::getTimes(uint64_t** ret) {
-    *ret = m_times;
-    return m_times_ptr;
+void* LazyScheduler::graphWalkFunction(void* arg) {
+	LazyScheduler* sched = (LazyScheduler*)arg;
+	pin_thread(&sched->m_binding_info[1]);
+
+	SimpleQueue* input_queue = sched->m_walking_queue;
+	
+	xchgq(&sched->m_walk_flag, 1);
+	
+	while (true) {
+		Action* to_walk = (Action*)(input_queue->DequeueBlocking());
+		sched->substantiate(to_walk);
+	}
 }
 
 void* LazyScheduler::schedulerFunction(void* arg) {
+	numa_set_strict(1);
     LazyScheduler* sched = (LazyScheduler*)arg;
-    pin_thread(sched->m_binding_info);
+    pin_thread(&sched->m_binding_info[0]);
     
     struct Heuristic empty;
     empty.last_txn = NULL;
@@ -56,10 +68,30 @@ void* LazyScheduler::schedulerFunction(void* arg) {
         (*(sched->m_last_txns))[i].is_write = false;
     }
 
-    sched->m_times = new uint64_t[1000000];
-    sched->m_times_ptr = 0;
-
     sched->m_num_txns = 0;
+	pthread_t walker_thread;
+
+	if (!sched->m_serial) {
+		
+		// Create a queue to communicate with the graph walking thread. 
+		int walk_queue_size = (1 << 12);
+		uint64_t* walk_queue_data = 
+			(uint64_t*)numa_alloc_local(CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
+		memset(walk_queue_data, 0, CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
+		sched->m_walking_queue = new SimpleQueue(walk_queue_data, walk_queue_size);
+		
+		// Kick off the graph walking thread. 
+		xchgq(&sched->m_walk_flag, 0);
+		pthread_create(&walker_thread,
+					   NULL,
+					   graphWalkFunction, 
+					   sched);
+		
+		// Wait until the thread is ready..
+		while (sched->m_walk_flag == 0)
+			;		
+	}
+
     xchgq(&(sched->m_start_flag), 1);
     
     SimpleQueue* incoming_txns = sched->m_log_input;
@@ -81,63 +113,71 @@ void* LazyScheduler::schedulerFunction(void* arg) {
 
 // Add the given action to the dependency graph. 
 void LazyScheduler::addGraph(Action* action) {
-	action->state = STICKY;
+	
+	if (m_serial) {
+		action->state = SUBSTANTIATED;
+		run_txn(action);
+		return;
+	}
+	else {
+		action->state = STICKY;
 
-    // Iterate through this action's read set and write set, find the 
-    // transactions it depends on and add it to the dependency graph. 
-    int num_reads = action->readset.size();
-    int num_writes = action->writeset.size();
-	int* count_ptrs[num_reads+num_writes];
+		// Iterate through this action's read set and write set, find the 
+		// transactions it depends on and add it to the dependency graph. 
+		int num_reads = action->readset.size();
+		int num_writes = action->writeset.size();
+		int* count_ptrs[num_reads+num_writes];
 
-    // Go through the read set. 
-    bool force_materialize = action->materialize;
-    for (int i = 0; i < num_reads; ++i) {
-		int record = action->readset[i].record;
+		// Go through the read set. 
+		bool force_materialize = action->materialize;
+		for (int i = 0; i < num_reads; ++i) {
+			int record = action->readset[i].record;
 
-        // Keep the information about the previous txn around. 
-		action->readset[i].dependency = (*m_last_txns)[record].last_txn;
-		action->readset[i].is_write = (*m_last_txns)[record].is_write;
-		action->readset[i].index = (*m_last_txns)[record].index;
-		count_ptrs[i] = &((*m_last_txns)[record].chain_length);
+			// Keep the information about the previous txn around. 
+			action->readset[i].dependency = (*m_last_txns)[record].last_txn;
+			action->readset[i].is_write = (*m_last_txns)[record].is_write;
+			action->readset[i].index = (*m_last_txns)[record].index;
+			count_ptrs[i] = &((*m_last_txns)[record].chain_length);
 
-        // Update the heuristic information. 
-        (*m_last_txns)[record].last_txn = action;
-        (*m_last_txns)[record].index = i;
-        (*m_last_txns)[record].is_write = false;
+			// Update the heuristic information. 
+			(*m_last_txns)[record].last_txn = action;
+			(*m_last_txns)[record].index = i;
+			(*m_last_txns)[record].is_write = false;
         
-        // Increment the length of the chain corresponding to this record, 
-        // check if it exceeds our threshold value. 
-		(*m_last_txns)[record].chain_length += 1;		
-		force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
-  }
+			// Increment the length of the chain corresponding to this record, 
+			// check if it exceeds our threshold value. 
+			(*m_last_txns)[record].chain_length += 1;		
+			force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+		}
 
-  // Go through the write set. 
-  for (int i = 0; i < num_writes; ++i) {
-	  int record = action->writeset[i].record;
+		// Go through the write set. 
+		for (int i = 0; i < num_writes; ++i) {
+			int record = action->writeset[i].record;
 
-	  // Keep the information about the previous txn around. 
-	  action->writeset[i].dependency = (*m_last_txns)[record].last_txn;
-	  action->writeset[i].is_write = (*m_last_txns)[record].is_write;
-	  action->writeset[i].index = (*m_last_txns)[record].index;
-	  count_ptrs[num_reads+i] = &((*m_last_txns)[record].chain_length);
+			// Keep the information about the previous txn around. 
+			action->writeset[i].dependency = (*m_last_txns)[record].last_txn;
+			action->writeset[i].is_write = (*m_last_txns)[record].is_write;
+			action->writeset[i].index = (*m_last_txns)[record].index;
+			count_ptrs[num_reads+i] = &((*m_last_txns)[record].chain_length);
 
-	  // Update the heuristic information. 
-	  (*m_last_txns)[record].last_txn = action;
-	  (*m_last_txns)[record].index = i;
-	  (*m_last_txns)[record].is_write = true;
+			// Update the heuristic information. 
+			(*m_last_txns)[record].last_txn = action;
+			(*m_last_txns)[record].index = i;
+			(*m_last_txns)[record].is_write = true;
 
-	  // Increment the length of the chain corresponding to this record, check if 
-	  // it exceeds our threshold value. 
-	  (*m_last_txns)[record].chain_length += 1;
-	  force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
-  }  
+			// Increment the length of the chain corresponding to this record, check if 
+			// it exceeds our threshold value. 
+			(*m_last_txns)[record].chain_length += 1;
+			force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+		}  
   
-  if (force_materialize) {      
-	  for (int i = 0; i < num_reads+num_writes; ++i) {
-		  *(count_ptrs[i]) = 0;		  
-	  }
-      substantiate(action);
-  }
+		if (force_materialize) {      
+			for (int i = 0; i < num_reads+num_writes; ++i) {
+				*(count_ptrs[i]) = 0;		  
+			}
+			m_walking_queue->EnqueueBlocking((uint64_t)action);
+		}
+	}
 }
 
 void LazyScheduler::processRead(Action* action, 
@@ -229,7 +269,7 @@ uint64_t LazyScheduler::substantiate(Action* start) {
         processWrite(start, i);
     }
     start->state = SUBSTANTIATED;
-    run_txn(start);
+	run_txn(start);
     return 0;
 }
 

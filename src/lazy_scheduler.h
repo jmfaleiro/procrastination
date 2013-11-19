@@ -36,8 +36,9 @@ enum TxnState {
 class LazyScheduler {
 
     volatile uint64_t m_run_flag;
-    volatile uint64_t m_start_flag;    
-    
+    volatile uint64_t m_start_flag;
+	volatile uint64_t m_walk_flag;
+
     pthread_t m_scheduler_thread;
     
     set<Action*>* m_starts; 
@@ -64,6 +65,8 @@ class LazyScheduler {
     int m_num_workers;
     int m_last_used;
 
+	bool m_serial;
+
   // Free list of struct queue_elems to use to communicate with workers. 
   ElementStore *store;
 
@@ -78,6 +81,8 @@ class LazyScheduler {
   // Queue of completed actions. 
   SimpleQueue** m_worker_output;
   
+  SimpleQueue* m_walking_queue;
+
   // Queue from log.
   SimpleQueue* m_log_input;
 
@@ -98,11 +103,14 @@ class LazyScheduler {
 
   // Scheduler thread function.
   static void* schedulerFunction(void* arg);
+  static void* graphWalkFunction(void* arg);
+
 
   virtual void cleanup_txns();
   
 public:
-  LazyScheduler(int num_workers, 
+  LazyScheduler(bool serial,
+				int num_workers, 
                 int num_records, 
                 int max_chain,
                 SimpleQueue** input,
@@ -127,8 +135,6 @@ public:
   virtual void startThread();  
 
   virtual int numDone();
-  
-  virtual int getTimes(uint64_t** ret);
 };
 
 #endif // LAZY_SCHEDULER_H
