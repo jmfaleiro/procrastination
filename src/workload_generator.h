@@ -1,9 +1,12 @@
 #ifndef WORKLOAD_GENERATOR_H
 #define WORKLOAD_GENERATOR_H
 
-#include "action_int.pb.h"
+#include "action.h"
 
 class WorkloadGenerator {
+ protected:
+	Action* m_action_set;
+	int m_use_next;
 
  public:
 

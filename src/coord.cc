@@ -2,7 +2,7 @@
 #include "lazy_scheduler.h"
 #include "cpuinfo.h"
 #include "concurrent_queue.h"
-#include "action_int.pb.h"
+#include "action.h"
 #include "normal_generator.h"
 #include "uniform_generator.h"
 #include "experiment_info.h"
@@ -49,7 +49,7 @@ buildDependencies(WorkloadGenerator* generator,
         Action* gen = generator->genNext();
         input_queue->EnqueueBlocking((uint64_t)gen);
 
-        if (gen->materialize()) {
+        if (gen->materialize) {
             ++to_wait;
         }
     }
@@ -65,8 +65,8 @@ initWorkers(Worker** workers,
             SimpleQueue** output_queue,
             int num_records) {
     numa_set_strict(1);
-    int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records);
-    for (int i = 0; i < num_records; ++i) {
+    int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records*4);
+    for (int i = 0; i < 4*num_records; ++i) {
         records[i*CACHE_LINE] = 1;
     }
 
@@ -107,10 +107,10 @@ timespec wait(int num_waits,
 }
 
 // Append the timing information to an output file. 
-void write_answers(ExperimentInfo* info, timespec time_taken) {
+void write_answers(ExperimentInfo* info, timespec time_taken, int num_done) {
     ofstream output_file;
     output_file.open(info->output_file, ios::app | ios::out);
-    output_file << time_taken.tv_sec << "." << time_taken.tv_nsec << "\n";
+    output_file << time_taken.tv_sec << "." << time_taken.tv_nsec <<  "  " << num_done << "\n";
     output_file.close();
 }
 
@@ -216,8 +216,7 @@ void run_experiment(ExperimentInfo* info) {
     int num_waits = 
         initialize(info, &scheduler_output, &sched, &worker);
     timespec exec_time = wait(num_waits, sched, scheduler_output);
-    std::cout << sched->numDone() << "\n";
-    write_answers(info, exec_time);
+    write_answers(info, exec_time, sched->numDone());
     write_latencies(worker);
 }
 

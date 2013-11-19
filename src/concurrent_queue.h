@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <cstddef>
 #include <iostream>
+#include <cassert>
 
 #include "util.h"
 #include "machine.h"

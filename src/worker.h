@@ -1,7 +1,7 @@
 #ifndef WORKER_H
 #define WORKER_H
 
-#include "action_int.pb.h"
+#include "action.h"
 #include "concurrent_queue.h"
 #include "util.h"
 #include "cpuinfo.h"

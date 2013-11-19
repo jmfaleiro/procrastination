@@ -5,23 +5,29 @@
 // For the microbenchmarks, read the values of the records in the read set and 
 // then add the sum to each of the records in the writeset. 
 void ProcessAction(const Action* to_proc, int* records) {
-    int readset_size = to_proc->readset_size();
-    int writeset_size = to_proc->writeset_size();
+    int readset_size = to_proc->readset.size();
+    int writeset_size = to_proc->writeset.size();
 
     // Sum all the values of the records in the read set. 
     int count = 1;
 
     for (int i = 0; i < readset_size; ++i) {
-        int index = to_proc->readset(i);
+        int index = to_proc->readset[i].record;
         int value = records[CACHE_LINE * index];
-        count += value;
+        count += records[CACHE_LINE*index];        
+        count += records[CACHE_LINE*(index+1)];
+        count += records[CACHE_LINE*(index+2)];
+        count += records[CACHE_LINE*(index+3)];        
     }
     
     
     // Update the value of each of the records in the write-set. 
     for (int i = 0; i < writeset_size; ++i) {
-        int index = to_proc->writeset(i);
+        int index = to_proc->writeset[i].record;
         records[CACHE_LINE * index] += count;
+        records[CACHE_LINE * (index+1)] += count;
+        records[CACHE_LINE * (index+2)] += count;
+        records[CACHE_LINE * (index+3)] += count;
     } 
 }
 
@@ -90,14 +96,6 @@ void* Worker::workerFunction(void* arg) {
             worker->m_num_values += 1;
             
             output_queue->EnqueueBlocking(ptr);
-
-            /*
-            volatile struct queue_elem* to_use = input_queue->Dequeue(true);
-            to_use->m_next = NULL;
-            action = (const Action*)to_use->m_data;
-            ProcessAction(action, worker->m_records);
-            output_queue->Enqueue(to_use);
-            */
 	}
   }
   

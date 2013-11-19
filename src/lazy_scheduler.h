@@ -10,7 +10,7 @@
 #include <list>
 #include <vector>
 
-#include "action_int.pb.h"
+#include "action.h"
 #include "concurrent_queue.h"
 #include "cpuinfo.h"
 #include "util.h"
@@ -86,8 +86,6 @@ class LazyScheduler {
   
   virtual void processWrite(Action* action, int index);
   virtual void processRead(Action* action, int index);
-
-  virtual int depIndex(Action* action, int record, bool* is_write);
   
   // Force a transaction to substantiate. 
   virtual uint64_t substantiate(Action* action);

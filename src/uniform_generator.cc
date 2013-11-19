@@ -10,7 +10,10 @@ UniformGenerator::UniformGenerator(int read_size,
     m_write_set_size = write_size;
     m_num_records = num_records;
     m_freq = freq;
-    
+	
+	m_action_set = new Action[10000000];
+	m_use_next = 0;
+
     // Init rand number generator. 
     srand(time(NULL));
 }
@@ -28,25 +31,30 @@ int UniformGenerator::genUnique(std::set<int>* done) {
 
 Action* UniformGenerator::genNext() {
     std::set<int> done;
-    Action* ret = new Action();    
+    Action* ret = &m_action_set[m_use_next];
+	m_use_next += 1;
 
     // Generate elements to read. 
     for (int i = 0; i < m_read_set_size; ++i) {
         int record = genUnique(&done);
-        ret->add_readset(record);
+		struct DependencyInfo to_add;
+		to_add.record = record;
+		ret->readset.push_back(to_add);
     }
     
     // Generate elements to write. 
     for (int i = 0; i < m_write_set_size; ++i) {
         int record = genUnique(&done);
-        ret->add_writeset(record);
+		struct DependencyInfo to_add;
+		to_add.record = record;
+		ret->writeset.push_back(to_add);
     }    
     
     if ((rand() % m_freq) == 0) {
-        ret->set_materialize(true);
+		ret->materialize = true;
     }
     else {
-        ret->set_materialize(false);
+		ret->materialize = false;
     }
     return ret;  
 }

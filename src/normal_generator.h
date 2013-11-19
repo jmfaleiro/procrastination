@@ -4,6 +4,8 @@
 #include "workload_generator.h"
 #include <set>
 #include <random>
+#include <cassert>
+
 
 class NormalGenerator : public WorkloadGenerator {
     
