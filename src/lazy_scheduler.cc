@@ -74,7 +74,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
 	if (!sched->m_serial) {
 		
 		// Create a queue to communicate with the graph walking thread. 
-		int walk_queue_size = (1 << 12);
+		int walk_queue_size = (1 << 10);
 		uint64_t* walk_queue_data = 
 			(uint64_t*)numa_alloc_local(CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
 		memset(walk_queue_data, 0, CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
@@ -259,8 +259,9 @@ void LazyScheduler::cleanup_txns() {
 
 void LazyScheduler::run_txn(Action* to_run) {
     assert(to_run->state == SUBSTANTIATED);
-    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
-    assert(done);
+    m_worker_input[0]->EnqueueBlocking((uint64_t)to_run);
+    //    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
+    //    assert(done);
     ++m_num_txns;
 }
 

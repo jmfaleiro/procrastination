@@ -15,13 +15,14 @@ class Worker {
   SimpleQueue* m_output_queue;
   
   uint64_t* m_txn_latencies;
-  int m_num_values;
+  volatile int m_num_values;
 
   int m_queue_size;
 
   // The "database" of records. 
   // XXX: Switch this to something more generic for later on. 
   int* m_records;
+  
 
   // Information used to bind to specific queues. 
   cpu_set_t* m_binding_info;  
@@ -55,6 +56,8 @@ class Worker {
   
   // Wait for the newly allocated thread to signal before returning. 
   void waitForStart();
+
+  int numDone();
 };
 
 #endif // WORKER_H

@@ -6,8 +6,11 @@
 #include "concurrent_queue.h"
 #include "util.h"
 
+
 #include <algorithm>
 #include <fstream>
+
+
 
 // Use this for "peak" workloads. 
 class Client {
@@ -18,13 +21,48 @@ class Client {
     SimpleQueue* m_lazy_output;
     WorkloadGenerator* m_gen;
     int m_num_runs;
+    volatile uint64_t reader_flag;
+    Worker* m_worker;
+    
+
+    void* readWorker(void* arg) {
+        Client* client = (Client*)arg;
+        cpu_set_t read_binding;
+        CPU_ZERO(&read_binding);
+	CPU_SET(4, &read_binding);
+        
+        // We have 100 points per second. 
+        uint64_t* buckets = (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
+        memset(buckets, 0, sizeof(uint64_t)*300);
+
+        xchgq(&reader_flag, 1);
+        uint64_t start_time = rdtsc();
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 100; ++j) {
+                while (true) {
+                    uint64_t dummy;
+                    if (client->m_lazy_output->Dequeue(&dummy)) {
+                        buckets[100*i + j] += 1;
+                    }
+                    uint64_t cur_time = rdtsc();
+                    if (cur_time - start_time >= (1996*10000)) {
+                        start_time = cur_time;
+                        break;
+                    }
+                }
+            }
+        }
+        return buckets;
+    }
 
 public:
-    Client(LazyScheduler* scheduler,
+    Client(Worker* worker, 
+           LazyScheduler* scheduler,
            SimpleQueue* lazy_input, 
            SimpleQueue* lazy_output, 
            WorkloadGenerator* generator,
            int num_txns) {
+        m_worker = worker;
         m_sched = scheduler;
         m_lazy_input = lazy_input;
         m_lazy_output = lazy_output;
@@ -32,42 +70,170 @@ public:
         m_num_runs = num_txns;
     }
 
-    /*
-    void RunPeak() {
-        
+    void RunPeak() {        
+        m_gen->preGen();                
+        m_sched->startScheduler();
+
         uint64_t phase1 = 0, phase2 = 0, phase3 = 0;
-        uint64_t start_time = rdtsc();
-        uint64_t phase1_time, phase2_time, phase3_time;
-        while (true) {
-            ++phase1;
-            Action* action = m_gen->genNext();
+        uint64_t phase1_iters = 0, phase2_iters = 0, phase3_iters = 0;
+        volatile uint64_t start_time = rdtsc();
+        volatile uint64_t phase1_time; 
+        volatile uint64_t phase2_time; 
+        volatile uint64_t phase3_time;
+
+        uint64_t* buckets_in = 
+            (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
+        memset(buckets_in, 0, sizeof(uint64_t)*300);
+
+        uint64_t* buckets_out = 
+            (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
+        memset(buckets_out, 0, sizeof(uint64_t)*300);
+        
+        uint64_t* buckets_done = 
+            (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
+        memset(buckets_done, 0, sizeof(uint64_t)*300);
+        
+        
+        for (int i = 0; i < 8000000; ++i) {
+            Action* action = m_gen->getPreGen();
             m_lazy_input->EnqueueBlocking((uint64_t)action);
-            phase1_time = rdtsc();
-            if (phase1_time - start_time >= (1996 * 1000000)) {
-                break;
+            for (int i = 0; i < 10000; ++i) {
+                single_work();
+            }            
+        }
+
+        volatile int start_count = m_worker->numDone();
+        // Regular load for 1 second. 
+        for (int j = 0; j < 100; ++j) {
+            while (true) {
+                buckets_in[j] += 1;
+                Action* action = m_gen->getPreGen();
+                if (m_lazy_input->Enqueue((uint64_t)action)) {
+                    buckets_out[j] += 1;
+                }
+                else {
+                    for (int i = 0; i < 110; ++i) {
+                        single_work();
+                    }
+                }
+                phase1_time = rdtsc();
+                
+                // Check whether or not 1 second has elapsed. 
+                // XXX: The constant here is specific to smorz!!!
+                if (phase1_time - start_time >= (1996 * 10000)) {
+                    start_time = phase1_time;
+                    volatile int end_count = m_worker->numDone();
+                    buckets_done[j] = end_count - start_count;
+                    start_count = end_count;
+                    break;
+                }
+                for (int i = 0; i < 100000; ++i) {
+                    single_work();
+                }
             }
         }
 
-        while (true) {
-            ++phase2;
-            Action* action = m_gen->genNext();
-            m_lazy_input->EnqueueBlocking((uint64_t)action);
-            phase2_time = rdtsc();
-            if (phase2_time - start_time >= (2*1996*1000000)) {
-                break;
+        // Spike in load for 1 second. 
+        for (int j = 0; j < 100; ++j) {
+            while (true) {
+                buckets_in[100+j] += 1;
+                Action* action = m_gen->getPreGen();
+                if (m_lazy_input->Enqueue((uint64_t)action)) {
+                    buckets_out[100+j] += 1;
+                }
+                
+                else {
+                    for (int i = 0; i < 800; ++i) {
+                        single_work();
+                    }
+                }
+                
+
+                phase2_time = rdtsc();
+
+                // Check whether or not 1 second has elapsed. 
+                // XXX: The constant here is specific to smorz!!!
+                if (phase2_time - start_time >= (1996*10000)) {
+                    start_time = phase2_time;
+                    volatile int end_count = m_worker->numDone();
+                    buckets_done[100+j] = end_count - start_count;
+                    start_count = end_count;
+                    break;
+                }
+                for (int i = 0; i < 750; ++i) {
+                    single_work();
+                }
             }
         }
         
-        while (true) {
-            ++phase3;
+        // Regular load for 1 second. 
+        for (int j = 0; j < 100; ++j) {
+            while (true) {
+                buckets_in[200+j] += 1;
+                Action* action = m_gen->getPreGen();
+                if (m_lazy_input->Enqueue((uint64_t)action)) {
+                    buckets_out[200+j] += 1;
+                }
+                else {
+                    for (int i = 0; i < 110; ++i) {
+                        single_work();
+                    }
+                }
 
-            uint64_t cur_time = rdtsc();
-            if (phase3_time - start_time >= (3*1996*1000000)) {
-                break;
+                uint64_t phase3_time = rdtsc();
+
+                // Check whether or not 1 second has elapsed. 
+                // XXX: The constant here is specific to smorz!!!
+                if (phase3_time - start_time >= (1996*10000)) {
+                    start_time = phase3_time;
+                    volatile int end_count = m_worker->numDone();
+                    buckets_done[200+j] = end_count - start_count;
+                    start_count = end_count;
+
+                    break;
+                }
+                for (int i = 0; i < 100000; ++i) {
+                    single_work();
+                }
             }
         }
+        
+        ofstream client_try;
+
+        
+        client_try.open("client_try.txt");
+        double cur = 0.0;
+        double diff = 1.0 / 100.0;
+        for (int i = 0; i < 300; ++i) {
+            uint64_t throughput = buckets_in[i]*100;
+            client_try << cur << " " << throughput << "\n";
+            cur += diff;
+        }
+
+        client_try.close();
+
+        ofstream client_success;
+        client_success.open("client_success.txt");
+        cur = 0.0;
+        for (int i = 0; i < 300; ++i) {
+            double percentage = 
+                ((double)buckets_out[i])/((double)buckets_in[i]);
+            percentage = percentage*100.0;
+            client_success << cur << " " << percentage << "\n";
+            cur += diff;
+        }
+        client_success.close();
+
+        ofstream throughput_file;
+        throughput_file.open("client_throughput.txt");
+        cur = 0.0;
+        for (int i = 0; i < 300; ++i) {
+            uint64_t throughput = buckets_done[i]*100;
+            throughput_file << cur << " " << throughput << "\n";
+            cur += diff;
+        }
+        throughput_file.close();
     }
-    */
 
     void Run() {
         

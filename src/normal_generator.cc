@@ -10,9 +10,10 @@ NormalGenerator::NormalGenerator(int read_size,
     m_num_records = num_records;
     m_freq = freq;
     m_std_dev = std_dev;
-
-	m_action_set = new Action[10000000];
-        memset(m_action_set, 0, sizeof(Action)*10000000);
+    
+    m_num_actions = 10000000;
+	m_action_set = new Action[m_num_actions];
+        memset(m_action_set, 0, sizeof(Action)*m_num_actions);
 	m_use_next = 0;
 
     srand(time(NULL));

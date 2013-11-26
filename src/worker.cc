@@ -52,19 +52,21 @@ void* Worker::workerFunction(void* arg) {
   uint64_t* input_queue_data = 
       (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
   uint64_t* output_queue_data = 
-      (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
+      (uint64_t*)numa_alloc_local((1 << 24)*CACHE_LINE*sizeof(uint64_t));
   
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
 
   memset(input_queue_data, 0, (size));
-  memset(output_queue_data, 0, (size));
+  memset(output_queue_data, 0, 1<<24);
+  
+  std::cout << "here!\n";
 
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
 
   worker->m_input_queue = new SimpleQueue(input_queue_data, size);
-  worker->m_output_queue = new SimpleQueue(output_queue_data, size);
+  worker->m_output_queue = new SimpleQueue(output_queue_data, 1<<24);
 
   SimpleQueue* input_queue = worker->m_input_queue;
   SimpleQueue* output_queue = worker->m_output_queue;
@@ -101,6 +103,10 @@ void* Worker::workerFunction(void* arg) {
   
   // We should never get here!
   assert(false);
+}
+
+int Worker::numDone() {
+    return m_num_values;
 }
 
 uint64_t* Worker::getTimes(int* num_vals) {

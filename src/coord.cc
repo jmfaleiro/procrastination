@@ -79,9 +79,9 @@ initWorkers(Worker** workers,
 	int cpu_id = get_cpu(start_index + i, 1);
 	CPU_ZERO(&bindings[i]);
 	CPU_SET(cpu_id, &bindings[i]);
-	
+        	
 	// Start the worker. 
-	workers[i] = new Worker(1 << 24,
+	workers[i] = new Worker(1 << 10,
                                 &bindings[i], 
                                 records);
 	workers[i]->startThread(&input_queue[i], &output_queue[i]);	
@@ -190,7 +190,7 @@ int initialize(ExperimentInfo* info,
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
 
     // Data for input/output queues. 
-    uint64_t sched_size = (1 << 24);
+    uint64_t sched_size = (1 << 10);
     uint64_t* sched_input_data = 
         (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
     uint64_t* sched_output_data = 
@@ -270,8 +270,13 @@ void run_experiment(ExperimentInfo* info) {
                    &gen);
     
     if (info->latency) {    
-        Client c(sched, scheduler_input, scheduler_output, gen, info->num_txns);
-        c.Run();
+        Client c(worker, 
+                 sched, 
+                 scheduler_input, 
+                 scheduler_output, 
+                 gen, 
+                 info->num_txns);
+        c.RunPeak();
     }
     else {
         std::cout << "Begin building dependencies\n";
