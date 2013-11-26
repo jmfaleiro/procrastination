@@ -111,73 +111,80 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     return NULL;
 }
 
+bool LazyScheduler::isDone(uint64_t* num_done) {
+    if (m_start_flag == 0) {
+        *num_done = m_num_txns;
+    }
+    return (m_start_flag == 0);
+}
+
 // Add the given action to the dependency graph. 
 void LazyScheduler::addGraph(Action* action) {
-	
-	if (m_serial) {
-		action->state = SUBSTANTIATED;
-		run_txn(action);
-		return;
-	}
-	else {
-		action->state = STICKY;
 
-		// Iterate through this action's read set and write set, find the 
-		// transactions it depends on and add it to the dependency graph. 
-		int num_reads = action->readset.size();
-		int num_writes = action->writeset.size();
-		int* count_ptrs[num_reads+num_writes];
-
-		// Go through the read set. 
-		bool force_materialize = action->materialize;
-		for (int i = 0; i < num_reads; ++i) {
-			int record = action->readset[i].record;
-
-			// Keep the information about the previous txn around. 
-			action->readset[i].dependency = (*m_last_txns)[record].last_txn;
-			action->readset[i].is_write = (*m_last_txns)[record].is_write;
-			action->readset[i].index = (*m_last_txns)[record].index;
-			count_ptrs[i] = &((*m_last_txns)[record].chain_length);
-
-			// Update the heuristic information. 
-			(*m_last_txns)[record].last_txn = action;
-			(*m_last_txns)[record].index = i;
-			(*m_last_txns)[record].is_write = false;
+    if (m_serial) {
+        action->state = SUBSTANTIATED;
+        run_txn(action);
+        return;
+    }
+    else {
+        action->state = STICKY;
         
-			// Increment the length of the chain corresponding to this record, 
-			// check if it exceeds our threshold value. 
-			(*m_last_txns)[record].chain_length += 1;		
-			force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
-		}
-
-		// Go through the write set. 
-		for (int i = 0; i < num_writes; ++i) {
-			int record = action->writeset[i].record;
-
-			// Keep the information about the previous txn around. 
-			action->writeset[i].dependency = (*m_last_txns)[record].last_txn;
-			action->writeset[i].is_write = (*m_last_txns)[record].is_write;
-			action->writeset[i].index = (*m_last_txns)[record].index;
-			count_ptrs[num_reads+i] = &((*m_last_txns)[record].chain_length);
-
-			// Update the heuristic information. 
-			(*m_last_txns)[record].last_txn = action;
-			(*m_last_txns)[record].index = i;
-			(*m_last_txns)[record].is_write = true;
-
-			// Increment the length of the chain corresponding to this record, check if 
-			// it exceeds our threshold value. 
-			(*m_last_txns)[record].chain_length += 1;
-			force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
-		}  
-  
-		if (force_materialize) {      
-			for (int i = 0; i < num_reads+num_writes; ++i) {
-				*(count_ptrs[i]) = 0;		  
-			}
-			m_walking_queue->EnqueueBlocking((uint64_t)action);
-		}
-	}
+        // Iterate through this action's read set and write set, find the 
+        // transactions it depends on and add it to the dependency graph. 
+        int num_reads = action->readset.size();
+        int num_writes = action->writeset.size();
+        int* count_ptrs[num_reads+num_writes];
+        
+        // Go through the read set. 
+        bool force_materialize = action->materialize;
+        for (int i = 0; i < num_reads; ++i) {
+            int record = action->readset[i].record;
+            
+            // Keep the information about the previous txn around. 
+            action->readset[i].dependency = (*m_last_txns)[record].last_txn;
+            action->readset[i].is_write = (*m_last_txns)[record].is_write;
+            action->readset[i].index = (*m_last_txns)[record].index;
+            count_ptrs[i] = &((*m_last_txns)[record].chain_length);
+            
+            // Update the heuristic information. 
+            (*m_last_txns)[record].last_txn = action;
+            (*m_last_txns)[record].index = i;
+            (*m_last_txns)[record].is_write = false;
+            
+            // Increment the length of the chain corresponding to this record, 
+            // check if it exceeds our threshold value. 
+            (*m_last_txns)[record].chain_length += 1;		
+            force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+        }
+        
+        // Go through the write set. 
+        for (int i = 0; i < num_writes; ++i) {
+            int record = action->writeset[i].record;
+            
+            // Keep the information about the previous txn around. 
+            action->writeset[i].dependency = (*m_last_txns)[record].last_txn;
+            action->writeset[i].is_write = (*m_last_txns)[record].is_write;
+            action->writeset[i].index = (*m_last_txns)[record].index;
+            count_ptrs[num_reads+i] = &((*m_last_txns)[record].chain_length);
+            
+            // Update the heuristic information. 
+            (*m_last_txns)[record].last_txn = action;
+            (*m_last_txns)[record].index = i;
+            (*m_last_txns)[record].is_write = true;
+            
+            // Increment the length of the chain corresponding to this record, 
+            // check if it exceeds our threshold value. 
+            (*m_last_txns)[record].chain_length += 1;
+            force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+        }  
+        
+        if (force_materialize) {      
+            for (int i = 0; i < num_reads+num_writes; ++i) {
+                *(count_ptrs[i]) = 0;		  
+            }
+            m_walking_queue->EnqueueBlocking((uint64_t)action);
+        }
+    }
 }
 
 void LazyScheduler::processRead(Action* action, 

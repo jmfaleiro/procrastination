@@ -6,7 +6,7 @@
 #include <set>
 #include <iostream>
 
-#define NUM_OPTS 10
+#define NUM_OPTS 11
 
 // Use this class to parse command line arguments for our particular experiment
 // scenario. 
@@ -34,11 +34,15 @@ public:
             {"num_runs", required_argument, NULL, 7},
             {"output_file", required_argument, NULL, 8},
             {"normal", required_argument, NULL, 9},
-            { NULL, no_argument, NULL, 10}
+            {"latency", no_argument, NULL, 10},
+            { NULL, no_argument, NULL, 11}
         };
-        
+
+        serial = true;
+        substantiate_period = 1;
         is_normal = false;
         std_dev = -1;
+        latency = false;
 
         std::set<int> args_received;
         int index;
@@ -54,6 +58,7 @@ public:
             }
             switch (index) {
             case 0:
+                serial = false;
                 substantiate_period = atoi(optarg);
                 break;
             case 1:
@@ -84,13 +89,16 @@ public:
                 is_normal = true;
                 std_dev = atoi(optarg);
                 break;
+            case 10:
+                latency = true;
+                break;
             default:
                 argError(long_options, NUM_OPTS);
             }
         }
         
         for (int i = 0; i < NUM_OPTS; ++i) {
-            if (i != 9) {
+            if (i != 9 && i != 0 && i != 10) {
                 if (args_received.find(i) == args_received.end()) {
                     argError(long_options, NUM_OPTS);
                 }
@@ -106,9 +114,12 @@ public:
     // Binding information for scheduler+worker threads. 
     cpu_set_t* worker_bindings;
     cpu_set_t* scheduler_bindings;
+    
+    bool latency;
 
     // Period between txns that force substantiation. 'f' means that we have one
-    // every 'f' txns. 
+    // every 'f' txns
+    bool serial; 
     int substantiate_period;
     
     // Number of worker threads. 

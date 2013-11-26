@@ -12,6 +12,7 @@ NormalGenerator::NormalGenerator(int read_size,
     m_std_dev = std_dev;
 
 	m_action_set = new Action[10000000];
+        memset(m_action_set, 0, sizeof(Action)*10000000);
 	m_use_next = 0;
 
     srand(time(NULL));

@@ -7,6 +7,7 @@
 #include "uniform_generator.h"
 #include "experiment_info.h"
 #include "machine.h"
+#include "client.h"
 
 #include <numa.h>
 #include <pthread.h>
@@ -47,6 +48,8 @@ buildDependencies(WorkloadGenerator* generator,
     int to_wait = 0;
     for (int i = 0; i < num_actions; ++i) {
         Action* gen = generator->genNext();
+        gen->start_time = 0;
+        gen->end_time = 0;
         input_queue->EnqueueBlocking((uint64_t)gen);
 
         if (gen->materialize) {
@@ -87,20 +90,22 @@ initWorkers(Worker** workers,
 }
 
 // Returns the time elapsed in processing a given workload. 
-timespec wait(int num_waits, 
-              LazyScheduler* sched,
+timespec wait(LazyScheduler* sched,
               SimpleQueue* scheduler_output) {
-         
+    
     timespec start_time, end_time;
     sched->startScheduler();
     
     // Start measuring time elapsed. 
     clock_gettime(CLOCK_REALTIME, &start_time);        
-	uint64_t to_wait = sched->waitFinished();    	
+    uint64_t to_wait = sched->waitFinished();    	
+        
+    
     while (to_wait-- > 0) {
         volatile uint64_t ptr;
         ptr = scheduler_output->DequeueBlocking();
     }    
+        
     clock_gettime(CLOCK_REALTIME, &end_time);    
 
     return diff_time(start_time, end_time);
@@ -114,14 +119,46 @@ void write_answers(ExperimentInfo* info, timespec time_taken, int num_done) {
     output_file.close();
 }
 
+void write_client_latencies(int num_waits, WorkloadGenerator* gen) {
+    uint64_t* times = (uint64_t*)numa_alloc_local(sizeof(uint64_t)*num_waits);
+    memset(times, 0, sizeof(uint64_t)*num_waits);
+
+    int total_actions = gen->numUsed();
+    Action* action_set = gen->getActions();
+    int j = 0;
+    for (int i = 0; i < total_actions; ++i) {
+        Action cur = action_set[i];
+        if (cur.materialize) {
+            times[j++] = cur.end_time - cur.start_time;
+        }
+    }
+    
+    std::sort(times, times+j);
+    
+    ofstream output_file;
+    output_file.open("client_latencies.txt", ios::out);
+    
+    double cdf_y = 0.0;
+    double diff = 1.0 / (double)j;
+    for (int i = 0; i < j; ++i) {
+        output_file << cdf_y << " " << times[i] << "\n";
+        cdf_y += diff;
+    }
+    
+    output_file.close();
+}
+
 void write_latencies(Worker* worker) {
+                     
+        
     ofstream output_file;
     output_file.open("latencies.txt", ios::out);
     
     int num_values;
     uint64_t* times = worker->getTimes(&num_values);
     num_values = num_values > 1000000? 1000000 : num_values;
-    sort(times, times + num_values);
+	std::cout << num_values << "\n";
+	std::sort(times, times + num_values);
 
     double diff = 1.0 / (double)(num_values);
     double cur = 0.0;
@@ -135,8 +172,10 @@ void write_latencies(Worker* worker) {
 
 int initialize(ExperimentInfo* info, 
                SimpleQueue** output,
+               SimpleQueue** input,
                LazyScheduler** scheduler,
-               Worker** worker) {
+               Worker** worker,
+               WorkloadGenerator** generator) {
 
     init_cpuinfo();
     numa_set_strict(1);
@@ -179,8 +218,7 @@ int initialize(ExperimentInfo* info,
                                    info->num_records,
                                    info->substantiate_period);
     }
-    int waits = 
-        buildDependencies(gen, info->num_txns, scheduler_input);
+    *generator = gen;
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
@@ -199,8 +237,8 @@ int initialize(ExperimentInfo* info,
     CPU_ZERO(&info->scheduler_bindings[1]);
     CPU_SET(1, &info->scheduler_bindings[1]);
 	
-    *scheduler = new LazyScheduler(false,
-								   info->num_workers, 
+    *scheduler = new LazyScheduler(info->serial,
+                                   info->num_workers, 
                                    info->num_records, 
                                    info->substantiate_threshold,
                                    worker_inputs,
@@ -212,19 +250,38 @@ int initialize(ExperimentInfo* info,
     (*scheduler)->startThread();
     *worker = workers[0];
     *output = worker_outputs[0];
-    return waits;
+    *input = scheduler_input;
+    return 0;
 }
 
 
 void run_experiment(ExperimentInfo* info) {
     SimpleQueue* scheduler_output;
+    SimpleQueue* scheduler_input;
+    WorkloadGenerator* gen;
     LazyScheduler* sched;
     Worker* worker;
     int num_waits = 
-        initialize(info, &scheduler_output, &sched, &worker);
-    timespec exec_time = wait(num_waits, sched, scheduler_output);
-    write_answers(info, exec_time, sched->numDone());
-    write_latencies(worker);
+        initialize(info, 
+                   &scheduler_output, 
+                   &scheduler_input, 
+                   &sched, 
+                   &worker, 
+                   &gen);
+    
+    if (info->latency) {    
+        Client c(sched, scheduler_input, scheduler_output, gen, info->num_txns);
+        c.Run();
+    }
+    else {
+        std::cout << "Begin building dependencies\n";
+        buildDependencies(gen, info->num_txns, scheduler_input);
+        std::cout << "End building dependencies\n";
+        timespec exec_time = wait(sched, scheduler_output);
+        write_answers(info, exec_time, sched->numDone());
+        write_latencies(worker);
+    }
+    exit(0);
 }
 
 int

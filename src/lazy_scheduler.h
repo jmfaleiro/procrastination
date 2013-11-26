@@ -135,6 +135,8 @@ public:
   virtual void startThread();  
 
   virtual int numDone();
+
+  virtual bool isDone(uint64_t* num_done);
 };
 
 #endif // LAZY_SCHEDULER_H
