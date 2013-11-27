@@ -13,7 +13,6 @@ void ProcessAction(const Action* to_proc, int* records) {
 
     for (int i = 0; i < readset_size; ++i) {
         int index = to_proc->readset[i].record;
-        int value = records[CACHE_LINE * index];
         count += records[CACHE_LINE*index];        
         count += records[CACHE_LINE*(index+1)];
         count += records[CACHE_LINE*(index+2)];
@@ -52,21 +51,12 @@ void* Worker::workerFunction(void* arg) {
   uint64_t* input_queue_data = 
       (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
   uint64_t* output_queue_data = 
-      (uint64_t*)numa_alloc_local((1 << 24)*CACHE_LINE*sizeof(uint64_t));
-  
-  assert(input_queue_data != NULL);
-  assert(output_queue_data != NULL);
-
-  memset(input_queue_data, 0, (size));
-  memset(output_queue_data, 0, 1<<24);
-  
-  std::cout << "here!\n";
-
+      (uint64_t*)numa_alloc_local(LARGE_QUEUE*CACHE_LINE*sizeof(uint64_t));
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
 
   worker->m_input_queue = new SimpleQueue(input_queue_data, size);
-  worker->m_output_queue = new SimpleQueue(output_queue_data, 1<<24);
+  worker->m_output_queue = new SimpleQueue(output_queue_data, LARGE_QUEUE);
 
   SimpleQueue* input_queue = worker->m_input_queue;
   SimpleQueue* output_queue = worker->m_output_queue;
@@ -83,7 +73,6 @@ void* Worker::workerFunction(void* arg) {
   }  
 
   worker->m_num_values = 0;
-  uint64_t num_done = 0;
   Action* action;
   while (true) {
 	if (worker->m_run_flag) {

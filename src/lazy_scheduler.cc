@@ -1,4 +1,5 @@
 #include "lazy_scheduler.h"
+#include "machine.h"
 
 #include <assert.h>
 #include <deque>
@@ -6,7 +7,7 @@
 using namespace std;
 
 LazyScheduler::LazyScheduler(bool serial, 
-							 int num_workers,
+                             int num_workers,
                              int num_records, 
                              int max_chain,
                              SimpleQueue** worker_inputs,
@@ -46,6 +47,8 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
 		Action* to_walk = (Action*)(input_queue->DequeueBlocking());
 		sched->substantiate(to_walk);
 	}
+        
+        return NULL;
 }
 
 void* LazyScheduler::schedulerFunction(void* arg) {
@@ -69,29 +72,29 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     }
 
     sched->m_num_txns = 0;
-	pthread_t walker_thread;
-
-	if (!sched->m_serial) {
-		
-		// Create a queue to communicate with the graph walking thread. 
-		int walk_queue_size = (1 << 10);
-		uint64_t* walk_queue_data = 
-			(uint64_t*)numa_alloc_local(CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
-		memset(walk_queue_data, 0, CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
-		sched->m_walking_queue = new SimpleQueue(walk_queue_data, walk_queue_size);
-		
-		// Kick off the graph walking thread. 
-		xchgq(&sched->m_walk_flag, 0);
-		pthread_create(&walker_thread,
-					   NULL,
-					   graphWalkFunction, 
-					   sched);
-		
-		// Wait until the thread is ready..
-		while (sched->m_walk_flag == 0)
-			;		
-	}
-
+    pthread_t walker_thread;
+    
+    if (!sched->m_serial) {
+        
+        // Create a queue to communicate with the graph walking thread. 
+        int walk_queue_size = SMALL_QUEUE;
+        uint64_t* walk_queue_data = 
+            (uint64_t*)numa_alloc_local(CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
+        memset(walk_queue_data, 0, CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
+        sched->m_walking_queue = new SimpleQueue(walk_queue_data, walk_queue_size);
+        
+        // Kick off the graph walking thread. 
+        xchgq(&sched->m_walk_flag, 0);
+        pthread_create(&walker_thread,
+                       NULL,
+                       graphWalkFunction, 
+                       sched);
+        
+        // Wait until the thread is ready..
+        while (sched->m_walk_flag == 0)
+            ;		
+    }
+    
     xchgq(&(sched->m_start_flag), 1);
     
     SimpleQueue* incoming_txns = sched->m_log_input;
@@ -190,10 +193,9 @@ void LazyScheduler::addGraph(Action* action) {
 void LazyScheduler::processRead(Action* action, 
                                 int readIndex) {
      
-    assert(action->state == STICKY);
-    
-    int record = action->readset[readIndex].record;
-	Action* prev = action->readset[readIndex].dependency;
+    assert(action->state == STICKY);    
+
+    Action* prev = action->readset[readIndex].dependency;
     int index = action->readset[readIndex].index;
     bool is_write = action->readset[readIndex].is_write;
 
@@ -227,7 +229,6 @@ void LazyScheduler::processWrite(Action* action,
     assert(action->state == STICKY);
     
     // Get the record and txn this action is dependent on. 
-    int record = action->writeset[writeIndex].record;
     Action* prev = action->writeset[writeIndex].dependency;
     bool is_write = action->writeset[writeIndex].is_write;
     int index = action->writeset[writeIndex].index;

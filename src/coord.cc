@@ -66,7 +66,8 @@ initWorkers(Worker** workers,
             cpu_set_t* bindings,
             SimpleQueue** input_queue,
             SimpleQueue** output_queue,
-            int num_records) {
+            int num_records,
+            ExperimentInfo* info) {
     numa_set_strict(1);
     int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records*4);
     for (int i = 0; i < 4*num_records; ++i) {
@@ -81,9 +82,17 @@ initWorkers(Worker** workers,
 	CPU_SET(cpu_id, &bindings[i]);
         	
 	// Start the worker. 
-	workers[i] = new Worker(1 << 10,
-                                &bindings[i], 
-                                records);
+        if (info->experiment == PEAK_LOAD) {
+            workers[i] = new Worker(SMALL_QUEUE,
+                                    &bindings[i], 
+                                    records);
+        }
+        else {
+            workers[i] = new Worker(LARGE_QUEUE,
+                                    &bindings[i], 
+                                    records);            
+        }
+
 	workers[i]->startThread(&input_queue[i], &output_queue[i]);	
 	workers[i]->startWorker();
   }
@@ -91,15 +100,16 @@ initWorkers(Worker** workers,
 
 // Returns the time elapsed in processing a given workload. 
 timespec wait(LazyScheduler* sched,
-              SimpleQueue* scheduler_output) {
+              SimpleQueue* scheduler_output,
+              timespec* stickification_time) {
     
-    timespec start_time, end_time;
+    timespec start_time, end_time, input_time;
     sched->startScheduler();
     
     // Start measuring time elapsed. 
     clock_gettime(CLOCK_REALTIME, &start_time);        
     uint64_t to_wait = sched->waitFinished();    	
-        
+    clock_gettime(CLOCK_REALTIME, &input_time);
     
     while (to_wait-- > 0) {
         volatile uint64_t ptr;
@@ -107,16 +117,26 @@ timespec wait(LazyScheduler* sched,
     }    
         
     clock_gettime(CLOCK_REALTIME, &end_time);    
-
+    *stickification_time = diff_time(start_time, input_time);
     return diff_time(start_time, end_time);
 }
 
 // Append the timing information to an output file. 
-void write_answers(ExperimentInfo* info, timespec time_taken, int num_done) {
-    ofstream output_file;
-    output_file.open(info->output_file, ios::app | ios::out);
-    output_file << time_taken.tv_sec << "." << time_taken.tv_nsec <<  "  " << num_done << "\n";
-    output_file.close();
+void write_answers(ExperimentInfo* info, 
+                   timespec subst_time, 
+                   timespec stick_time,
+                   int num_done) {
+    ofstream subst_file;
+    subst_file.open(info->subst_file, ios::app | ios::out);
+    subst_file << subst_time.tv_sec << "." << subst_time.tv_nsec <<  "  " << num_done << "\n";
+    subst_file.close();
+
+    if (!info->serial) {
+        ofstream stick_file;
+        stick_file.open(info->stick_file, ios::app | ios::out);
+        subst_file << stick_time.tv_sec << "." << stick_time.tv_nsec << " " << info->num_txns << "\n";
+        stick_file.close();
+    }
 }
 
 void write_client_latencies(int num_waits, WorkloadGenerator* gen) {
@@ -170,12 +190,12 @@ void write_latencies(Worker* worker) {
     output_file.close();
 }
 
-int initialize(ExperimentInfo* info, 
-               SimpleQueue** output,
-               SimpleQueue** input,
-               LazyScheduler** scheduler,
-               Worker** worker,
-               WorkloadGenerator** generator) {
+void initialize(ExperimentInfo* info, 
+                SimpleQueue** output,
+                SimpleQueue** input,
+                LazyScheduler** scheduler,
+                Worker** worker,
+                WorkloadGenerator** generator) {
 
     init_cpuinfo();
     numa_set_strict(1);
@@ -190,14 +210,17 @@ int initialize(ExperimentInfo* info,
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
 
     // Data for input/output queues. 
-    uint64_t sched_size = (1 << 10);
+    uint64_t sched_size;
+    if (info->experiment == PEAK_LOAD) {
+        sched_size = SMALL_QUEUE;
+    }
+    else {
+        sched_size = LARGE_QUEUE;
+    }
+
     uint64_t* sched_input_data = 
         (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
-    uint64_t* sched_output_data = 
-        (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
-
     assert(sched_input_data != NULL);
-    assert(sched_output_data != NULL);
 
     // Create the queues. 
     SimpleQueue* scheduler_input = 
@@ -228,7 +251,8 @@ int initialize(ExperimentInfo* info,
                 info->worker_bindings,
                 worker_inputs,
                 worker_outputs,
-                info->num_records);
+                info->num_records,
+                info);
     
     // Create a scheduler thread. 
     CPU_ZERO(&info->scheduler_bindings[0]);
@@ -251,7 +275,6 @@ int initialize(ExperimentInfo* info,
     *worker = workers[0];
     *output = worker_outputs[0];
     *input = scheduler_input;
-    return 0;
 }
 
 
@@ -261,15 +284,30 @@ void run_experiment(ExperimentInfo* info) {
     WorkloadGenerator* gen;
     LazyScheduler* sched;
     Worker* worker;
-    int num_waits = 
-        initialize(info, 
-                   &scheduler_output, 
-                   &scheduler_input, 
-                   &sched, 
-                   &worker, 
-                   &gen);
+    initialize(info, 
+               &scheduler_output, 
+               &scheduler_input, 
+               &sched, 
+               &worker, 
+               &gen);
     
-    if (info->latency) {    
+    if (info->experiment == THROUGHPUT) {
+        buildDependencies(gen, info->num_txns, scheduler_input);
+        timespec input_time;
+        timespec exec_time = wait(sched, scheduler_output, &input_time);
+        write_answers(info, exec_time, input_time, sched->numDone());
+        write_latencies(worker);     
+    }
+    else if (info->experiment == LATENCY) {
+        Client c(worker, 
+                 sched, 
+                 scheduler_input, 
+                 scheduler_output, 
+                 gen, 
+                 info->num_txns);
+        c.Run();
+    }
+    else if (info->experiment == PEAK_LOAD) {
         Client c(worker, 
                  sched, 
                  scheduler_input, 
@@ -277,14 +315,6 @@ void run_experiment(ExperimentInfo* info) {
                  gen, 
                  info->num_txns);
         c.RunPeak();
-    }
-    else {
-        std::cout << "Begin building dependencies\n";
-        buildDependencies(gen, info->num_txns, scheduler_input);
-        std::cout << "End building dependencies\n";
-        timespec exec_time = wait(sched, scheduler_output);
-        write_answers(info, exec_time, sched->numDone());
-        write_latencies(worker);
     }
     exit(0);
 }

@@ -5,8 +5,16 @@
 #include <stdlib.h>
 #include <set>
 #include <iostream>
+#include <string>
+#include <sstream>
 
-#define NUM_OPTS 11
+#define NUM_OPTS 10
+
+enum ExperimentType {
+    THROUGHPUT,
+    LATENCY,
+    PEAK_LOAD,
+};
 
 // Use this class to parse command line arguments for our particular experiment
 // scenario. 
@@ -32,19 +40,24 @@ public:
             {"num_txns", required_argument, NULL, 5},
             {"sub_threshold", required_argument, NULL, 6},
             {"num_runs", required_argument, NULL, 7},
-            {"output_file", required_argument, NULL, 8},
-            {"normal", required_argument, NULL, 9},
-            {"latency", no_argument, NULL, 10},
-            { NULL, no_argument, NULL, 11}
+            {"normal", required_argument, NULL, 8},
+            {"experiment", required_argument, NULL, 9},
+            { NULL, no_argument, NULL, 10}
         };
 
         serial = true;
         substantiate_period = 1;
         is_normal = false;
         std_dev = -1;
-        latency = false;
 
         std::set<int> args_received;
+        std::stringstream stick_stream;
+        std::stringstream subst_stream;
+        stick_stream << "eager.txt";
+        subst_stream << "eager.txt";
+        
+        int exp_type = -1;
+
         int index;
         while (getopt_long_only(argc, argv, "", long_options, &index) != -1) {
             
@@ -59,7 +72,13 @@ public:
             switch (index) {
             case 0:
                 serial = false;
+                
                 substantiate_period = atoi(optarg);
+                subst_stream.str("");
+                stick_stream.str("");
+                
+                subst_stream << "lazy_" << substantiate_period << "_subst.txt";
+                stick_stream << "lazy_" << substantiate_period << "_stick.txt";
                 break;
             case 1:
                 num_workers = atoi(optarg);
@@ -83,14 +102,17 @@ public:
                 num_runs = atoi(optarg);
                 break;
             case 8:
-                output_file = optarg;
+                subst_file = optarg;
                 break;
             case 9:
                 is_normal = true;
                 std_dev = atoi(optarg);
                 break;
             case 10:
-                latency = true;
+                exp_type = atoi(optarg);
+                break;
+            case 11:
+                stick_file = optarg;
                 break;
             default:
                 argError(long_options, NUM_OPTS);
@@ -98,24 +120,33 @@ public:
         }
         
         for (int i = 0; i < NUM_OPTS; ++i) {
-            if (i != 9 && i != 0 && i != 10) {
+            if (i != 8 && i != 0) {
                 if (args_received.find(i) == args_received.end()) {
                     argError(long_options, NUM_OPTS);
                 }
             }
         }
         
+        if (exp_type != LATENCY && 
+            exp_type != THROUGHPUT && 
+            exp_type != PEAK_LOAD) {
+            argError(long_options, NUM_OPTS);
+        }
+        else {
+            experiment = (ExperimentType)exp_type;
+        }
         // Allocate cpu_set_t's for binding threads. 
         // XXX: The scheduler is single threaded so we have just one for now. 
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[2];		
+
+        subst_file = subst_stream.str().c_str();
+        stick_file = stick_stream.str().c_str();
     }
     
     // Binding information for scheduler+worker threads. 
     cpu_set_t* worker_bindings;
     cpu_set_t* scheduler_bindings;
-    
-    bool latency;
 
     // Period between txns that force substantiation. 'f' means that we have one
     // every 'f' txns
@@ -124,7 +155,9 @@ public:
     
     // Number of worker threads. 
     int num_workers;
-
+    
+    // Type of experiment for the coordinator to setup. 
+    ExperimentType experiment;
 
     // Number of elements in the read set. 
     int read_set_size;
@@ -142,9 +175,11 @@ public:
     // "steady state" behavior. 
     int substantiate_threshold;
     
-    // File in which to dump results. 
-    // XXX: We're only going to dump throughput for now.. 
-    char* output_file;
+    // File in which to dump substantiation throughput. 
+    const char* subst_file;
+    
+    // File in which to dump stickification throughput. 
+    const char* stick_file;
 
     // Number of times to repeat our experiment. 
     int num_runs;

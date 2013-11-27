@@ -45,7 +45,7 @@ class Client {
                         buckets[100*i + j] += 1;
                     }
                     uint64_t cur_time = rdtsc();
-                    if (cur_time - start_time >= (1996*10000)) {
+                    if (cur_time - start_time >= (FREQUENCY/100)) {
                         start_time = cur_time;
                         break;
                     }
@@ -74,12 +74,8 @@ public:
         m_gen->preGen();                
         m_sched->startScheduler();
 
-        uint64_t phase1 = 0, phase2 = 0, phase3 = 0;
-        uint64_t phase1_iters = 0, phase2_iters = 0, phase3_iters = 0;
         volatile uint64_t start_time = rdtsc();
-        volatile uint64_t phase1_time; 
-        volatile uint64_t phase2_time; 
-        volatile uint64_t phase3_time;
+        volatile uint64_t phase_time; 
 
         uint64_t* buckets_in = 
             (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
@@ -116,12 +112,12 @@ public:
                         single_work();
                     }
                 }
-                phase1_time = rdtsc();
+                phase_time = rdtsc();
                 
                 // Check whether or not 1 second has elapsed. 
                 // XXX: The constant here is specific to smorz!!!
-                if (phase1_time - start_time >= (1996 * 10000)) {
-                    start_time = phase1_time;
+                if (phase_time - start_time >= (FREQUENCY/100)) {
+                    start_time = phase_time;
                     volatile int end_count = m_worker->numDone();
                     buckets_done[j] = end_count - start_count;
                     start_count = end_count;
@@ -149,12 +145,12 @@ public:
                 }
                 
 
-                phase2_time = rdtsc();
+                phase_time = rdtsc();
 
                 // Check whether or not 1 second has elapsed. 
                 // XXX: The constant here is specific to smorz!!!
-                if (phase2_time - start_time >= (1996*10000)) {
-                    start_time = phase2_time;
+                if (phase_time - start_time >= (FREQUENCY/100)) {
+                    start_time = phase_time;
                     volatile int end_count = m_worker->numDone();
                     buckets_done[100+j] = end_count - start_count;
                     start_count = end_count;
@@ -180,12 +176,12 @@ public:
                     }
                 }
 
-                uint64_t phase3_time = rdtsc();
+                phase_time = rdtsc();
 
                 // Check whether or not 1 second has elapsed. 
                 // XXX: The constant here is specific to smorz!!!
-                if (phase3_time - start_time >= (1996*10000)) {
-                    start_time = phase3_time;
+                if (phase_time - start_time >= (FREQUENCY/100)) {
+                    start_time = phase_time;
                     volatile int end_count = m_worker->numDone();
                     buckets_done[200+j] = end_count - start_count;
                     start_count = end_count;
@@ -287,7 +283,7 @@ public:
                 gen_actions[i].end_time != 0) {
                 latencies[j] = 
                     1.0*(gen_actions[i].end_time - gen_actions[i].start_time);
-                latencies[j] = latencies[j] / (1996.0);
+                latencies[j] = latencies[j] / (1.0*FREQUENCY/1000000);
                 ++j;
             }
         }
