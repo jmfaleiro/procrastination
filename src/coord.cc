@@ -112,8 +112,7 @@ timespec wait(LazyScheduler* sched,
     clock_gettime(CLOCK_REALTIME, &input_time);
     
     while (to_wait-- > 0) {
-        volatile uint64_t ptr;
-        ptr = scheduler_output->DequeueBlocking();
+        scheduler_output->DequeueBlocking();
     }    
         
     clock_gettime(CLOCK_REALTIME, &end_time);    

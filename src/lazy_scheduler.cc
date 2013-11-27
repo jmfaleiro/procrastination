@@ -249,6 +249,7 @@ void LazyScheduler::processWrite(Action* action,
     }
 }
 
+/*
 void LazyScheduler::cleanup_txns() {
     for (int i = 0; i < m_num_workers; ++i) {
         uint64_t done_ptr;
@@ -257,6 +258,7 @@ void LazyScheduler::cleanup_txns() {
         }
     }
 }
+*/
 
 void LazyScheduler::run_txn(Action* to_run) {
     assert(to_run->state == SUBSTANTIATED);
@@ -288,9 +290,11 @@ int LazyScheduler::numDone() {
 }
 
 // Mark the dependents as having completed. 
+/*
 void LazyScheduler::finishTxn(Action* action) {
     assert(false);
 }
+*/
 
 void 
 LazyScheduler::startScheduler() {

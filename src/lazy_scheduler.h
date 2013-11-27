@@ -96,7 +96,7 @@ class LazyScheduler {
   virtual uint64_t substantiate(Action* action);
 
   // Clean up after a transaction is done.
-  virtual void finishTxn(Action* action);
+  //  virtual void finishTxn(Action* action);
   
   // Dispatch a transaction to a worker for processing. 
   virtual void run_txn(Action* action);
@@ -106,7 +106,7 @@ class LazyScheduler {
   static void* graphWalkFunction(void* arg);
 
 
-  virtual void cleanup_txns();
+  //virtual void cleanup_txns();
   
 public:
   LazyScheduler(bool serial,
