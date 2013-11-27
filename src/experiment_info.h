@@ -53,9 +53,10 @@ public:
         std::set<int> args_received;
         std::stringstream stick_stream;
         std::stringstream subst_stream;
-        stick_stream << "eager.txt";
-        subst_stream << "eager.txt";
         
+        stick_stream << "eager";
+        subst_stream << "eager";
+
         int exp_type = -1;
 
         int index;
@@ -74,11 +75,11 @@ public:
                 serial = false;
                 
                 substantiate_period = atoi(optarg);
-                subst_stream.str("");
                 stick_stream.str("");
-                
-                subst_stream << "lazy_" << substantiate_period << "_subst.txt";
-                stick_stream << "lazy_" << substantiate_period << "_stick.txt";
+                subst_stream.str("");
+
+                subst_stream << "lazy_" << substantiate_period << "_subst";
+                stick_stream << "lazy_" << substantiate_period << "_stick";
                 break;
             case 1:
                 num_workers = atoi(optarg);
@@ -102,17 +103,11 @@ public:
                 num_runs = atoi(optarg);
                 break;
             case 8:
-                subst_file = optarg;
-                break;
-            case 9:
                 is_normal = true;
                 std_dev = atoi(optarg);
                 break;
-            case 10:
+            case 9:
                 exp_type = atoi(optarg);
-                break;
-            case 11:
-                stick_file = optarg;
                 break;
             default:
                 argError(long_options, NUM_OPTS);
@@ -139,6 +134,15 @@ public:
         // XXX: The scheduler is single threaded so we have just one for now. 
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[2];		
+        
+        if (is_normal) {
+            subst_stream << "_normal_" << std_dev << ".txt";
+            stick_stream << "_normal_" << std_dev << ".txt";
+        }
+        else {
+            subst_stream << "_uniform.txt";
+            stick_stream << "_uniform.txt";
+        }
 
         subst_file = subst_stream.str().c_str();
         stick_file = stick_stream.str().c_str();
