@@ -18,17 +18,17 @@ dev: CFLAGS = -g -Wall -Isrc -Wall -Wextra -std=c++0x
 dev: all
 
 $(TARGET): build $(OBJECTS)
-	@g++ $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	g++ $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
 
 $(OBJECTS): $(HEADERS) 
 
 
 build/%.o: src/%.cc
-	@g++ $(CFLAGS) -c -o $@ $<
+	g++ $(CFLAGS) -c -o $@ $<
 
 build:
-	@mkdir -p build
+	mkdir -p build
 
 .PHONY: clean
 clean:
-	@rm -rf build $(OBJECTS)
+	rm -rf build $(OBJECTS)

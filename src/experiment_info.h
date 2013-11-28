@@ -135,6 +135,11 @@ public:
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[2];		
         
+        if (!serial) {
+            subst_stream << "_threshold_" << substantiate_threshold;
+            stick_stream << "_threshold_" << substantiate_threshold;
+        }
+
         if (is_normal) {
             subst_stream << "_normal_" << std_dev << ".txt";
             stick_stream << "_normal_" << std_dev << ".txt";
@@ -143,9 +148,12 @@ public:
             subst_stream << "_uniform.txt";
             stick_stream << "_uniform.txt";
         }
-
-        subst_file = subst_stream.str().c_str();
-        stick_file = stick_stream.str().c_str();
+        subst_file = subst_stream.str();
+        stick_file = stick_stream.str();        
+        
+        std::cout << "Experiment info:\n";
+        std::cout << subst_file << "\n";
+        std::cout << stick_file << "\n";
     }
     
     // Binding information for scheduler+worker threads. 
@@ -180,10 +188,10 @@ public:
     int substantiate_threshold;
     
     // File in which to dump substantiation throughput. 
-    const char* subst_file;
+    string subst_file;
     
     // File in which to dump stickification throughput. 
-    const char* stick_file;
+    string stick_file;
 
     // Number of times to repeat our experiment. 
     int num_runs;

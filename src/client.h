@@ -89,6 +89,9 @@ public:
             (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
         memset(buckets_done, 0, sizeof(uint64_t)*300);
         
+        uint64_t* buckets_stick = 
+            (uint64_t*)numa_alloc_local(sizeof(uint64_t)*300);
+        memset(buckets_stick, 0, sizeof(uint64_t)*300);
         
         for (int i = 0; i < 8000000; ++i) {
             Action* action = m_gen->getPreGen();
@@ -99,6 +102,7 @@ public:
         }
 
         volatile int start_count = m_worker->numDone();
+        volatile uint64_t start_stick = m_sched->numStick();
         // Regular load for 1 second. 
         for (int j = 0; j < 100; ++j) {
             while (true) {
@@ -118,9 +122,13 @@ public:
                 // XXX: The constant here is specific to smorz!!!
                 if (phase_time - start_time >= (FREQUENCY/100)) {
                     start_time = phase_time;
-                    volatile int end_count = m_worker->numDone();
+                    volatile int end_count = m_worker->numDone();     
                     buckets_done[j] = end_count - start_count;
                     start_count = end_count;
+                    
+                    volatile uint64_t end_stick = m_sched->numStick();
+                    buckets_stick[j] = end_stick - start_stick;
+                    start_stick = end_stick;
                     break;
                 }
                 for (int i = 0; i < 100000; ++i) {
@@ -154,6 +162,11 @@ public:
                     volatile int end_count = m_worker->numDone();
                     buckets_done[100+j] = end_count - start_count;
                     start_count = end_count;
+
+                    volatile uint64_t end_stick = m_sched->numStick();
+                    buckets_stick[100+j] = end_stick - start_stick;
+                    start_stick = end_stick;
+
                     break;
                 }
                 for (int i = 0; i < 750; ++i) {
@@ -185,6 +198,11 @@ public:
                     volatile int end_count = m_worker->numDone();
                     buckets_done[200+j] = end_count - start_count;
                     start_count = end_count;
+
+                    volatile uint64_t end_stick = m_sched->numStick();
+                    buckets_stick[200+j] = end_stick - start_stick;
+                    start_stick = end_stick;
+
 
                     break;
                 }
@@ -219,7 +237,7 @@ public:
             cur += diff;
         }
         client_success.close();
-
+        
         ofstream throughput_file;
         throughput_file.open("client_throughput.txt");
         cur = 0.0;
@@ -229,6 +247,16 @@ public:
             cur += diff;
         }
         throughput_file.close();
+
+        ofstream stick_file;
+        stick_file.open("client_stickification.txt");
+        cur = 0.0;
+        for (int i = 0; i < 300; ++i) {
+            uint64_t stick = buckets_stick[i]*100;
+            stick_file << cur << " " << stick << "\n";
+            cur += diff;
+        }
+        stick_file.close();
     }
 
     void Run() {

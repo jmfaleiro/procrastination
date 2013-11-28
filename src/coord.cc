@@ -100,23 +100,35 @@ initWorkers(Worker** workers,
 
 // Returns the time elapsed in processing a given workload. 
 timespec wait(LazyScheduler* sched,
-              SimpleQueue* scheduler_output,
-              timespec* stickification_time) {
+              SimpleQueue* scheduler_output, 
+              Worker* worker,
+              timespec* stickification_time,
+              int* num_done,
+              ExperimentInfo* info) {
     
     timespec start_time, end_time, input_time;
     sched->startScheduler();
     
     // Start measuring time elapsed. 
-    clock_gettime(CLOCK_REALTIME, &start_time);        
-    uint64_t to_wait = sched->waitFinished();    	
-    clock_gettime(CLOCK_REALTIME, &input_time);
-    
-    while (to_wait-- > 0) {
-        scheduler_output->DequeueBlocking();
-    }    
-        
+    clock_gettime(CLOCK_REALTIME, &start_time);   
+    int to_wait = 0, done_count = 0;
+    if (!info->serial) {
+        sched->waitSubstantiated();
+        uint64_t num_waits = sched->waitFinished();
+        clock_gettime(CLOCK_REALTIME, &input_time);    
+        *num_done = worker->numDone();
+    }
+    else {
+        while (done_count++ != info->num_txns) {
+            scheduler_output->DequeueBlocking();
+        }
+        *num_done = info->num_txns;
+    }
+       
     clock_gettime(CLOCK_REALTIME, &end_time);    
-    *stickification_time = diff_time(start_time, input_time);
+    input_time = diff_time(start_time, input_time);
+    stickification_time->tv_sec = input_time.tv_sec;
+    stickification_time->tv_nsec = input_time.tv_nsec;
     return diff_time(start_time, end_time);
 }
 
@@ -126,14 +138,16 @@ void write_answers(ExperimentInfo* info,
                    timespec stick_time,
                    int num_done) {
     ofstream subst_file;
-    subst_file.open(info->subst_file, ios::app | ios::out);
+    subst_file.open(info->subst_file.c_str(), ios::app | ios::out);
     subst_file << subst_time.tv_sec << "." << subst_time.tv_nsec <<  "  " << num_done << "\n";
     subst_file.close();
 
     if (!info->serial) {
         ofstream stick_file;
-        stick_file.open(info->stick_file, ios::app | ios::out);
-        subst_file << stick_time.tv_sec << "." << stick_time.tv_nsec << " " << info->num_txns << "\n";
+        std::cout << stick_time.tv_sec << "." << stick_time.tv_nsec << "\n";
+        stick_file.open(info->stick_file.c_str(), ios::app | ios::out);
+        stick_file << stick_time.tv_sec << "." ;
+        stick_file << stick_time.tv_nsec << " " << info->num_txns << "\n";
         stick_file.close();
     }
 }
@@ -260,7 +274,9 @@ void initialize(ExperimentInfo* info,
     CPU_ZERO(&info->scheduler_bindings[1]);
     CPU_SET(1, &info->scheduler_bindings[1]);
 	
+    bool throughput_expt = (info->experiment == THROUGHPUT);
     *scheduler = new LazyScheduler(info->serial,
+                                   throughput_expt,
                                    info->num_workers, 
                                    info->num_records, 
                                    info->substantiate_threshold,
@@ -292,9 +308,16 @@ void run_experiment(ExperimentInfo* info) {
     
     if (info->experiment == THROUGHPUT) {
         buildDependencies(gen, info->num_txns, scheduler_input);
+        int num_done;
         timespec input_time;
-        timespec exec_time = wait(sched, scheduler_output, &input_time);
-        write_answers(info, exec_time, input_time, sched->numDone());
+        timespec exec_time = wait(sched, 
+                                  scheduler_output, 
+                                  worker, 
+                                  &input_time, 
+                                  &num_done,
+                                  info);
+        std::cout << "here!\n";
+        write_answers(info, exec_time, input_time, num_done);
         write_latencies(worker);     
     }
     else if (info->experiment == LATENCY) {

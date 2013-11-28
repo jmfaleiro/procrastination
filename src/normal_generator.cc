@@ -62,7 +62,7 @@ Action* NormalGenerator::genNext() {
 		to_add.record = record;
 		ret->writeset.push_back(to_add);
     }
-    
+
     if ((rand() % m_freq) == 0) {
 		ret->materialize = true;
     }

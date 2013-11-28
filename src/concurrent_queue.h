@@ -50,6 +50,10 @@ class SimpleQueue {
         m_tail = 0;
     }
     
+    bool isEmpty() {
+        return m_head == m_tail;
+    }
+
     bool Enqueue(uint64_t data) {
         assert(m_head >= m_tail);
         if (m_head == m_tail + m_size) {

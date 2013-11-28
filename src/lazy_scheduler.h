@@ -46,6 +46,11 @@ class LazyScheduler {
     tr1::unordered_map<Action*, list<Action*>*>* m_dependents;
     tr1::unordered_map<Action*, int>* m_to_resolve;
     
+    uint64_t start_time;
+    uint64_t end_time;
+
+    bool m_throughput;
+
     int m_num_records;
 
     int m_num_waiting;
@@ -57,7 +62,7 @@ class LazyScheduler {
     cpu_set_t* m_binding_info;
     
     // Time in cycles elapsed in substantiation, and number of txns completed.
-    uint64_t m_subst;
+    volatile uint64_t m_stick;
     uint64_t m_num_txns;
     
     int m_max_chain;
@@ -110,7 +115,8 @@ class LazyScheduler {
   
 public:
   LazyScheduler(bool serial,
-				int num_workers, 
+                bool throughput, 
+                int num_workers, 
                 int num_records, 
                 int max_chain,
                 SimpleQueue** input,
@@ -136,7 +142,11 @@ public:
 
   virtual int numDone();
 
-  virtual bool isDone(uint64_t* num_done);
+  virtual bool isDone(int* count);
+  
+  virtual void waitSubstantiated();
+  
+  virtual uint64_t numStick();
 };
 
 #endif // LAZY_SCHEDULER_H
