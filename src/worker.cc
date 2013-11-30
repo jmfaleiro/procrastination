@@ -67,10 +67,7 @@ void* Worker::workerFunction(void* arg) {
   worker->m_txn_latencies = 
       (uint64_t*)numa_alloc_local(sizeof(uint64_t) * 1000000);
   assert(worker->m_txn_latencies != NULL);
-
-  for (int i = 0; i < 1000000; ++i) {
-      (worker->m_txn_latencies)[i] = 0;
-  }  
+  memset(worker->m_txn_latencies, 0, sizeof(uint64_t)*1000000);
 
   worker->m_num_values = 0;
   Action* action;

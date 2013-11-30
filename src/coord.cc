@@ -113,13 +113,14 @@ timespec wait(LazyScheduler* sched,
     clock_gettime(CLOCK_REALTIME, &start_time);   
     int to_wait = 0, done_count = 0;
     if (!info->serial) {
-        sched->waitSubstantiated();
         uint64_t num_waits = sched->waitFinished();
         clock_gettime(CLOCK_REALTIME, &input_time);    
+        sched->waitSubstantiated();
         *num_done = worker->numDone();
     }
     else {
-        while (done_count++ != info->num_txns) {
+        int todo = info->num_txns;
+        for (int i = 0; i < todo; ++i) {
             scheduler_output->DequeueBlocking();
         }
         *num_done = info->num_txns;
@@ -189,16 +190,17 @@ void write_latencies(Worker* worker) {
     
     int num_values;
     uint64_t* times = worker->getTimes(&num_values);
+    std::cout << num_values << "\n";
     num_values = num_values > 1000000? 1000000 : num_values;
-	std::cout << num_values << "\n";
-	std::sort(times, times + num_values);
+    std::sort(times, times + num_values);
 
     double diff = 1.0 / (double)(num_values);
     double cur = 0.0;
 
     for (int i = 0; i < num_values; ++i) {
-        output_file << cur << " " << times[i] << "\n";
-        cur += diff;
+        output_file << times[i] << "\n";
+        //output_file << cur << " " << times[i] << "\n";
+        //cur += diff;
     }
     output_file.close();
 }

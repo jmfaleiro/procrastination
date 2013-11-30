@@ -37,7 +37,7 @@ class LazyScheduler {
 
     volatile uint64_t m_run_flag;
     volatile uint64_t m_start_flag;
-	volatile uint64_t m_walk_flag;
+    volatile uint64_t m_walk_flag;
 
     pthread_t m_scheduler_thread;
     

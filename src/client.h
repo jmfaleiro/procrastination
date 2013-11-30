@@ -146,8 +146,9 @@ public:
                     buckets_out[100+j] += 1;
                 }
                 
+                
                 else {
-                    for (int i = 0; i < 800; ++i) {
+                    for (int i = 0; i < 500; ++i) {
                         single_work();
                     }
                 }
