@@ -12,6 +12,7 @@ class WorkloadGenerator {
 	Action* m_action_set;
         int m_num_actions;
 	int m_use_next;
+	int m_blind_write_freq;
 
  public:
 

@@ -3,13 +3,15 @@
 UniformGenerator::UniformGenerator(int read_size, 
                                    int write_size, 
                                    int num_records,
-                                   int freq) {
+                                   int freq,
+				   int blind_freq) {
         
     // Size of read/write sets to generate. 
     m_read_set_size = read_size;
     m_write_set_size = write_size;
     m_num_records = num_records;
     m_freq = freq;
+    m_blind_write_freq = blind_freq;
     m_num_actions = 10000000;
 	m_action_set = new Action[m_num_actions];
         memset(m_action_set, 0, sizeof(Action)*m_num_actions);
@@ -34,8 +36,8 @@ int UniformGenerator::genUnique(std::set<int>* done) {
 Action* UniformGenerator::genNext() {
     std::set<int> done;
     Action* ret = &m_action_set[m_use_next];
-	m_use_next += 1;
-
+    m_use_next += 1;
+    ret->is_blind = false;
     // Generate elements to read. 
     for (int i = 0; i < m_read_set_size; ++i) {
         int record = genUnique(&done);
@@ -57,6 +59,12 @@ Action* UniformGenerator::genNext() {
     }
     else {
 		ret->materialize = false;
+    }
+    
+    if (m_blind_write_freq != -1) {
+      if ((rand() % m_blind_write_freq) == 0) {
+	ret->is_blind = true;
+      }
     }
     return ret;  
 }

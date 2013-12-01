@@ -8,7 +8,7 @@
 #include <string>
 #include <sstream>
 
-#define NUM_OPTS 10
+#define NUM_OPTS 11
 
 enum ExperimentType {
     THROUGHPUT,
@@ -42,7 +42,8 @@ public:
             {"num_runs", required_argument, NULL, 7},
             {"normal", required_argument, NULL, 8},
             {"experiment", required_argument, NULL, 9},
-            { NULL, no_argument, NULL, 10}
+	    {"blind_writes", required_argument, NULL, 10},
+            { NULL, no_argument, NULL, 11}
         };
 
         serial = true;
@@ -58,7 +59,7 @@ public:
         subst_stream << "eager";
 
         int exp_type = -1;
-
+	blind_write_frequency = -1;
         int index;
         while (getopt_long_only(argc, argv, "", long_options, &index) != -1) {
             
@@ -109,13 +110,16 @@ public:
             case 9:
                 exp_type = atoi(optarg);
                 break;
+	    case 10:
+	      blind_write_frequency = atoi(optarg);
+	      break;
             default:
                 argError(long_options, NUM_OPTS);
             }
         }
         
         for (int i = 0; i < NUM_OPTS; ++i) {
-            if (i != 8 && i != 0) {
+            if (i != 10 && i != 8 && i != 0) {
                 if (args_received.find(i) == args_received.end()) {
                     argError(long_options, NUM_OPTS);
                 }
@@ -141,13 +145,22 @@ public:
         }
 
         if (is_normal) {
-            subst_stream << "_normal_" << std_dev << ".txt";
-            stick_stream << "_normal_" << std_dev << ".txt";
+	  subst_stream << "_normal_" << std_dev;
+	  stick_stream << "_normal_" << std_dev;
         }
         else {
-            subst_stream << "_uniform.txt";
-            stick_stream << "_uniform.txt";
+	  subst_stream << "_uniform";
+	  stick_stream << "_uniform";
         }
+	
+	if (blind_write_frequency != -1) {
+	  subst_stream << "_blind_" << blind_write_frequency;
+	  stick_stream << "_blind_" << blind_write_frequency;
+	}
+	
+	subst_stream << ".txt";
+	stick_stream << ".txt";
+
         subst_file = subst_stream.str();
         stick_file = stick_stream.str();        
         
@@ -156,6 +169,8 @@ public:
         std::cout << stick_file << "\n";
     }
     
+    int blind_write_frequency;
+
     // Binding information for scheduler+worker threads. 
     cpu_set_t* worker_bindings;
     cpu_set_t* scheduler_bindings;

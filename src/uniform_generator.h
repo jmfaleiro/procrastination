@@ -20,7 +20,8 @@ class UniformGenerator : public WorkloadGenerator {
     UniformGenerator(int read_size, 
                      int write_size, 
                      int num_records,
-                     int freq);
+                     int freq,
+		     int blind_freq);
 
     virtual Action* genNext();
 };

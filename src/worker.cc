@@ -13,20 +13,24 @@ void ProcessAction(const Action* to_proc, int* records) {
 
     for (int i = 0; i < readset_size; ++i) {
         int index = to_proc->readset[i].record;
-        count += records[CACHE_LINE*index];        
-        count += records[CACHE_LINE*(index+1)];
-        count += records[CACHE_LINE*(index+2)];
-        count += records[CACHE_LINE*(index+3)];        
+	if (index != -1) {
+	  count += records[CACHE_LINE*index];        
+	  count += records[CACHE_LINE*(index+1)];
+	  count += records[CACHE_LINE*(index+2)];
+	  count += records[CACHE_LINE*(index+3)];        
+	}
     }
     
     
     // Update the value of each of the records in the write-set. 
     for (int i = 0; i < writeset_size; ++i) {
         int index = to_proc->writeset[i].record;
-        records[CACHE_LINE * index] += count;
-        records[CACHE_LINE * (index+1)] += count;
-        records[CACHE_LINE * (index+2)] += count;
-        records[CACHE_LINE * (index+3)] += count;
+	if (index != -1) {
+	  records[CACHE_LINE * index] += count;
+	  records[CACHE_LINE * (index+1)] += count;
+	  records[CACHE_LINE * (index+2)] += count;
+	  records[CACHE_LINE * (index+3)] += count;
+	}
     } 
 }
 

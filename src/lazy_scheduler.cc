@@ -68,9 +68,9 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
 }
 
 void* LazyScheduler::schedulerFunction(void* arg) {
-	numa_set_strict(1);
-    LazyScheduler* sched = (LazyScheduler*)arg;
-    pin_thread(&sched->m_binding_info[0]);
+  numa_set_strict(1);
+  LazyScheduler* sched = (LazyScheduler*)arg;
+  pin_thread(&sched->m_binding_info[0]);
     
     struct Heuristic empty;
     empty.last_txn = NULL;
@@ -158,7 +158,7 @@ void LazyScheduler::addGraph(Action* action) {
         action->state = SUBSTANTIATED;
         run_txn(action);
         return;
-    }
+    }    
     else {
         action->state = STICKY;
         
@@ -211,7 +211,7 @@ void LazyScheduler::addGraph(Action* action) {
             force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
         }  
         
-        if (force_materialize) {      
+        if (force_materialize) {
             for (int i = 0; i < num_reads+num_writes; ++i) {
                 *(count_ptrs[i]) = 0;		  
             }
@@ -222,6 +222,7 @@ void LazyScheduler::addGraph(Action* action) {
 
 void LazyScheduler::processRead(Action* action, 
                                 int readIndex) {
+		
      
     assert(action->state == STICKY);    
 
@@ -245,16 +246,39 @@ void LazyScheduler::processRead(Action* action,
             prev = NULL;
         }
         else {
-			prev = prev->readset[index].dependency;
-			is_write = prev->readset[index].is_write;
-			index = prev->readset[index].index;
+	  prev = prev->readset[index].dependency;
+	  is_write = prev->readset[index].is_write;
+	  index = prev->readset[index].index;
         }
     }
+}
+
+void LazyScheduler::processBlindWrite(Action* action, int writeIndex) {
+  assert(action->state == STICKY);
+  
+  Action* prev = action->writeset[writeIndex].dependency;
+  bool is_write = action->writeset[writeIndex].is_write;
+  int index = action->writeset[writeIndex].index;
+  
+  while (prev != NULL && is_write) {
+    if (prev->state != SUBSTANTIATED) {
+      prev->writeset[index].record = -1;    
+    
+      is_write = prev->writeset[index].is_write;
+      index = prev->writeset[index].index;
+      prev = prev->writeset[index].dependency;    
+    }
+    else {
+      prev = NULL;
+    }
+  }
+  processWrite(action, writeIndex);
 }
 
 // We break if prev is NULL, or if it is a write
 void LazyScheduler::processWrite(Action* action, 
                                  int writeIndex) {
+
                                 
     assert(action->state == STICKY);
     
@@ -299,19 +323,25 @@ void LazyScheduler::run_txn(Action* to_run) {
 }
 
 uint64_t LazyScheduler::substantiate(Action* start) {    
-    assert(start->state == STICKY);
-    int num_reads = start->readset.size();
-    int num_writes = start->writeset.size();
+  assert(start->state == STICKY);
+  int num_reads = start->readset.size();
+  int num_writes = start->writeset.size();
+  
+  for (int i = 0; i < num_reads; ++i) {
+    processRead(start, i);
+  }
+  for (int i = 0; i < num_writes; ++i) {
+    if (start->is_blind) {
+      processBlindWrite(start, i);
+    }
+    else {
+      processWrite(start, i);
+    }
+  }
+  start->state = SUBSTANTIATED;
+  run_txn(start);
 
-    for (int i = 0; i < num_reads; ++i) {
-        processRead(start, i);
-    }
-    for (int i = 0; i < num_writes; ++i) {
-        processWrite(start, i);
-    }
-    start->state = SUBSTANTIATED;
-	run_txn(start);
-    return 0;
+  return 0;
 }
 
 uint64_t LazyScheduler::numStick() {

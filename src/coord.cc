@@ -248,13 +248,15 @@ void initialize(ExperimentInfo* info,
                                   info->write_set_size,
                                   info->num_records,
                                   info->substantiate_period,
-                                  info->std_dev);
+                                  info->std_dev,
+				  info->blind_write_frequency);
     }
     else {
         gen = new UniformGenerator(info->read_set_size,
                                    info->write_set_size,
                                    info->num_records,
-                                   info->substantiate_period);
+                                   info->substantiate_period,
+				   info->blind_write_frequency);
     }
     *generator = gen;
 

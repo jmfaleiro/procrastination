@@ -16,7 +16,9 @@ struct DependencyInfo {
 class Action {
  public:
 	int state;
+	int num_writes;
 	bool materialize;
+	bool is_blind;
         volatile uint64_t start_time;
         volatile uint64_t end_time;
 	std::vector<struct DependencyInfo> readset;

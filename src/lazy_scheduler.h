@@ -94,6 +94,8 @@ class LazyScheduler {
   // Output queue for scheduer. 
   SimpleQueue* m_log_output;
   
+  virtual void processBlindWrite(Action* action, int index);
+
   virtual void processWrite(Action* action, int index);
   virtual void processRead(Action* action, int index);
   
