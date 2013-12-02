@@ -7,6 +7,7 @@
 using namespace std;
 
 LazyScheduler::LazyScheduler(bool serial, 
+			     bool blind,
                              bool throughput, 
                              int num_workers,
                              int num_records, 
@@ -31,8 +32,11 @@ LazyScheduler::LazyScheduler(bool serial,
     m_num_waiting = 0;
     m_num_inflight = 0;
     
+    m_num_saved = 0;
     m_num_txns = 0;
     
+    m_proc_blind = blind;
+
     m_max_chain = max_chain;
     m_last_used = 0;
     
@@ -46,22 +50,55 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
 	SimpleQueue* input_queue = sched->m_walking_queue;
 	
 	xchgq(&sched->m_walk_flag, 1);
-        
+	
+	if (sched->m_proc_blind) {
+	  if (sched->m_throughput) {
+            while (true) {
+                uint64_t ptr;
+                if (input_queue->Dequeue(&ptr)) {
+		  Action* to_proc = (Action*)ptr;
+		  if (to_proc->is_blind) {
+		    sched->processBlindWrite(to_proc);
+		  }
+		  else {
+		    sched->substantiateCart(to_proc);
+		  }
+                }
+                else if (sched->m_start_flag == 2 && sched->m_walk_flag != 2) {
+                    xchgq(&sched->m_walk_flag, 2);
+                }
+            }
+	  }
+	  else {
+	    while (true) {
+	      Action* to_proc = (Action*)input_queue->DequeueBlocking();
+	      if (to_proc->is_blind) {
+		sched->processBlindWrite(to_proc);
+	      }
+	      else {
+		sched->substantiateCart(to_proc);
+	      }
+	    }
+	  }
+	}
+	
         if (sched->m_throughput) {
             while (true) {
                 uint64_t ptr;
                 if (input_queue->Dequeue(&ptr)) {
-                    sched->substantiate((Action*)ptr);
+		  Action* to_proc = (Action*)ptr;
+		  sched->substantiate(to_proc);
                 }
                 else if (sched->m_start_flag == 2 && sched->m_walk_flag != 2) {
                     xchgq(&sched->m_walk_flag, 2);
                 }
             }
         }
+
         else {
             while (true) {
                 Action* to_proc = (Action*)input_queue->DequeueBlocking();
-                sched->substantiate(to_proc);
+		sched->substantiate(to_proc);
             }
         }
         return NULL;
@@ -211,7 +248,14 @@ void LazyScheduler::addGraph(Action* action) {
             force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
         }  
         
-        if (force_materialize) {
+		/*
+	if (action->is_blind) {
+	  for (int i = 0; i < num_writes; ++i) {
+	    processBlindWrite(action, i);
+	  }
+	  }*/
+
+        if (force_materialize || action->is_blind) {
             for (int i = 0; i < num_reads+num_writes; ++i) {
                 *(count_ptrs[i]) = 0;		  
             }
@@ -253,26 +297,66 @@ void LazyScheduler::processRead(Action* action,
     }
 }
 
-void LazyScheduler::processBlindWrite(Action* action, int writeIndex) {
+void LazyScheduler::processRealDeps(Action* action) {
   assert(action->state == STICKY);
   
-  Action* prev = action->writeset[writeIndex].dependency;
-  bool is_write = action->writeset[writeIndex].is_write;
-  int index = action->writeset[writeIndex].index;
-  
-  while (prev != NULL && is_write) {
-    if (prev->state != SUBSTANTIATED) {
-      prev->writeset[index].record = -1;    
-    
-      is_write = prev->writeset[index].is_write;
-      index = prev->writeset[index].index;
-      prev = prev->writeset[index].dependency;    
-    }
-    else {
-      prev = NULL;
-    }
+  Action* prev = action->writeset[0].dependency;
+  if (prev != NULL && prev->state == STICKY) {
+    processRealDeps(prev);
   }
-  processWrite(action, writeIndex);
+
+  action->state = PROCESSING;
+  run_txn(action);
+}
+
+void LazyScheduler::substantiateCart(Action* action) {
+  Action* prev = action->writeset[0].dependency;
+  
+  while (prev != NULL && prev->state != SUBSTANTIATED) {
+    if (prev->state == STICKY) {
+      processRealDeps(prev);
+    }
+    prev->state = SUBSTANTIATED;
+    prev = prev->writeset[1].dependency;
+  }
+  action->state = SUBSTANTIATED;
+  run_txn(action);
+}
+
+void LazyScheduler::processBlindWrite(Action* action) {
+  assert(action->state == STICKY);
+
+  int write_size = action->writeset.size();
+  int saved_count = 0;
+
+  Action* prev = action->writeset[0].dependency;
+  
+  // Go through all the transactions in this session and mark them as
+  // substantiated. We don't have to touch them. 
+  while (prev != NULL && prev->state != SUBSTANTIATED) {
+    
+    // If it's still a sticky, we've saved a transaction from being processed. 
+    if (prev->state == STICKY) {
+      saved_count += 1;
+      
+      // This transaction might write a record that's written by another one, 
+      // make sure to run the other one. 
+      if (prev->writeset[0].dependency != NULL &&
+	  prev->writeset[0].dependency->state == STICKY) {
+	processRealDeps(prev->writeset[0].dependency);
+      }
+    }
+    prev->state = SUBSTANTIATED;
+    prev = prev->writeset[1].dependency;
+  }
+  
+  m_num_saved += saved_count;
+  action->state = SUBSTANTIATED;
+  run_txn(action);  
+}
+
+uint64_t LazyScheduler::getSaved() {
+  return m_num_saved;
 }
 
 // We break if prev is NULL, or if it is a write
@@ -315,7 +399,7 @@ void LazyScheduler::cleanup_txns() {
 */
 
 void LazyScheduler::run_txn(Action* to_run) {
-    assert(to_run->state == SUBSTANTIATED);
+  assert((to_run->state & PROCESSING) == PROCESSING);
     m_worker_input[0]->EnqueueBlocking((uint64_t)to_run);
     //    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
     //    assert(done);
@@ -326,15 +410,15 @@ uint64_t LazyScheduler::substantiate(Action* start) {
   assert(start->state == STICKY);
   int num_reads = start->readset.size();
   int num_writes = start->writeset.size();
-  
-  for (int i = 0; i < num_reads; ++i) {
-    processRead(start, i);
+
+  if (start->is_blind) {
+    processBlindWrite(start);
   }
-  for (int i = 0; i < num_writes; ++i) {
-    if (start->is_blind) {
-      processBlindWrite(start, i);
+  else {
+    for (int i = 0; i < num_reads; ++i) {
+      processRead(start, i);
     }
-    else {
+    for (int i = 0; i < num_writes; ++i) {
       processWrite(start, i);
     }
   }

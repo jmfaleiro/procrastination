@@ -38,6 +38,8 @@ class LazyScheduler {
     volatile uint64_t m_run_flag;
     volatile uint64_t m_start_flag;
     volatile uint64_t m_walk_flag;
+    
+    bool m_proc_blind;
 
     pthread_t m_scheduler_thread;
     
@@ -61,6 +63,9 @@ class LazyScheduler {
     
     cpu_set_t* m_binding_info;
     
+
+    uint64_t m_num_saved;
+
     // Time in cycles elapsed in substantiation, and number of txns completed.
     volatile uint64_t m_stick;
     uint64_t m_num_txns;
@@ -94,10 +99,11 @@ class LazyScheduler {
   // Output queue for scheduer. 
   SimpleQueue* m_log_output;
   
-  virtual void processBlindWrite(Action* action, int index);
-
-  virtual void processWrite(Action* action, int index);
+  virtual void processBlindWrite(Action* action);
+  void processWrite(Action* action, int index);
   virtual void processRead(Action* action, int index);
+
+  void processRealDeps(Action* action);
   
   // Force a transaction to substantiate. 
   virtual uint64_t substantiate(Action* action);
@@ -108,6 +114,8 @@ class LazyScheduler {
   // Dispatch a transaction to a worker for processing. 
   virtual void run_txn(Action* action);
 
+  virtual void substantiateCart(Action* action);
+
   // Scheduler thread function.
   static void* schedulerFunction(void* arg);
   static void* graphWalkFunction(void* arg);
@@ -117,6 +125,7 @@ class LazyScheduler {
   
 public:
   LazyScheduler(bool serial,
+		bool blind,
                 bool throughput, 
                 int num_workers, 
                 int num_records, 
@@ -127,6 +136,7 @@ public:
                 SimpleQueue* sched_input,
                 SimpleQueue* sched_output);
   
+  virtual uint64_t getSaved();
   virtual uint64_t waitFinished();
   
   // Add the action to the dependency graph. We add dependencies on the 

@@ -8,6 +8,7 @@
 #include "experiment_info.h"
 #include "machine.h"
 #include "client.h"
+#include "shopping_cart.h"
 
 #include <numa.h>
 #include <pthread.h>
@@ -117,13 +118,11 @@ timespec wait(LazyScheduler* sched,
         clock_gettime(CLOCK_REALTIME, &input_time);    
         sched->waitSubstantiated();
         *num_done = worker->numDone();
+	*num_done += sched->getSaved();
     }
     else {
-        int todo = info->num_txns;
-        for (int i = 0; i < todo; ++i) {
-            scheduler_output->DequeueBlocking();
-        }
-        *num_done = info->num_txns;
+      sched->waitFinished();
+      *num_done = worker->numDone();
     }
        
     clock_gettime(CLOCK_REALTIME, &end_time);    
@@ -251,6 +250,13 @@ void initialize(ExperimentInfo* info,
                                   info->std_dev,
 				  info->blind_write_frequency);
     }
+    else if (info->blind_write_frequency != -1) {
+      gen = new ShoppingCart(1000,
+			     info->num_records, 
+			     20,
+			     info->blind_write_frequency,
+			     10000);
+    }
     else {
         gen = new UniformGenerator(info->read_set_size,
                                    info->write_set_size,
@@ -280,6 +286,7 @@ void initialize(ExperimentInfo* info,
 	
     bool throughput_expt = (info->experiment == THROUGHPUT);
     *scheduler = new LazyScheduler(info->serial,
+				   (info->blind_write_frequency != -1),
                                    throughput_expt,
                                    info->num_workers, 
                                    info->num_records, 

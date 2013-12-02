@@ -65,6 +65,7 @@ Action* NormalGenerator::genNext() {
 		struct DependencyInfo to_add;
 		to_add.record = record;
 		ret->writeset.push_back(to_add);
+		ret->real_writes.push_back(record);
     }
 
     if ((rand() % m_freq) == 0) {

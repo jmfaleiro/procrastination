@@ -48,10 +48,11 @@ Action* UniformGenerator::genNext() {
     
     // Generate elements to write. 
     for (int i = 0; i < m_write_set_size; ++i) {
-        int record = genUnique(&done);
-		struct DependencyInfo to_add;
-		to_add.record = record;
-		ret->writeset.push_back(to_add);
+      int record = genUnique(&done);
+      struct DependencyInfo to_add;
+      to_add.record = record;
+      ret->writeset.push_back(to_add);
+      ret->real_writes.push_back(record);
     }    
     
     if ((rand() % m_freq) == 0) {

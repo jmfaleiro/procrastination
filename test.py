@@ -1,35 +1,23 @@
 import sys
 import os
 
-def do_expt(direct_string, blind_freq):
-    prefix_string = "scripts/" + direct_string + "/"
-    print prefix_string
-
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 300 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_300.txt")
-
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 250 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_250.txt")
-
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 200 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_200.txt")
-
-
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 150 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_150.txt")
     
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 100 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_100.txt")
-    
-    os.system("build/lazy_db --period 1000 --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold 50 --num_runs 1 --normal 30 --experiment 0 --blind_writes " + str(blind_freq))
-    os.system("mv latencies.txt " + prefix_string + "lazy_50.txt")
+def do_expt(threshold_list, do_blind, blind_freq):
+    cmd = "build/lazy_db   --num_workers 1 --num_reads 0 --num_writes 20 --num_records 1000000 --num_txns 10000000 --sub_threshold {0} --num_runs 1 --normal 30 --experiment 0 "
+    for threshold in threshold_list:
+        output_string = cmd.format(str(threshold))
+        if do_blind:
+            output_string += "--blind_writes " + str(blind_freq)
+        os.system(output_string)
+        
 
 def main():
-    for j in [100, 1000, 10000]:
-        for i in range(0, 10):
-            do_expt("blind", j)
+#    for i in range(0, 5):
+#        do_expt([50,100,150,200,250,300], False, -1)
 
-
+    #for j in [10, 100, 1000, 10000]:
+    for i in range(0, 5):
+        do_expt([300], True, 10)
 
 if __name__ == "__main__":
     main()
