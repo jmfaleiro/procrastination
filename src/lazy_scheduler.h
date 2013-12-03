@@ -103,6 +103,7 @@ class LazyScheduler {
   void processWrite(Action* action, int index);
   virtual void processRead(Action* action, int index);
 
+  void overwriteTxn(Action* action);
   void processRealDeps(Action* action);
   
   // Force a transaction to substantiate. 

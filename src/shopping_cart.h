@@ -2,6 +2,7 @@
 #define SHOPPING_CART_H
 
 #include "workload_generator.h"
+#include <iostream>
 #include <numa.h>
 #include <set>
 
@@ -22,11 +23,12 @@ class ShoppingCart : public WorkloadGenerator {
 	       int cart_size, 
 	       int freq, 
 	       int hot) {
-
+    
+    std::cout << "Shopping cart!\n";
     m_hot = hot;
     m_num_clients = num_clients;
     m_num_records = num_records;
-    m_cart_size = cart_size;
+    m_cart_size = 40;
     m_freq = freq;
     m_next_client = 0;
 
@@ -48,12 +50,12 @@ class ShoppingCart : public WorkloadGenerator {
     m_next_client += 1;
 
     Action* action = &m_action_set[m_use_next++];    
+
+    struct DependencyInfo fake;
+    fake.record = cur_client;
+    action->writeset.push_back(fake);
     
     if (rand() % m_cart_size == 0) {
-
-      struct DependencyInfo blah;
-      blah.record = cur_client;
-      action->writeset.push_back(blah);
 
       for (std::set<int>::iterator it = cart->begin();
 	   it != cart->end();
@@ -63,40 +65,42 @@ class ShoppingCart : public WorkloadGenerator {
 	action->writeset.push_back(inf);	
       }
       
+      action->is_checkout = true;
       action->materialize = true;
       action->is_blind = ((rand() % m_freq) == 0);
       cart->clear();
     }
     else {
-      struct DependencyInfo real, fake;
+      struct DependencyInfo real;
       int record;
-
-      // Pick a hot record. 
-      if (rand() % 2 == 0) {
-	while (true) {
-	  record = rand() % m_hot;
-	  if ((cart->find(record) == cart->end()) && record >= m_num_clients) {
-	    break;
+      for (int i = 0; i < 20; ++i) {
+	// Pick a hot record. 
+	if (rand() % 2 == 0) {
+	  while (true) {
+	    record = rand() % m_hot;
+	    if ((cart->find(record) == cart->end()) && record >= m_num_clients) {
+	      break;
+	    }
 	  }
 	}
-      }
-      // Pick a cold record. 
-      else {	
-	while (true) {
-	  record = rand() % m_num_records;
-	  if ((cart->find(record) == cart->end()) && 
-	      (record >= m_num_clients) &&
-	      (record >= m_hot)) {
-	    break;
+	// Pick a cold record. 
+	else {	
+	  while (true) {
+	    record = rand() % m_num_records;
+	    if ((cart->find(record) == cart->end()) && 
+		(record >= m_num_clients) &&
+		(record >= m_hot)) {
+	      break;
+	    }
 	  }
 	}
-      }
       
-      cart->insert(record);
-      real.record = record;
-      fake.record = cur_client;
-      action->writeset.push_back(real);
-      action->writeset.push_back(fake);
+	cart->insert(record);
+	real.record = record;
+	action->writeset.push_back(real);
+      }
+
+      action->is_checkout = false;
 
       action->materialize = false;      
       action->is_blind = false;

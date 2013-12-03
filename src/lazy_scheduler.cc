@@ -297,27 +297,45 @@ void LazyScheduler::processRead(Action* action,
     }
 }
 
+void LazyScheduler::overwriteTxn(Action* action) {
+  assert(action->state == STICKY);
+  
+  int num_writes = action->writeset.size();
+  for (int i = 0; i < num_writes; ++i) {
+    Action* prev = action->writeset[i].dependency;
+    if (prev != NULL && prev->state == STICKY) {
+      overwriteTxn(prev);
+    }
+  }
+  
+  action->state = SUBSTANTIATED;
+  m_num_saved += 1;
+}
+
 void LazyScheduler::processRealDeps(Action* action) {
   assert(action->state == STICKY);
   
-  Action* prev = action->writeset[0].dependency;
-  if (prev != NULL && prev->state == STICKY) {
-    processRealDeps(prev);
+  int num_writes = action->writeset.size();
+  for (int i = 0; i < num_writes; ++i) {
+    Action* prev = action->writeset[i].dependency;
+    if (prev != NULL && prev->state == STICKY) {
+      processRealDeps(prev);
+    }
   }
 
-  action->state = PROCESSING;
+  action->state = SUBSTANTIATED;
   run_txn(action);
 }
 
 void LazyScheduler::substantiateCart(Action* action) {
   Action* prev = action->writeset[0].dependency;
   
-  while (prev != NULL && prev->state != SUBSTANTIATED) {
-    if (prev->state == STICKY) {
+  if (prev != NULL && prev->state != SUBSTANTIATED) {
+    //    if (prev->state == STICKY) {
       processRealDeps(prev);
-    }
-    prev->state = SUBSTANTIATED;
-    prev = prev->writeset[1].dependency;
+      //    }
+      //    prev->state = SUBSTANTIATED;
+      //    prev = prev->writeset[0].dependency;
   }
   action->state = SUBSTANTIATED;
   run_txn(action);
@@ -326,33 +344,26 @@ void LazyScheduler::substantiateCart(Action* action) {
 void LazyScheduler::processBlindWrite(Action* action) {
   assert(action->state == STICKY);
 
-  int write_size = action->writeset.size();
-  int saved_count = 0;
+  action->state = SUBSTANTIATED;
+  run_txn(action);  
 
-  Action* prev = action->writeset[0].dependency;
-  
+  Action* prev = action->writeset[0].dependency;  
+  if (prev != NULL && prev->state != SUBSTANTIATED) {
+    overwriteTxn(prev);
+  }
   // Go through all the transactions in this session and mark them as
   // substantiated. We don't have to touch them. 
+  /*
   while (prev != NULL && prev->state != SUBSTANTIATED) {
     
     // If it's still a sticky, we've saved a transaction from being processed. 
-    if (prev->state == STICKY) {
-      saved_count += 1;
-      
-      // This transaction might write a record that's written by another one, 
-      // make sure to run the other one. 
-      if (prev->writeset[0].dependency != NULL &&
-	  prev->writeset[0].dependency->state == STICKY) {
-	processRealDeps(prev->writeset[0].dependency);
-      }
-    }
+    //    if (prev->state == STICKY) {
+      overwriteTxn(prev);
+      //    }
     prev->state = SUBSTANTIATED;
-    prev = prev->writeset[1].dependency;
+    prev = prev->writeset[0].dependency;
   }
-  
-  m_num_saved += saved_count;
-  action->state = SUBSTANTIATED;
-  run_txn(action);  
+  */
 }
 
 uint64_t LazyScheduler::getSaved() {

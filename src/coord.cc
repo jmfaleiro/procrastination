@@ -121,8 +121,11 @@ timespec wait(LazyScheduler* sched,
 	*num_done += sched->getSaved();
     }
     else {
-      sched->waitFinished();
-      *num_done = worker->numDone();
+      to_wait = info->num_txns;
+      while (done_count++ < to_wait) {
+	scheduler_output->DequeueBlocking();
+      }
+      *num_done = info->num_txns;
     }
        
     clock_gettime(CLOCK_REALTIME, &end_time);    

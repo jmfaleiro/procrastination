@@ -15,7 +15,8 @@ struct DependencyInfo {
 
 class Action {
  public:
-
+  
+  bool is_checkout;
   int state;
   int num_writes;
   bool materialize;
