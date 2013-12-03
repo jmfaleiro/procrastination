@@ -138,7 +138,10 @@ public:
         // XXX: The scheduler is single threaded so we have just one for now. 
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[2];		
-        
+	
+	subst_stream << "_workers_" << num_workers;
+	stick_stream << "_workers_" << num_workers;
+
         if (!serial) {
             subst_stream << "_threshold_" << substantiate_threshold;
             stick_stream << "_threshold_" << substantiate_threshold;

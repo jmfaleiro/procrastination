@@ -2,6 +2,7 @@
 #define ACTION_H
 
 #include <vector>
+#include <deque>
 #include <stdint.h>
 
 class Action;
@@ -16,6 +17,8 @@ struct DependencyInfo {
 class Action {
  public:
   
+  int cpu;
+  int wait_count;
   bool is_checkout;
   int state;
   int num_writes;
@@ -25,7 +28,7 @@ class Action {
   volatile uint64_t end_time;
   std::vector<struct DependencyInfo> readset;
   std::vector<struct DependencyInfo> writeset;
-  std::vector<int> real_writes;
+  std::deque<Action*> dependents;
 };
 
 #endif // ACTION_H

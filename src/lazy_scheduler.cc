@@ -48,7 +48,7 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
 	pin_thread(&sched->m_binding_info[1]);
 
 	SimpleQueue* input_queue = sched->m_walking_queue;
-	
+	sched->m_to_use = 0;
 	xchgq(&sched->m_walk_flag, 1);
 	
 	if (sched->m_proc_blind) {
@@ -73,7 +73,9 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
 	    while (true) {
 	      Action* to_proc = (Action*)input_queue->DequeueBlocking();
 	      if (to_proc->is_blind) {
+	
 		sched->processBlindWrite(to_proc);
+	
 	      }
 	      else {
 		sched->substantiateCart(to_proc);
@@ -87,18 +89,44 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
                 uint64_t ptr;
                 if (input_queue->Dequeue(&ptr)) {
 		  Action* to_proc = (Action*)ptr;
+
+		  to_proc->cpu = sched->m_to_use;
 		  sched->substantiate(to_proc);
+		  sched->m_to_use = 
+		    (sched->m_to_use + 1) % (sched->m_num_workers);
+
                 }
-                else if (sched->m_start_flag == 2 && sched->m_walk_flag != 2) {
+                else if (sched->m_num_inflight == 0) {
                     xchgq(&sched->m_walk_flag, 2);
+		    for (int i = 0; i < sched->m_num_workers; ++i) {
+		      assert(sched->m_worker_output[i]->isEmpty());
+		      assert(sched->m_worker_input[i]->isEmpty());
+		    }
                 }
+
+		for (int i = 0; i < sched->m_num_workers; ++i) {
+		  uint64_t done_raw;
+		  while (sched->m_worker_output[i]->Dequeue(&done_raw)) {
+		    sched->finishTxn((Action*)done_raw);
+		  }
+		}
             }
         }
 
         else {
             while (true) {
                 Action* to_proc = (Action*)input_queue->DequeueBlocking();
+		to_proc->cpu = sched->m_to_use;
 		sched->substantiate(to_proc);
+		sched->m_to_use = 
+		  (sched->m_to_use + 1) % (sched->m_num_workers);
+		
+		for (int i = 0; i < sched->m_num_workers; ++i) {
+		  uint64_t done_raw;
+		  while (sched->m_worker_output[i]->Dequeue(&done_raw)) {
+		    sched->finishTxn((Action*)done_raw);
+		  }
+		}
             }
         }
         return NULL;
@@ -193,6 +221,7 @@ void LazyScheduler::addGraph(Action* action) {
 
     if (m_serial) {
         action->state = SUBSTANTIATED;
+	action->cpu = 0;
         run_txn(action);
         return;
     }    
@@ -255,7 +284,7 @@ void LazyScheduler::addGraph(Action* action) {
 	  }
 	  }*/
 
-        if (force_materialize || action->is_blind) {
+        if (force_materialize) {
             for (int i = 0; i < num_reads+num_writes; ++i) {
                 *(count_ptrs[i]) = 0;		  
             }
@@ -375,7 +404,7 @@ void LazyScheduler::processWrite(Action* action,
                                  int writeIndex) {
 
                                 
-    assert(action->state == STICKY);
+    assert(action->state == PROCESSING);
     
     // Get the record and txn this action is dependent on. 
     Action* prev = action->writeset[writeIndex].dependency;
@@ -384,7 +413,12 @@ void LazyScheduler::processWrite(Action* action,
 
     while (prev != NULL) {
         if (prev->state != SUBSTANTIATED) {
+	  if (prev->state == STICKY) {
+	    prev->cpu = action->cpu;
             substantiate(prev);
+	  }
+	  prev->dependents.push_back(action);
+	  action->wait_count += 1;
         }
 
         if (is_write) {
@@ -410,31 +444,29 @@ void LazyScheduler::cleanup_txns() {
 */
 
 void LazyScheduler::run_txn(Action* to_run) {
-  assert((to_run->state & PROCESSING) == PROCESSING);
-    m_worker_input[0]->EnqueueBlocking((uint64_t)to_run);
-    //    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
-    //    assert(done);
-    ++m_num_txns;
+  //  assert((to_run->state & PROCESSING) == PROCESSING);
+  m_worker_input[to_run->cpu]->EnqueueBlocking((uint64_t)to_run);  
+  ++m_num_txns;
+  ++m_num_inflight;
 }
 
 uint64_t LazyScheduler::substantiate(Action* start) {    
   assert(start->state == STICKY);
+  start->state = PROCESSING;
+  start->wait_count = 0;
   int num_reads = start->readset.size();
   int num_writes = start->writeset.size();
 
-  if (start->is_blind) {
-    processBlindWrite(start);
+  for (int i = 0; i < num_reads; ++i) {
+    processRead(start, i);
   }
-  else {
-    for (int i = 0; i < num_reads; ++i) {
-      processRead(start, i);
-    }
-    for (int i = 0; i < num_writes; ++i) {
-      processWrite(start, i);
-    }
+  for (int i = 0; i < num_writes; ++i) {
+    processWrite(start, i);
   }
-  start->state = SUBSTANTIATED;
-  run_txn(start);
+
+  if (start->wait_count == 0) {
+    run_txn(start);
+  }
 
   return 0;
 }
@@ -448,11 +480,23 @@ int LazyScheduler::numDone() {
 }
 
 // Mark the dependents as having completed. 
-/*
 void LazyScheduler::finishTxn(Action* action) {
-    assert(false);
+    
+    action->state = SUBSTANTIATED;
+    --m_num_inflight;
+    for (std::deque<Action*>::iterator it = action->dependents.begin();
+	 it != action->dependents.end();
+	 ++it) {
+      Action* dep = *it;
+      dep->wait_count -= 1;
+      if (dep->wait_count == 0) {
+	run_txn(dep);
+      }
+    }
+
+    //m_log_output->EnqueueBlocking((uint64_t)action);
 }
-*/
+
 
 void 
 LazyScheduler::startScheduler() {
@@ -471,10 +515,11 @@ LazyScheduler::waitFinished() {
     return m_num_txns;
 }
 
-void
+uint64_t
 LazyScheduler::waitSubstantiated() {
     while (m_walk_flag != 2) 
         ;    
+    return m_num_txns;
 }
 
 void

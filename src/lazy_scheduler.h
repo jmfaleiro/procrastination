@@ -110,8 +110,10 @@ class LazyScheduler {
   virtual uint64_t substantiate(Action* action);
 
   // Clean up after a transaction is done.
-  //  virtual void finishTxn(Action* action);
+  virtual void finishTxn(Action* action);
   
+  int m_to_use;
+
   // Dispatch a transaction to a worker for processing. 
   virtual void run_txn(Action* action);
 
@@ -157,7 +159,7 @@ public:
 
   virtual bool isDone(int* count);
   
-  virtual void waitSubstantiated();
+  virtual uint64_t waitSubstantiated();
   
   virtual uint64_t numStick();
 };

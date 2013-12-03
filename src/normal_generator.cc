@@ -14,9 +14,9 @@ NormalGenerator::NormalGenerator(int read_size,
     m_blind_write_freq = blind_freq;
     
     m_num_actions = 10000000;
-	m_action_set = new Action[m_num_actions];
-        memset(m_action_set, 0, sizeof(Action)*m_num_actions);
-	m_use_next = 0;
+    m_action_set = new Action[m_num_actions];
+
+    m_use_next = 0;
 
     srand(time(NULL));
 }
@@ -65,7 +65,6 @@ Action* NormalGenerator::genNext() {
 		struct DependencyInfo to_add;
 		to_add.record = record;
 		ret->writeset.push_back(to_add);
-		ret->real_writes.push_back(record);
     }
 
     if ((rand() % m_freq) == 0) {
@@ -75,10 +74,5 @@ Action* NormalGenerator::genNext() {
 		ret->materialize = false;
     }
     
-    if (m_blind_write_freq != -1) {
-      if ((rand() % m_blind_write_freq) == 0) {
-	ret->is_blind = true;
-      }
-    }
     return ret;
 }

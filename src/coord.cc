@@ -102,7 +102,7 @@ initWorkers(Worker** workers,
 // Returns the time elapsed in processing a given workload. 
 timespec wait(LazyScheduler* sched,
               SimpleQueue* scheduler_output, 
-              Worker* worker,
+	      //              Worker** workers,
               timespec* stickification_time,
               int* num_done,
               ExperimentInfo* info) {
@@ -114,10 +114,11 @@ timespec wait(LazyScheduler* sched,
     clock_gettime(CLOCK_REALTIME, &start_time);   
     int to_wait = 0, done_count = 0;
     if (!info->serial) {
-        uint64_t num_waits = sched->waitFinished();
+      sched->waitFinished();
         clock_gettime(CLOCK_REALTIME, &input_time);    
-        sched->waitSubstantiated();
-        *num_done = worker->numDone();
+        int count = sched->waitSubstantiated();
+	clock_gettime(CLOCK_REALTIME, &end_time);    
+        *num_done = count;
 	*num_done += sched->getSaved();
     }
     else {
@@ -125,10 +126,11 @@ timespec wait(LazyScheduler* sched,
       while (done_count++ < to_wait) {
 	scheduler_output->DequeueBlocking();
       }
+      clock_gettime(CLOCK_REALTIME, &end_time);    
       *num_done = info->num_txns;
     }
        
-    clock_gettime(CLOCK_REALTIME, &end_time);    
+
     input_time = diff_time(start_time, input_time);
     stickification_time->tv_sec = input_time.tv_sec;
     stickification_time->tv_nsec = input_time.tv_nsec;
@@ -218,7 +220,7 @@ void initialize(ExperimentInfo* info,
     numa_set_strict(1);
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(3, &my_binding);
+    CPU_SET(9, &my_binding);
 
     SimpleQueue** worker_inputs = 
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
@@ -235,15 +237,15 @@ void initialize(ExperimentInfo* info,
         sched_size = LARGE_QUEUE;
     }
 
+    uint64_t* sched_output_data = 
+      (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
+    assert(sched_output_data != NULL);
+    
     uint64_t* sched_input_data = 
         (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
     assert(sched_input_data != NULL);
 
-    // Create the queues. 
-    SimpleQueue* scheduler_input = 
-        new SimpleQueue(sched_input_data, sched_size);
-    
-    // Create a workload generator and generate txns to process. 
+
     WorkloadGenerator* gen;
     if (info->is_normal) {
         gen = new NormalGenerator(info->read_set_size,
@@ -268,6 +270,19 @@ void initialize(ExperimentInfo* info,
 				   info->blind_write_frequency);
     }
     *generator = gen;
+
+
+    // Create the queues. 
+    SimpleQueue* scheduler_input = 
+        new SimpleQueue(sched_input_data, sched_size);
+    if (info->experiment == THROUGHPUT) {
+      buildDependencies(gen, info->num_txns, scheduler_input);
+    }
+
+    SimpleQueue* scheduler_output = 
+      new SimpleQueue(sched_output_data, sched_size);
+    
+    // Create a workload generator and generate txns to process. 
 
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
@@ -295,14 +310,19 @@ void initialize(ExperimentInfo* info,
                                    info->num_records, 
                                    info->substantiate_threshold,
                                    worker_inputs,
-                                   NULL,
+				   worker_outputs, 
                                    info->scheduler_bindings,
                                    scheduler_input,
-                                   NULL);
+                                   scheduler_output);
 
     (*scheduler)->startThread();
     *worker = workers[0];
-    *output = worker_outputs[0];
+    if (info->serial) {
+      *output = worker_outputs[0];
+    }
+    else {
+      *output = scheduler_output;
+    }
     *input = scheduler_input;
 }
 
@@ -321,12 +341,12 @@ void run_experiment(ExperimentInfo* info) {
                &gen);
     
     if (info->experiment == THROUGHPUT) {
-        buildDependencies(gen, info->num_txns, scheduler_input);
+
         int num_done;
         timespec input_time;
         timespec exec_time = wait(sched, 
                                   scheduler_output, 
-                                  worker, 
+                                  //worker, 
                                   &input_time, 
                                   &num_done,
                                   info);
