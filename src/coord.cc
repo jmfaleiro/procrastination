@@ -130,7 +130,7 @@ timespec wait(LazyScheduler* sched,
       *num_done = info->num_txns;
     }
        
-
+    std::cout << "Experiment complete...\n";
     input_time = diff_time(start_time, input_time);
     stickification_time->tv_sec = input_time.tv_sec;
     stickification_time->tv_nsec = input_time.tv_nsec;

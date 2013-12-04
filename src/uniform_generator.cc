@@ -36,6 +36,7 @@ int UniformGenerator::genUnique(std::set<int>* done) {
 Action* UniformGenerator::genNext() {
     std::set<int> done;
     Action* ret = &m_action_set[m_use_next];
+    ret->wakeups = NULL;
     m_use_next += 1;
     ret->is_blind = false;
     // Generate elements to read. 

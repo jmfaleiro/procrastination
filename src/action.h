@@ -7,6 +7,8 @@
 
 class Action;
 
+struct ActionItem;
+
 struct DependencyInfo {
 	int record;
 	Action* dependency;
@@ -17,6 +19,7 @@ struct DependencyInfo {
 class Action {
  public:
   
+  ActionItem* wakeups;
   int cpu;
   int wait_count;
   bool is_checkout;
@@ -28,7 +31,6 @@ class Action {
   volatile uint64_t end_time;
   std::vector<struct DependencyInfo> readset;
   std::vector<struct DependencyInfo> writeset;
-  std::deque<Action*> dependents;
 };
 
 #endif // ACTION_H

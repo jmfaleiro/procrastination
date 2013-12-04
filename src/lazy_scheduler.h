@@ -32,6 +32,49 @@ enum TxnState {
     SUBSTANTIATED = 3,
 };
 
+struct ActionItem;
+struct ActionItem {
+  Action* value;
+  struct ActionItem* next;  
+};
+
+class ActionQueue {
+  
+ private:
+  ActionItem* m_free_list;
+  
+
+ public:
+  ActionQueue(int size) {
+    
+    // Allocate a hunk of data to queue actions. 
+    ActionItem* data = (ActionItem*)malloc(sizeof(ActionItem)*size);
+    assert(data != NULL);
+    memset(data, 0, sizeof(ActionItem)*size);
+    
+    for (int i = 0; i < size - 1; ++i) {
+      data[i].next = &data[i+1];
+    }
+    
+    data[size-1].next = NULL;
+    m_free_list = &data[0];
+    
+    std::cout << "ACTION QUEUE INITIALIZATED!\n";
+  }
+
+  inline ActionItem* checkout() {
+    ActionItem* ret = m_free_list;    
+    m_free_list = m_free_list->next;
+    ret->next = NULL;      
+    return ret;
+  }
+  
+  inline void checkin(ActionItem* ret) {
+    ret->next = m_free_list;
+    m_free_list = ret;
+  }
+  
+};
 
 class LazyScheduler {
 
@@ -63,6 +106,7 @@ class LazyScheduler {
     
     cpu_set_t* m_binding_info;
     
+    ActionQueue* m_action_queue;
 
     uint64_t m_num_saved;
 
