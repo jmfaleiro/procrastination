@@ -71,9 +71,7 @@ initWorkers(Worker** workers,
             ExperimentInfo* info) {
     numa_set_strict(1);
     int* records = (int*)numa_alloc_local(sizeof(int)*CACHE_LINE*num_records*4);
-    for (int i = 0; i < 4*num_records; ++i) {
-        records[i*CACHE_LINE] = 1;
-    }
+    memset(records, 1, sizeof(int)*CACHE_LINE*num_records*4);
 
   for (int i = 0; i < num_workers; ++i) {
 	
@@ -225,6 +223,8 @@ void initialize(ExperimentInfo* info,
 
     SimpleQueue** worker_outputs = 
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
+    memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
+    memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
 
     // Data for input/output queues. 
     uint64_t sched_size;
@@ -237,6 +237,8 @@ void initialize(ExperimentInfo* info,
 
     uint64_t* sched_input_data = 
         (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
+    memset(sched_input_data, 0, CACHE_LINE*sizeof(uint64_t)*sched_size);
+
     assert(sched_input_data != NULL);
 
     // Create the queues. 

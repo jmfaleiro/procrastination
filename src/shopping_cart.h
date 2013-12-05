@@ -17,6 +17,9 @@ class ShoppingCart : public WorkloadGenerator {
   int m_next_client;
   int m_hot;
 
+  std::vector<int> m_client_indices;
+  std::set<int> m_index_set;
+
  public:
   ShoppingCart(int num_clients, 
 	       int num_records, 
@@ -31,7 +34,16 @@ class ShoppingCart : public WorkloadGenerator {
     m_cart_size = 40;
     m_freq = freq;
     m_next_client = 0;
+    
 
+
+    int last_client_index = 0;
+    for (int i = 0; i < m_num_clients; ++i) {
+      m_client_indices.push_back(last_client_index);
+      m_index_set.insert(last_client_index);
+
+      last_client_index += m_num_records / m_num_clients;
+    }
     m_carts = new std::set<int>*[m_num_clients];
     for (int i = 0; i < m_num_clients; ++i) {
       m_carts[i] = new std::set<int>();
@@ -46,7 +58,7 @@ class ShoppingCart : public WorkloadGenerator {
   
   Action* genNext() {
     std::set<int>* cart = m_carts[m_next_client % m_num_clients];
-    int cur_client = m_next_client % m_num_clients;
+    int cur_client = m_client_indices[m_next_client % m_num_clients];
     m_next_client += 1;
 
     Action* action = &m_action_set[m_use_next++];    
@@ -55,7 +67,7 @@ class ShoppingCart : public WorkloadGenerator {
     struct DependencyInfo fake;
     fake.record = cur_client;
     action->writeset.push_back(fake);
-    action->is_blind = false;
+    action->is_blind = 0;
     action->materialize = false;
 
     // Check-out if the cart size is now 20. 
@@ -66,7 +78,7 @@ class ShoppingCart : public WorkloadGenerator {
 
       // Flip a coin, if we like the result, generate a blind-write.
       if (rand() % m_freq == 0) {
-	action->is_blind = false;
+	action->is_blind = 1;
       }
       // Regular checkout. 
       else {
@@ -91,22 +103,22 @@ class ShoppingCart : public WorkloadGenerator {
       struct DependencyInfo temp;
       int record;
 
-      // Pick a random item that we want to buy, mark it as a read. 
-      while (true) {
-	record = rand() % m_num_records;
-	if (record < m_num_clients) {
-	  record += m_num_clients;
+      //      for (int i = 0; i < 20; ++i) {
+	
+	// Pick a random item that we want to buy, mark it as a read. 
+	while (true) {
+	  record = rand() % m_num_records;
+	  if (cart->find(record) == cart->end() && 
+	      m_index_set.find(record) == m_index_set.end()) {
+	    break;
+	  }
 	}
-	assert(record >= m_num_clients && record < m_num_records);
-	if (cart->find(record) == cart->end()) {
-	  break;
-	}
+	temp.record = record;
+	action->readset.push_back(temp);
+	cart->insert(record);
       }
-      temp.record = record;
-      action->readset.push_back(temp);
-      cart->insert(record);
-    }
-    
+    //    }
+    //    assert(!action->is_blind || action->materialize);
     /*
     if (!action->materialize) {
       assert(action->readset.size() == 1);

@@ -24,12 +24,17 @@ void ProcessAction(const Action* to_proc, int* records) {
     // Update the value of each of the records in the write-set. 
     for (int i = 0; i < writeset_size; ++i) {
       int index = to_proc->writeset[i].record;
+      /*
+      for (int j = 0; j < CACHE_LINE*index; ++j) {
+	records[j] += count;
+	}
+      */
 
       records[CACHE_LINE * index] += count;
       records[CACHE_LINE * (index+1)] += count;
       records[CACHE_LINE * (index+2)] += count;
       records[CACHE_LINE * (index+3)] += count;      
-
+      
     }    
 }
 
@@ -55,6 +60,9 @@ void* Worker::workerFunction(void* arg) {
       (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
   uint64_t* output_queue_data = 
       (uint64_t*)numa_alloc_local(LARGE_QUEUE*CACHE_LINE*sizeof(uint64_t));
+  memset(input_queue_data, 0, size*CACHE_LINE*sizeof(uint64_t));
+  memset(output_queue_data, 0, LARGE_QUEUE*CACHE_LINE*sizeof(uint64_t));
+
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);
 
@@ -82,6 +90,7 @@ void* Worker::workerFunction(void* arg) {
             volatile uint64_t start = rdtsc();
             ProcessAction(action, worker->m_records);
             volatile uint64_t end = rdtsc();
+
             (worker->m_txn_latencies)[(worker->m_num_values) % 1000000] = 
                 end - start;
             worker->m_num_values += 1;

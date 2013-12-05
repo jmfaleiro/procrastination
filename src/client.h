@@ -36,7 +36,7 @@ class Client {
         memset(buckets, 0, sizeof(uint64_t)*300);
 
         xchgq(&reader_flag, 1);
-        uint64_t start_time = rdtsc();
+	uint64_t start_time = rdtsc();
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 100; ++j) {
                 while (true) {
@@ -273,16 +273,16 @@ public:
             if (gen->materialize) {
                 to_wait += 1;
             }
-            gen->start_time = rdtsc();
+	    //            gen->start_time = rdtsc();
             m_lazy_input->EnqueueBlocking((uint64_t)gen);
-            gen->end_time = rdtsc();
+	    //            gen->end_time = rdtsc();
 
             uint64_t ptr;
             while (m_lazy_output->Dequeue(&ptr)) {
                 Action* done_action = (Action*)ptr;
                 if (done_action->materialize) {
                     ++num_completed;
-                    done_action->end_time = rdtsc();
+		    //                    done_action->end_time = rdtsc();
                 }
 
             }            
@@ -296,7 +296,7 @@ public:
         while (num_completed < to_wait) {
             Action* done_action = (Action*)m_lazy_output->DequeueBlocking();
             if (done_action->materialize) {
-                done_action->end_time = rdtsc();
+	      //                done_action->end_time = rdtsc();
                 ++num_completed;
             }
         }
@@ -307,16 +307,19 @@ public:
         int j = 0;
         for (int i = 0; i < m_num_runs; ++i) {
             Action cur = gen_actions[i];
-            if (gen_actions[i].materialize && 
-                gen_actions[i].start_time != 0 &&
-                gen_actions[i].end_time != 0) {
+            if (gen_actions[i].materialize) {
+	      assert(gen_actions[i].end_time != 0 &&
+		     gen_actions[i].start_time != 0);
                 latencies[j] = 
-                    1.0*(gen_actions[i].end_time - gen_actions[i].start_time);
-                latencies[j] = latencies[j] / (1.0*FREQUENCY/1000000);
+		  1.0*(gen_actions[i].end_time - gen_actions[i].start_time);
+		latencies[j] = latencies[j] / (1.0*FREQUENCY/1000000);
+
+		//latencies[j] = gen_actions[i].end_time - gen_actions[i].start_time;
                 ++j;
             }
         }
         
+	assert(j == to_wait);
         ofstream output_file;
         output_file.open("client_latencies.txt", ios::out);
         
