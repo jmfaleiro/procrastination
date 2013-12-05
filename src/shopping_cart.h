@@ -51,62 +51,80 @@ class ShoppingCart : public WorkloadGenerator {
 
     Action* action = &m_action_set[m_use_next++];    
 
+    // Both regular updates and check-outs write the shopping cart itself.
     struct DependencyInfo fake;
     fake.record = cur_client;
     action->writeset.push_back(fake);
-    
-    if (rand() % m_cart_size == 0) {
+    action->is_blind = false;
+    action->materialize = false;
 
-      for (std::set<int>::iterator it = cart->begin();
-	   it != cart->end();
-	   ++it) {
-	struct DependencyInfo inf;
-	inf.record = *it;
-	action->writeset.push_back(inf);	
+    // Check-out if the cart size is now 20. 
+    if (cart->size() == 20) {
+      
+      // Make sure that the action will be materialized. 
+      action->materialize = true;
+
+      // Flip a coin, if we like the result, generate a blind-write.
+      if (rand() % m_freq == 0) {
+	action->is_blind = false;
+      }
+      // Regular checkout. 
+      else {
+
+	// Make sure that the check-out writes the records in the cart. 
+	struct DependencyInfo blah;
+	for (std::set<int>::iterator it = cart->begin();
+	     it != cart->end();
+	     ++it) {
+	  blah.record = *it;
+	  action->writeset.push_back(blah);
+	}
       }
       
-      action->is_checkout = true;
-      action->materialize = true;
-      action->is_blind = ((rand() % m_freq) == 0);
+      // In either case, make sure that the client-side shopping cart state  is
+      // cleared. 
       cart->clear();
     }
-    else {
-      struct DependencyInfo real;
+    
+    // Otherwise keep adding to the cart. 
+    else {	
+      struct DependencyInfo temp;
       int record;
-      for (int i = 0; i < 20; ++i) {
-	// Pick a hot record. 
-	if (rand() % 2 == 0) {
-	  while (true) {
-	    record = rand() % m_hot;
-	    if ((cart->find(record) == cart->end()) && record >= m_num_clients) {
-	      break;
-	    }
-	  }
+
+      // Pick a random item that we want to buy, mark it as a read. 
+      while (true) {
+	record = rand() % m_num_records;
+	if (record < m_num_clients) {
+	  record += m_num_clients;
 	}
-	// Pick a cold record. 
-	else {	
-	  while (true) {
-	    record = rand() % m_num_records;
-	    if ((cart->find(record) == cart->end()) && 
-		(record >= m_num_clients) &&
-		(record >= m_hot)) {
-	      break;
-	    }
-	  }
+	assert(record >= m_num_clients && record < m_num_records);
+	if (cart->find(record) == cart->end()) {
+	  break;
 	}
-      
-	cart->insert(record);
-	real.record = record;
-	action->writeset.push_back(real);
       }
-
-      action->is_checkout = false;
-
-      action->materialize = false;      
-      action->is_blind = false;
+      temp.record = record;
+      action->readset.push_back(temp);
+      cart->insert(record);
     }
+    
+    /*
+    if (!action->materialize) {
+      assert(action->readset.size() == 1);
+      assert(action->writeset.size() == 1);      
+    }
+    else if (action->is_blind) {
+      assert(action->readset.size() == 0);
+      assert(action->writeset.size() == 1);
+    }
+    else {
+      if (action->writeset.size() != 21) {
+	std::cout << action->writeset.size() << "\n";
+      }
+      assert(action->writeset.size() == 21);
+      assert(action->readset.size() == 0);
+      }*/
     return action;
-  }  
+  }
 };
 
 

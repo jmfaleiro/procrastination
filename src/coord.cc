@@ -245,20 +245,20 @@ void initialize(ExperimentInfo* info,
     
     // Create a workload generator and generate txns to process. 
     WorkloadGenerator* gen;
-    if (info->is_normal) {
+    if (info->blind_write_frequency != -1) {
+      gen = new ShoppingCart(1000,
+			     info->num_records, 
+			     20,
+			     info->blind_write_frequency,
+			     10000);
+    }
+    else if (info->is_normal) {
         gen = new NormalGenerator(info->read_set_size,
                                   info->write_set_size,
                                   info->num_records,
                                   info->substantiate_period,
                                   info->std_dev,
 				  info->blind_write_frequency);
-    }
-    else if (info->blind_write_frequency != -1) {
-      gen = new ShoppingCart(1000,
-			     info->num_records, 
-			     20,
-			     info->blind_write_frequency,
-			     10000);
     }
     else {
         gen = new UniformGenerator(info->read_set_size,
@@ -289,7 +289,6 @@ void initialize(ExperimentInfo* info,
 	
     bool throughput_expt = (info->experiment == THROUGHPUT);
     *scheduler = new LazyScheduler(info->serial,
-				   (info->blind_write_frequency != -1),
                                    throughput_expt,
                                    info->num_workers, 
                                    info->num_records, 

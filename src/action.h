@@ -7,10 +7,10 @@
 class Action;
 
 struct DependencyInfo {
-	int record;
-	Action* dependency;
-	bool is_write;
-	int index;
+  int record;
+  Action* dependency;
+  bool is_write;
+  int index;
 };
 
 class Action {

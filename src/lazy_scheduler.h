@@ -100,7 +100,7 @@ class LazyScheduler {
   SimpleQueue* m_log_output;
   
   virtual void processBlindWrite(Action* action);
-  void processWrite(Action* action, int index);
+  virtual void processWrite(Action* action, int index);
   virtual void processRead(Action* action, int index);
 
   void overwriteTxn(Action* action);
@@ -115,8 +115,6 @@ class LazyScheduler {
   // Dispatch a transaction to a worker for processing. 
   virtual void run_txn(Action* action);
 
-  virtual void substantiateCart(Action* action);
-
   // Scheduler thread function.
   static void* schedulerFunction(void* arg);
   static void* graphWalkFunction(void* arg);
@@ -126,7 +124,6 @@ class LazyScheduler {
   
 public:
   LazyScheduler(bool serial,
-		bool blind,
                 bool throughput, 
                 int num_workers, 
                 int num_records, 
