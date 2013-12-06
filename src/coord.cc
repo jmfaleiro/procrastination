@@ -190,8 +190,7 @@ void write_client_latencies(WorkloadGenerator* gen) {
   int action_count = gen->numUsed();
   Action* gen_actions = gen->getActions();
   for (int i = 0; i < action_count; ++i) {
-    if (gen_actions[i].system_start_time != 0 && 
-	gen_actions[i].system_end_time != 0) {
+    if (gen_actions[i].materialize) {
       latencies.push_back(gen_actions[i].system_end_time + 
 			  gen_actions[i].sched_end_time -
 			  gen_actions[i].sched_start_time -
