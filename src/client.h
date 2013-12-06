@@ -310,11 +310,11 @@ public:
             if (gen_actions[i].materialize) {
 	      assert(gen_actions[i].end_time != 0 &&
 		     gen_actions[i].start_time != 0);
-                latencies[j] = 
-		  1.0*(gen_actions[i].end_time - gen_actions[i].start_time);
-		latencies[j] = latencies[j] / (1.0*FREQUENCY/1000000);
+	      latencies[j] = 
+		1.0*(gen_actions[i].end_time - gen_actions[i].start_time);
+	      latencies[j] = latencies[j] / (1.0*FREQUENCY/1000000);
 
-		//latencies[j] = gen_actions[i].end_time - gen_actions[i].start_time;
+	      //		  latencies[j] = gen_actions[i].end_time - gen_actions[i].start_time;
                 ++j;
             }
         }

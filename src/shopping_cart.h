@@ -62,6 +62,10 @@ class ShoppingCart : public WorkloadGenerator {
     m_next_client += 1;
 
     Action* action = &m_action_set[m_use_next++];    
+    action->start_time = 0;
+    action->end_time = 0;
+    action->system_start_time = 0;
+    action->system_end_time = 0;
 
     // Both regular updates and check-outs write the shopping cart itself.
     struct DependencyInfo fake;

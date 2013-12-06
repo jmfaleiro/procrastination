@@ -4,14 +4,13 @@ NormalGenerator::NormalGenerator(int read_size,
                                  int write_size,
                                  int num_records,
                                  int freq,
-                                 int std_dev,
-				 int blind_freq) {
+                                 int std_dev) {
+				 
     m_read_set_size = read_size;
     m_write_set_size = write_size;
     m_num_records = num_records;
     m_freq = freq;
     m_std_dev = std_dev;
-    m_blind_write_freq = blind_freq;
     
     m_num_actions = 10000000;
 	m_action_set = new Action[m_num_actions];
@@ -41,6 +40,11 @@ Action* NormalGenerator::genNext() {
     std::set<int> done;
 
     Action* ret = &m_action_set[m_use_next];
+    ret->start_time = 0;
+    ret->end_time = 0;
+    ret->system_start_time = 0;
+    ret->system_end_time = 0;
+
     m_use_next += 1;
     
     ret->is_blind = false;
@@ -75,10 +79,5 @@ Action* NormalGenerator::genNext() {
 		ret->materialize = false;
     }
     
-    if (m_blind_write_freq != -1) {
-      if ((rand() % m_blind_write_freq) == 0) {
-	ret->is_blind = true;
-      }
-    }
     return ret;
 }

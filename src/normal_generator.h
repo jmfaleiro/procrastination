@@ -25,8 +25,8 @@ class NormalGenerator : public WorkloadGenerator {
                     int write_size,
                     int num_records,
                     int freq,
-                    int std_dev,
-		    int blind_freq);
+                    int std_dev);
+
 
     
     virtual Action* genNext();

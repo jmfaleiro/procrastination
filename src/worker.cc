@@ -2,9 +2,13 @@
 #include "machine.h"
 #include "lazy_scheduler.h"
 
+
+
+
 // For the microbenchmarks, read the values of the records in the read set and 
 // then add the sum to each of the records in the writeset. 
-void ProcessAction(const Action* to_proc, int* records) {
+void ProcessAction(Action* to_proc, int* records) {
+  to_proc->start_time = rdtsc();
     int readset_size = to_proc->readset.size();
     int writeset_size = to_proc->writeset.size();
 
@@ -13,40 +17,54 @@ void ProcessAction(const Action* to_proc, int* records) {
 
     for (int i = 0; i < readset_size; ++i) {
         int index = to_proc->readset[i].record;
-
-	count += records[CACHE_LINE*index];        
-	count += records[CACHE_LINE*(index+1)];
-	count += records[CACHE_LINE*(index+2)];
-	count += records[CACHE_LINE*(index+3)];        	
+		/*
+		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
+			count += records[j];
+		}
+		*/
+		count += records[CACHE_LINE*index];        
+		count += records[CACHE_LINE*(index+1)];
+		count += records[CACHE_LINE*(index+2)];
+		count += records[CACHE_LINE*(index+3)];        	
     }
     
     
     // Update the value of each of the records in the write-set. 
     for (int i = 0; i < writeset_size; ++i) {
       int index = to_proc->writeset[i].record;
-      /*
-      for (int j = 0; j < CACHE_LINE*index; ++j) {
-	records[j] += count;
-	}
-      */
 
-      records[CACHE_LINE * index] += count;
-      records[CACHE_LINE * (index+1)] += count;
-      records[CACHE_LINE * (index+2)] += count;
-      records[CACHE_LINE * (index+3)] += count;      
+	  /*
+		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
+			records[j] += count;
+			//			count += records[i];
+		}
+	  */
+	  
+	  records[CACHE_LINE * index] += count;
+	  records[CACHE_LINE * (index+1)] += count;
+	  records[CACHE_LINE * (index+2)] += count;
+	  records[CACHE_LINE * (index+3)] += count;      
       
-    }    
+    }   
+    to_proc->end_time = rdtsc();
 }
 
 Worker::Worker(int queue_size,
                cpu_set_t* binding_info,
-               int* records) {
+               int* records,
+	       bool serial) {
     m_queue_size = queue_size;
     m_binding_info = binding_info;
     m_records = records;
     m_run_flag = 0;
     m_input_queue = NULL;
     m_output_queue = NULL;
+
+    m_serial = serial;
+    m_num_done = 0;
+
+    m_done_flag = 0;
+    m_sched_done_flag = 0;
 }
 
 void* Worker::workerFunction(void* arg) {  
@@ -81,30 +99,48 @@ void* Worker::workerFunction(void* arg) {
   memset(worker->m_txn_latencies, 0, sizeof(uint64_t)*1000000);
 
   worker->m_num_values = 0;
-  Action* action;
-  while (true) {
-	if (worker->m_run_flag) {
-            uint64_t ptr = input_queue->DequeueBlocking();
-            action = (Action*)ptr;
-
-            volatile uint64_t start = rdtsc();
-            ProcessAction(action, worker->m_records);
-            volatile uint64_t end = rdtsc();
-
-            (worker->m_txn_latencies)[(worker->m_num_values) % 1000000] = 
-                end - start;
-            worker->m_num_values += 1;
-            
-            output_queue->EnqueueBlocking(ptr);
-	}
+  if (worker->m_serial) {
+    while (true) {
+      Action* action = (Action*)input_queue->DequeueBlocking();
+      action->system_start_time += rdtsc();
+      ProcessAction(action, worker->m_records);
+      output_queue->EnqueueBlocking((uint64_t)action);
+      action->system_end_time += rdtsc();
+      worker->m_num_done += 1;
+    }
+  }
+  else {
+    while (true) {
+      uint64_t ptr = input_queue->DequeueBlocking();
+      Action* action = (Action*)ptr;
+      action->system_start_time += rdtsc();
+      switch(action->is_blind) {
+      case 0:	// It's a regular materialization.
+	worker->substantiate((Action*)ptr);
+	break;
+	
+      case 1:	// It's a blind write. 
+	worker->processBlindWrite(action);
+	break;
+      }
+  }
+  if (worker->m_run_flag) {
+    
+      
+    }
   }
   
   // We should never get here!
   assert(false);
 }
 
-int Worker::numDone() {
-    return m_num_values;
+void Worker::waitSubstantiated() {
+  while (!m_input_queue->isEmpty())
+    ;
+}
+
+uint64_t Worker::numDone() {
+  return m_num_done;
 }
 
 uint64_t* Worker::getTimes(int* num_vals) {
@@ -125,7 +161,7 @@ void Worker::waitForStart() {
 	continue;
 }
 
-void Worker::startThread(SimpleQueue** input, SimpleQueue** output) {
+uint64_t* Worker::startThread(SimpleQueue** input, SimpleQueue** output) {
   m_start_signal = 0;
   asm volatile("":::"memory");
   pthread_create(&m_worker_thread,
@@ -141,4 +177,107 @@ void Worker::startThread(SimpleQueue** input, SimpleQueue** output) {
   assert(m_output_queue != NULL);
   *input = m_input_queue;
   *output = m_output_queue;
+  return &m_sched_done_flag;
 }
+
+void Worker::processRead(Action* action, 
+			 int readIndex) {
+		
+     
+  //    assert(action->state == STICKY);    
+
+    Action* prev = action->readset[readIndex].dependency;
+    int index = action->readset[readIndex].index;
+    bool is_write = action->readset[readIndex].is_write;
+    
+    while (prev != NULL) {
+      if (is_write) {
+            
+	// Start processing the dependency. 
+	if (prev->state == STICKY) {
+	  substantiate(prev);
+	}
+	
+	// We can end since this is a write. 
+	prev = NULL;
+      }
+      else {
+	int cur_index = index;
+	is_write = prev->readset[cur_index].is_write;
+	index = prev->readset[cur_index].index;
+	prev = prev->readset[cur_index].dependency;
+      }
+    }
+}
+
+
+// XXX: In its current form, this function will only work when actions are 
+// generated by the shopping cart workload generator. 
+
+void Worker::processBlindWrite(Action* action) {
+  
+  // Execute the blind-write and return it to the user. 
+  action->state = SUBSTANTIATED;
+  ProcessAction(action, m_records);
+  action->system_end_time = rdtsc();
+  m_output_queue->EnqueueBlocking((uint64_t)action);
+  m_num_done += 1;
+
+  // Mark the transactions that made up the session as having been 
+  // substantiated.
+  Action* prev = action->writeset[0].dependency;  
+  while (prev != NULL && prev->state != SUBSTANTIATED) {
+    prev->state = SUBSTANTIATED;
+    prev = prev->writeset[0].dependency;
+    m_num_done += 1;
+  }
+}
+
+uint64_t Worker::substantiate(Action* start) {    
+  //  assert(start->state == STICKY);
+  int num_reads = start->readset.size();
+  int num_writes = start->writeset.size();
+  for (int i = 0; i < num_reads; ++i) {
+    processRead(start, i);
+  }
+  for (int i = 0; i < num_writes; ++i) {
+    processWrite(start, i);
+  }
+
+  start->state = SUBSTANTIATED;
+  ProcessAction(start, m_records);
+  start->system_end_time = rdtsc();
+  m_output_queue->EnqueueBlocking((uint64_t)start);
+  m_num_done += 1;
+  return 0;
+}
+
+// We break if prev is NULL, or if it is a write
+void Worker::processWrite(Action* action, 
+                                 int writeIndex) {
+
+                                
+  //    assert(action->state == STICKY);
+    
+    // Get the record and txn this action is dependent on. 
+    Action* prev = action->writeset[writeIndex].dependency;
+    bool is_write = action->writeset[writeIndex].is_write;
+    int index = action->writeset[writeIndex].index;
+
+    while (prev != NULL) {
+        if (prev->state != SUBSTANTIATED) {
+            substantiate(prev);
+        }
+
+        if (is_write) {
+            prev = NULL;
+        }
+        else {
+	  int cur_index = index;
+	  is_write = prev->readset[cur_index].is_write;
+	  index = prev->readset[cur_index].index;
+	  prev = prev->readset[cur_index].dependency;
+        }
+    }
+}
+

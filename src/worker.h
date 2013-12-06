@@ -23,6 +23,11 @@ class Worker {
   // XXX: Switch this to something more generic for later on. 
   int* m_records;
   
+  uint64_t m_num_done;
+
+  bool m_serial;
+  uint64_t m_sched_done_flag;
+  uint64_t m_done_flag;
 
   // Information used to bind to specific queues. 
   cpu_set_t* m_binding_info;  
@@ -37,10 +42,16 @@ class Worker {
   
   static void* workerFunction(void* arg);
 
+  void processRead(Action* action, int readIndex);
+  void processWrite(Action* action, int writeIndex);
+  void processBlindWrite(Action* action);
+  uint64_t substantiate(Action* action);
+
  public:
   Worker(int queue_size,
          cpu_set_t* binding_info,
-         int* records);
+         int* records,
+	 bool serial);
   
   // Get the completion times for txns. 
   uint64_t* getTimes(int* num_vals);
@@ -52,12 +63,16 @@ class Worker {
   void stopWorker();
   
   // Start the worker thread. 
-  void startThread(SimpleQueue** input, SimpleQueue** output);
+  uint64_t* startThread(SimpleQueue** input, SimpleQueue** output);
   
   // Wait for the newly allocated thread to signal before returning. 
   void waitForStart();
+  
+  uint64_t getSaved();
 
-  int numDone();
+  void waitSubstantiated();
+
+  uint64_t numDone();
 };
 
 #endif // WORKER_H

@@ -63,6 +63,8 @@ class LazyScheduler {
     
     cpu_set_t* m_binding_info;
     
+    
+    uint64_t* m_worker_flag;
 
     uint64_t m_num_saved;
 
@@ -128,6 +130,7 @@ public:
                 int num_workers, 
                 int num_records, 
                 int max_chain,
+		uint64_t* worker_flag,
                 SimpleQueue** input,
                 SimpleQueue** output,
                 cpu_set_t* binding,
@@ -135,7 +138,7 @@ public:
                 SimpleQueue* sched_output);
   
   virtual uint64_t getSaved();
-  virtual uint64_t waitFinished();
+  virtual void waitFinished();
   
   // Add the action to the dependency graph. We add dependencies on the 
   // actions it depends on, and also update the m_last_txns table. 

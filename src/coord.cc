@@ -60,7 +60,7 @@ buildDependencies(WorkloadGenerator* generator,
     return to_wait;
 }
 
-void
+uint64_t*
 initWorkers(Worker** workers,
             int start_index, 
             int num_workers, 
@@ -84,16 +84,19 @@ initWorkers(Worker** workers,
         if (info->experiment == PEAK_LOAD) {
             workers[i] = new Worker(SMALL_QUEUE,
                                     &bindings[i], 
-                                    records);
+                                    records,
+				    info->serial);
         }
         else {
             workers[i] = new Worker(LARGE_QUEUE,
                                     &bindings[i], 
-                                    records);            
+                                    records,
+				    info->serial);            
         }
-
-	workers[i]->startThread(&input_queue[i], &output_queue[i]);	
+	uint64_t* ret = NULL;
+	ret = workers[i]->startThread(&input_queue[i], &output_queue[i]);	
 	workers[i]->startWorker();
+	return ret;
   }
 }
 
@@ -104,27 +107,27 @@ timespec wait(LazyScheduler* sched,
               timespec* stickification_time,
               int* num_done,
               ExperimentInfo* info) {
-    
+
     timespec start_time, end_time, input_time;
     sched->startScheduler();
     
     // Start measuring time elapsed. 
     clock_gettime(CLOCK_REALTIME, &start_time);   
     int to_wait = 0, done_count = 0;
-    if (!info->serial) {
-        uint64_t num_waits = sched->waitFinished();
-        clock_gettime(CLOCK_REALTIME, &input_time);    
-        sched->waitSubstantiated();
-        *num_done = worker->numDone();
-	*num_done += sched->getSaved();
-    }
+
+    sched->waitFinished();	
+    clock_gettime(CLOCK_REALTIME, &input_time);    
+    worker->waitSubstantiated();
+    *num_done = worker->numDone();
+
+    /*
     else {
       to_wait = info->num_txns;
       while (done_count++ < to_wait) {
 	scheduler_output->DequeueBlocking();
       }
       *num_done = info->num_txns;
-    }
+      }*/
        
     clock_gettime(CLOCK_REALTIME, &end_time);    
     input_time = diff_time(start_time, input_time);
@@ -182,25 +185,58 @@ void write_client_latencies(int num_waits, WorkloadGenerator* gen) {
     output_file.close();
 }
 
-void write_latencies(Worker* worker) {
-                     
+void write_client_latencies(WorkloadGenerator* gen) {
+  vector<uint64_t> latencies;
+  int action_count = gen->numUsed();
+  Action* gen_actions = gen->getActions();
+  for (int i = 0; i < action_count; ++i) {
+    if (gen_actions[i].system_start_time != 0 && 
+	gen_actions[i].system_end_time != 0) {
+      latencies.push_back(gen_actions[i].system_end_time + 
+			  gen_actions[i].sched_end_time -
+			  gen_actions[i].sched_start_time -
+			  gen_actions[i].system_start_time);
+    }
+  }
+  
+  ofstream output_file;
+  output_file.open("system_latencies.txt");
+  
+  int num_values = latencies.size();
+  std::sort(latencies.begin(), latencies.end());
+  double diff = 1.0 / (double)(latencies.size());
+  double cur = 0.0;
+  
+  for (int i = 0; i < num_values; ++i) {
+    output_file << cur << " " << latencies[i] << "\n";
+    cur += diff;
+  }
+  output_file.close();
+}
+
+void write_latencies(WorkloadGenerator* gen) {
+  
+  vector<uint64_t> latencies;
+  int action_count = gen->numUsed();
+  Action* gen_actions = gen->getActions();
+  for (int i = 0; i < action_count; ++i) {
+    if (gen_actions[i].start_time != 0 && gen_actions[i].end_time != 0) {
+      latencies.push_back(gen_actions[i].end_time - gen_actions[i].start_time);
+    }
+  }
         
     ofstream output_file;
-    output_file.open("latencies.txt", ios::out);
+    output_file.open("txn_latencies.txt", ios::out);
     
-    int num_values;
-    uint64_t* times = worker->getTimes(&num_values);
-    std::cout << num_values << "\n";
-    num_values = num_values > 1000000? 1000000 : num_values;
-    std::sort(times, times + num_values);
+    int num_values = latencies.size();
+    std::sort(latencies.begin(), latencies.end());
 
-    double diff = 1.0 / (double)(num_values);
+    double diff = 1.0 / (double)(latencies.size());
     double cur = 0.0;
 
     for (int i = 0; i < num_values; ++i) {
-        output_file << times[i] << "\n";
-        //output_file << cur << " " << times[i] << "\n";
-        //cur += diff;
+      output_file << cur << " " << latencies[i] << "\n";
+      cur += diff;
     }
     output_file.close();
 }
@@ -226,6 +262,9 @@ void initialize(ExperimentInfo* info,
     memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
     memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
 
+
+
+
     // Data for input/output queues. 
     uint64_t sched_size;
     if (info->experiment == PEAK_LOAD) {
@@ -244,7 +283,7 @@ void initialize(ExperimentInfo* info,
     // Create the queues. 
     SimpleQueue* scheduler_input = 
         new SimpleQueue(sched_input_data, sched_size);
-    
+
     // Create a workload generator and generate txns to process. 
     WorkloadGenerator* gen;
     if (info->blind_write_frequency != -1) {
@@ -259,28 +298,30 @@ void initialize(ExperimentInfo* info,
                                   info->write_set_size,
                                   info->num_records,
                                   info->substantiate_period,
-                                  info->std_dev,
-				  info->blind_write_frequency);
+                                  info->std_dev);
+	  
+				 
     }
     else {
         gen = new UniformGenerator(info->read_set_size,
                                    info->write_set_size,
                                    info->num_records,
-                                   info->substantiate_period,
-				   info->blind_write_frequency);
+                                   info->substantiate_period);
     }
     *generator = gen;
-
+    if (info->experiment == THROUGHPUT) {
+      buildDependencies(gen, info->num_txns, scheduler_input);    
+    }
     // Create and start worker threads. 
     Worker* workers[info->num_workers];
-    initWorkers(workers,
-                2,
-                info->num_workers, 
-                info->worker_bindings,
-                worker_inputs,
-                worker_outputs,
-                info->num_records,
-                info);
+    uint64_t* worker_flag = initWorkers(workers,
+					1,
+					info->num_workers, 
+					info->worker_bindings,
+					worker_inputs,
+					worker_outputs,
+					info->num_records,
+					info);
     
     // Create a scheduler thread. 
     CPU_ZERO(&info->scheduler_bindings[0]);
@@ -295,6 +336,7 @@ void initialize(ExperimentInfo* info,
                                    info->num_workers, 
                                    info->num_records, 
                                    info->substantiate_threshold,
+				   worker_flag,
                                    worker_inputs,
                                    NULL,
                                    info->scheduler_bindings,
@@ -322,7 +364,7 @@ void run_experiment(ExperimentInfo* info) {
                &gen);
     
     if (info->experiment == THROUGHPUT) {
-        buildDependencies(gen, info->num_txns, scheduler_input);
+
         int num_done;
         timespec input_time;
         timespec exec_time = wait(sched, 
@@ -333,7 +375,8 @@ void run_experiment(ExperimentInfo* info) {
                                   info);
         std::cout << "here!\n";
         write_answers(info, exec_time, input_time, num_done);
-        write_latencies(worker);     
+        write_latencies(gen);     
+	write_client_latencies(gen);
     }
     else if (info->experiment == LATENCY) {
         Client c(worker, 
