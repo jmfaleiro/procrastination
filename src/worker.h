@@ -42,10 +42,10 @@ class Worker {
   
   static void* workerFunction(void* arg);
 
-  void processRead(Action* action, int readIndex);
-  void processWrite(Action* action, int writeIndex);
-  void processBlindWrite(Action* action);
-  uint64_t substantiate(Action* action);
+  virtual void processRead(Action* action, int readIndex);
+  virtual void processWrite(Action* action, int writeIndex);
+  virtual void processBlindWrite(Action* action);
+  virtual uint64_t substantiate(Action* action);
 
  public:
   Worker(int queue_size,
