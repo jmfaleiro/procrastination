@@ -117,10 +117,10 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     
     SimpleQueue* incoming_txns = sched->m_log_input;
     Action* action = NULL;
-    sched->start_time = rdtsc();
+    //    sched->start_time = rdtsc();
     while (true) {
       Action* to_process = (Action*)incoming_txns->DequeueBlocking();
-      to_process->sched_start_time = rdtsc();
+      //to_process->sched_start_time = rdtsc();
       sched->addGraph(to_process); 
     }
  
@@ -141,7 +141,7 @@ bool LazyScheduler::isDone(int* count) {
 void LazyScheduler::addGraph(Action* action) {
   if (m_serial) {
     action->state = SUBSTANTIATED;
-    action->sched_end_time = rdtsc();    
+    //    action->sched_end_time = rdtsc();    
     m_worker_input[0]->EnqueueBlocking((uint64_t)action);
     return;
   }    
@@ -202,7 +202,7 @@ void LazyScheduler::addGraph(Action* action) {
                 *(count_ptrs[i]) = 0;		  
             }
             m_worker_input[0]->EnqueueBlocking((uint64_t)action);
-	    action->sched_end_time = rdtsc();
+            //	    action->sched_end_time = rdtsc();
         }
     }
 }
@@ -303,7 +303,7 @@ void LazyScheduler::cleanup_txns() {
 
 void LazyScheduler::run_txn(Action* to_run) {
   //assert(to_run->state == SUBSTANTIATED);
-  to_run->end_time = rdtsc();
+  //  to_run->end_time = rdtsc();
     m_worker_input[0]->EnqueueBlocking((uint64_t)to_run);
     //    bool done = m_worker_input[0]->Enqueue((uint64_t)to_run);
     //    assert(done);
@@ -323,7 +323,7 @@ uint64_t LazyScheduler::substantiate(Action* start) {
 
   start->state = SUBSTANTIATED;
   m_worker_input[0]->EnqueueBlocking((uint64_t)start);
-  start->end_time = rdtsc();
+  //  start->end_time = rdtsc();
 
   return 0;
 }

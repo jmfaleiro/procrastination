@@ -8,7 +8,7 @@
 // For the microbenchmarks, read the values of the records in the read set and 
 // then add the sum to each of the records in the writeset. 
 void ProcessAction(Action* to_proc, int* records) {
-  to_proc->start_time = rdtsc();
+  //  to_proc->start_time = rdtsc();
     int readset_size = to_proc->readset.size();
     int writeset_size = to_proc->writeset.size();
 
@@ -46,7 +46,7 @@ void ProcessAction(Action* to_proc, int* records) {
 	  records[CACHE_LINE * (index+3)] += count;      
       
     }   
-    to_proc->end_time = rdtsc();
+    //    to_proc->end_time = rdtsc();
 }
 
 Worker::Worker(int queue_size,
@@ -102,10 +102,10 @@ void* Worker::workerFunction(void* arg) {
   if (worker->m_serial) {
     while (true) {
       Action* action = (Action*)input_queue->DequeueBlocking();
-      action->system_start_time += rdtsc();
+      //      action->system_start_time += rdtsc();
       ProcessAction(action, worker->m_records);
       output_queue->EnqueueBlocking((uint64_t)action);
-      action->system_end_time += rdtsc();
+      //      action->system_end_time += rdtsc();
       worker->m_num_done += 1;
     }
   }
@@ -113,7 +113,7 @@ void* Worker::workerFunction(void* arg) {
     while (true) {
       uint64_t ptr = input_queue->DequeueBlocking();
       Action* action = (Action*)ptr;
-      action->system_start_time += rdtsc();
+      //      action->system_start_time += rdtsc();
       switch(action->is_blind) {
       case 0:	// It's a regular materialization.
 	worker->substantiate((Action*)ptr);
@@ -223,7 +223,7 @@ void Worker::processBlindWrite(Action* action) {
   // Execute the blind-write and return it to the user. 
   action->state = SUBSTANTIATED;
   ProcessAction(action, m_records);
-  action->system_end_time = rdtsc();
+  //  action->system_end_time = rdtsc();
   m_output_queue->EnqueueBlocking((uint64_t)action);
   m_num_done += 1;
 
