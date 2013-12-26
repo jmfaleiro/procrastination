@@ -103,7 +103,8 @@ initWorkers(Worker** workers,
 // Returns the time elapsed in processing a given workload. 
 timespec wait(LazyScheduler* sched,
               SimpleQueue* scheduler_output, 
-              Worker* worker,
+              Worker** workers,
+              int num_workers,
               timespec* stickification_time,
               int* num_done,
               ExperimentInfo* info) {
@@ -117,8 +118,8 @@ timespec wait(LazyScheduler* sched,
 
     sched->waitFinished();	
     clock_gettime(CLOCK_REALTIME, &input_time);    
-    worker->waitSubstantiated();
-    *num_done = worker->numDone();
+    workers[0]->waitSubstantiated();
+    *num_done = workers[0]->numDone();
 
     /*
     else {
@@ -244,7 +245,7 @@ void initialize(ExperimentInfo* info,
                 SimpleQueue** output,
                 SimpleQueue** input,
                 LazyScheduler** scheduler,
-                Worker** worker,
+                Worker** workers,
                 WorkloadGenerator** generator) {
 
     init_cpuinfo();
@@ -260,9 +261,6 @@ void initialize(ExperimentInfo* info,
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));
     memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
     memset(worker_inputs, 0, info->num_workers*sizeof(SimpleQueue*));
-
-
-
 
     // Data for input/output queues. 
     uint64_t sched_size;
@@ -312,7 +310,6 @@ void initialize(ExperimentInfo* info,
       buildDependencies(gen, info->num_txns, scheduler_input);    
     }
     // Create and start worker threads. 
-    Worker* workers[info->num_workers];
     uint64_t* worker_flag = initWorkers(workers,
 					1,
 					info->num_workers, 
@@ -343,7 +340,6 @@ void initialize(ExperimentInfo* info,
                                    NULL);
 
     (*scheduler)->startThread();
-    *worker = workers[0];
     *output = worker_outputs[0];
     *input = scheduler_input;
 }
@@ -354,12 +350,12 @@ void run_experiment(ExperimentInfo* info) {
     SimpleQueue* scheduler_input;
     WorkloadGenerator* gen;
     LazyScheduler* sched;
-    Worker* worker;
+    Worker** workers = (Worker**)malloc(sizeof(Worker*) * info->num_workers);
     initialize(info, 
                &scheduler_output, 
                &scheduler_input, 
                &sched, 
-               &worker, 
+               workers, 
                &gen);
     
     if (info->experiment == THROUGHPUT) {
@@ -368,7 +364,8 @@ void run_experiment(ExperimentInfo* info) {
         timespec input_time;
         timespec exec_time = wait(sched, 
                                   scheduler_output, 
-                                  worker, 
+                                  workers, 
+                                  info->num_workers,
                                   &input_time, 
                                   &num_done,
                                   info);
@@ -378,7 +375,7 @@ void run_experiment(ExperimentInfo* info) {
 	write_client_latencies(gen);
     }
     else if (info->experiment == LATENCY) {
-        Client c(worker, 
+        Client c(*workers, 
                  sched, 
                  scheduler_input, 
                  scheduler_output, 
@@ -387,7 +384,7 @@ void run_experiment(ExperimentInfo* info) {
         c.Run();
     }
     else if (info->experiment == PEAK_LOAD) {
-        Client c(worker, 
+        Client c(*workers, 
                  sched, 
                  scheduler_input, 
                  scheduler_output, 
