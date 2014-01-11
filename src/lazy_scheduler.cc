@@ -202,6 +202,7 @@ void LazyScheduler::addGraph(Action* action) {
                 *(count_ptrs[i]) = 0;		  
             }
             m_last_used += 1;
+            
             int index = m_last_used % m_num_workers;
             m_worker_input[index]->EnqueueBlocking((uint64_t)action);
             //	    action->sched_end_time = rdtsc();

@@ -252,7 +252,7 @@ void initialize(ExperimentInfo* info,
     numa_set_strict(1);
     cpu_set_t my_binding;
     CPU_ZERO(&my_binding);
-    CPU_SET(3, &my_binding);
+    CPU_SET(9, &my_binding);
 
     SimpleQueue** worker_inputs = 
         (SimpleQueue**)malloc(info->num_workers*sizeof(SimpleQueue*));

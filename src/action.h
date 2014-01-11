@@ -22,6 +22,7 @@ struct StateLock {
 class Action {
 
  private:
+  // Use a 64-bit field to manage the lock + state of the transaction. 
   volatile uint64_t values[8] __attribute__ ((aligned(CACHE_LINE)));
 
  public:  
