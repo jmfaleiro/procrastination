@@ -95,6 +95,7 @@ initWorkers(Worker** workers,
         }
 	uint64_t* ret = NULL;
 	ret = workers[i]->startThread(&input_queue[i], &output_queue[i]);	
+        assert(input_queue[i] != NULL && output_queue[i] != NULL);
 	workers[i]->startWorker();
 	return ret;
   }

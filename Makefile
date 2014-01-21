@@ -1,6 +1,7 @@
 CFLAGS=-O3 -Wall -Wextra -g -std=c++0x
 LIBS=-lnuma -lpthread -lprotobuf -lrt
 
+INCLUDE=src/include
 HEADERS=$(wildcard src/*.h)
 PROTO=$(wildcard proto/*.proto)
 
@@ -18,13 +19,13 @@ dev: CFLAGS = -g -Wall -Isrc -Wall -Wextra -std=c++0x
 dev: all
 
 $(TARGET): build $(OBJECTS)
-	g++ $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	g++ $(CFLAGS) -I$(INCLUDE) -o $@ $(OBJECTS) $(LIBS)
 
 $(OBJECTS): $(HEADERS) 
 
 
 build/%.o: src/%.cc
-	g++ $(CFLAGS) -c -o $@ $<
+	g++ $(CFLAGS) -I$(INCLUDE) -c -o $@ $<
 
 build:
 	mkdir -p build

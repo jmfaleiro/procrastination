@@ -1,0 +1,6 @@
+void
+tpcc::Worker::NewOrder(int w_id, int d_id, int c_id,
+                       int o_ol_cnt, int o_all_local, int[] itemIDs,
+                       int[] supplierWarehouseIDs, int[] orderQuantities) {
+
+}
