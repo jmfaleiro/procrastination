@@ -1,6 +1,46 @@
-#include <storage/hash_store.h>
+// Author: Jose M. Faleiro (faleiro.jose.manuel@gmail.com)
+// Adapted from oltpbench (git@github.com:oltpbenchmark/oltpbench.git)
+
+#include <hash_store.h>
 
 namespace tpcc {
+  
+  typedef enum TPCCTable {
+    WAREHOUSE = 0,
+    DISTRICT,
+    CUSTOMER,
+    HISTORY,
+    NEW_ORDER,
+    ORDER,
+    ORDER_LINE,
+    ITEM,
+    STOCK,    
+  };
+  
+  class TPCCKeyGen : public KeyGen {
+  private:
+    static int *m_composite_width;
+    static int **m_key_width;
+    
+    static uint32_t s_customer_shift = 		24;
+    static uint32_t s_district_shift = 		16;
+    static uint32_t s_new_order_shift = 	24;
+    static uint32_t s_order_shift = 		24;
+    static uint32_t s_order_line_shift = 	56;
+    static uint32_t s_stock_shift = 		16;
+
+    static uint64_t s_customer_mask = 		0x000000FFFF000000;
+    static uint64_t s_district_mask = 		0x0000000000FF0000;
+    static uint64_t s_warehouse_mask = 		0x000000000000FFFF;
+    static uint64_t s_stock_mask = 		0x00000000000000FF;
+
+    static uint32_t customer_key(uint64_t composite_key);
+    static uint32_t warehouse_key(uint64_t composite_key);
+    static uint32_t district_key(uint64_t composite_key);
+
+  public:
+    
+  };
 
   // Each of the following classes defines a TPC-C table. 
   typedef struct {
@@ -85,9 +125,9 @@ namespace tpcc {
     public int ol_i_id;
     public int ol_supply_w_id;
     public int ol_quantity;
-    public Long ol_delivery_d;
+    public long ol_delivery_d;
     public float ol_amount;
-    public String ol_dist_info;
+    public string ol_dist_info;
   } OrderLine;
 
   typedef struct {
@@ -141,8 +181,14 @@ namespace tpcc {
   static HashStore<string, Stock> 		*s_stock_tbl;
   static HashStore<string, Warehouse> 	*s_warehouse_tbl;
 
+  class StockLevelTxn : public ILazyTxn {
+  public:
+    StockLevelTxn(int w_id, int d_id, int threshold);
+    bool NowPhase();
+    void LaterPhase();
+  };
 
-  class NewOrder : public ILazyTxn {
+  class NewOrderTxn : public ILazyTxn {
     
   private:
     // Read set indices
@@ -152,19 +198,24 @@ namespace tpcc {
 
     // Write set indices
     static const s_district_index = 0;
+    static const s_stock_index = 1;
 
-    // Remember the order id so we can use it in the later-phase. 
+    // Fields 
     int m_order_id;
+    int m_district_id;
+    int m_warehouse_id;
+    float m_district_tax;
+    int *m_order_quantities;
+    int *m_supplierWarehouse_ids;
+    int m_num_items;
 
   public:
-    NewOrder(int w_id, int d_id, int c_id, int o_ol_cnt, int o_all_local,
-             vector<int> *itemIds, vector<int> *supplierWarehouseIDs, 
-             vector<int> *orderQuantities);
+    NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt, int o_all_local,
+                vector<int> *itemIds, vector<int> *supplierWarehouseIDs, 
+                vector<int> *orderQuantities);
 
     bool NowPhase();
     void LaterPhase();
-    vector<string> getReadSet();
-    vector<string> getWriteSet();
   };
 
   // Implement a single "run" function which runs a particular TPCC function. 

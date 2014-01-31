@@ -1,8 +1,8 @@
 CFLAGS=-O3 -Wall -Wextra -g -std=c++0x
 LIBS=-lnuma -lpthread -lprotobuf -lrt
 
-INCLUDE=src/include
-HEADERS=$(wildcard src/*.h)
+INCLUDE=include
+HEADERS=$(wildcard $(INCLUDE)/*.h)
 PROTO=$(wildcard proto/*.proto)
 
 PROTOSRC=$(patsubst proto/%.proto,src/%.pb.cc,$(PROTO))

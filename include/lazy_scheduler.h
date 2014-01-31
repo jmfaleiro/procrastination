@@ -17,11 +17,19 @@
 
 using namespace std;
 
-struct Heuristic {
+class Heuristic {
+ public:
     Action* last_txn;
     int index;
     bool is_write;
     int chain_length;
+
+    Heuristic() {
+      last_txn = NULL;
+      index = -1;
+      is_write = false;
+      chain_length = 0;
+    }    
 };
 
 
@@ -85,7 +93,7 @@ class LazyScheduler {
   volatile struct queue_elem* m_free_elems;
 
   // Last txns to touch a given record.
-  vector<struct Heuristic>* m_last_txns;
+  tr1::unordered_map<CompositeKey, struct Heuristic> m_last_txns;
 
   // Queue of actions to process.
   SimpleQueue** m_worker_input;

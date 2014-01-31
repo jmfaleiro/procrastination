@@ -8,6 +8,11 @@
 
 class Action;
 
+typedef struct {
+  uint64_t table;
+  uint64_t key;
+} CompositeKey;
+
 struct DependencyInfo {
   int record;
   Action* dependency;
