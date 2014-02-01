@@ -140,8 +140,8 @@ multithreaded_test(uint32_t num_keys,
   for (int i = 0; i < num_threads; ++i) {
     args[i].keys = keys;
     args[i].is_master = i == 0? true : false;
-    args[i].init_flag = 0;
-    args[i].start_flag = 0;
+    args[i].init_flag = &init_flag;
+    args[i].start_flag = &start_flag;
     args[i].start_index = current;
     args[i].end_index = current+delta;
     args[i].cpu_number = i;
@@ -221,11 +221,14 @@ singlethreaded_test(uint32_t num_keys, uint32_t table_size) {
 int
 main(int argc, char **argv) {
   srand(time(NULL));
+  init_cpuinfo();
+
   uint32_t num_keys = 1<<24;
   uint32_t table_size = 1<<20;
   //  single_threaded_test(num_keys, table_size);
   
   uint32_t num_threads = get_num_cpus();  
+  cout << "Number of cpus: " << num_threads << "\n";
   multithreaded_test(num_keys, table_size, num_threads);
   return 0;
 }

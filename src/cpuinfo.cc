@@ -2,8 +2,9 @@
 #include <iostream>
 
 struct cpuinfo {
-    int num_nodes;
-    int **node_map;
+  int num_cpus;
+  int num_nodes;
+  int **node_map;
 };
 
 static struct cpuinfo cpu_info;
@@ -15,6 +16,7 @@ init_cpuinfo()
     int num_cpus = numa_num_thread_cpus();
     int num_numa_nodes = numa_num_thread_nodes();
     cpu_info.num_nodes = num_numa_nodes;    
+    cpu_info.num_cpus = num_cpus;
 
     // Keep a count of how many cpus exist per node. 
     int cpu_count[num_numa_nodes];
@@ -49,7 +51,7 @@ init_cpuinfo()
 
 int
 get_num_cpus() {
-  return cpu_info.num_nodes;
+  return cpu_info.num_cpus;
 }
 
 // Assumes that it's never called on an index greater than a valid
