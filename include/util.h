@@ -10,6 +10,17 @@ do_pause()
     asm volatile("pause;":::);
 }
 
+static inline bool
+cmp_and_swap(volatile uint64_t *to_write,
+	     volatile uint64_t to_cmp,
+	     volatile uint64_t new_value) {
+  volatile uint64_t out;
+  asm volatile("lock; cmpxchgq %2, %1"
+	       : "=a" (out), "+m"(*to_write)
+	       : "q" (new_value), "0"(to_cmp));
+  return out == to_cmp;
+}
+
 static inline uint64_t
 xchgq(volatile uint64_t *addr, uint64_t new_val)
 {
@@ -23,6 +34,18 @@ xchgq(volatile uint64_t *addr, uint64_t new_val)
 	return result;
 }
 
+// Spin lock implementation. XXX: Is test-n-test-n-set better?
+static inline void
+lock(uint64_t *word) {
+  while (xchgq(word, 1) == 1) {
+    do_pause();
+  }
+}
+
+static inline void
+unlock(uint64_t *word) {
+  xchgq(word, 0);
+}
 
 static inline uint64_t
 fetch_and_increment(volatile uint64_t *variable)

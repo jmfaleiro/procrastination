@@ -115,8 +115,8 @@ class ConcurrentQueue {
 
   inline bool
   cmp_and_swap(volatile struct queue_elem* volatile *  to_write, 
-			   volatile struct queue_elem* to_cmp,
-			   volatile struct queue_elem* new_value) {
+	       volatile struct queue_elem* to_cmp,
+	       volatile struct queue_elem* new_value) {
 	volatile struct queue_elem* out;
 	asm volatile ("lock; cmpxchgq %2, %1;"
 				  : "=a" (out), "+m" (*to_write)

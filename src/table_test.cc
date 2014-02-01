@@ -2,6 +2,7 @@
 //
 
 #include "hash_table.hh"
+#include "concurrent_hash_table.hh"
 
 #include <cassert>
 #include <string>
@@ -45,7 +46,7 @@ main(int argc, char **argv) {
   uint32_t table_size = 1<<20;
 
   HashTable<uint64_t, uint64_t> *tbl = 
-    new HashTable<uint64_t, uint64_t>(table_size, 10);
+    new ConcurrentHashTable<uint64_t, uint64_t>(table_size, 10);
   
   uint64_t *keys = (uint64_t*)malloc(sizeof(uint64_t)*num_keys);
   memset(keys, 0, sizeof(uint64_t)*num_keys);

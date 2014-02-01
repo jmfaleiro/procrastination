@@ -1,14 +1,17 @@
 // Author: Jose M. Faleiro (faleiro.jose.manuel@gmail.com)
 //
-
 #ifndef HASH_TABLE_HH_
 #define HASH_TABLE_HH_
+
 #define NDEBUG
 #define POWER_TWO(x) ((x) & ((x) - 1) == 0)
 
 #include <cassert>
+#include <stdio.h>
+#include <string.h>
 
-#include "city.h"
+#include <city.h>
+
 
 template <class K, class V>
 class BucketItem {
@@ -39,6 +42,14 @@ protected:
   hash_function(K key) {
     char *start = (char*)&key;
     return CityHash64(start, sizeof(K));
+  }
+
+  HashTable(uint32_t size, uint32_t chain_bound, void *tbl) {
+    assert(!(size & (size - 1)));
+    m_size = size;
+    m_mask = size - 1;
+    m_chain_bound = chain_bound;
+    m_table = (BucketItem<K, V>**)tbl;
   }
 
 public:
