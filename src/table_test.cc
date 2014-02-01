@@ -27,8 +27,8 @@ struct ThreadArgs {
   bool is_master;
   uint64_t start_index;
   uint64_t end_index;  
-  uint64_t *init_flag;		
-  uint64_t *start_flag;
+  volatile uint64_t *init_flag;		
+  volatile uint64_t *start_flag;
   uint32_t cpu_number;
   uint32_t num_threads;
   timespec elapsed_time;
@@ -51,15 +51,19 @@ diff_time(timespec start, timespec end)
 }
 
 static inline void
-master_wait(uint64_t *init_flag, uint64_t *start_flag, uint32_t num_threads) {
+master_wait(volatile uint64_t *init_flag, 
+	    volatile uint64_t *start_flag, 
+	    uint32_t num_threads) {
   fetch_and_increment(init_flag);
   while (*init_flag != num_threads)
     ;
   xchgq(start_flag, 1);  
+  assert(*start_flag == 1);
 }
 
 static inline void
-worker_wait(uint64_t *init_flag, uint64_t *start_flag) {
+worker_wait(volatile uint64_t *init_flag, 
+	    volatile uint64_t *start_flag) {
   fetch_and_increment(init_flag);
   while (*start_flag == 0)
     ;  
@@ -132,8 +136,8 @@ multithreaded_test(uint32_t num_keys,
   pthread_t *workers = (pthread_t*)malloc(sizeof(pthread_t)*(num_threads-1));
   memset(workers, 0, sizeof(pthread_t)*(num_threads - 1));
   
-  uint64_t init_flag = 0;
-  uint64_t start_flag = 0;
+  volatile uint64_t init_flag = 0;
+  volatile uint64_t start_flag = 0;
 
   int delta = num_keys / num_threads;
   int current = 0;
@@ -224,7 +228,7 @@ main(int argc, char **argv) {
   init_cpuinfo();
 
   uint32_t num_keys = 1<<24;
-  uint32_t table_size = 1<<20;
+  uint32_t table_size = 1<<22;
   //  single_threaded_test(num_keys, table_size);
   
   uint32_t num_threads = get_num_cpus();  
