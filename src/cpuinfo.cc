@@ -1,7 +1,6 @@
 #include <numa.h>
 #include <iostream>
 
-
 struct cpuinfo {
     int num_nodes;
     int **node_map;
@@ -48,6 +47,11 @@ init_cpuinfo()
     }
 }
 
+int
+get_num_cpus() {
+  return cpu_info.num_nodes;
+}
+
 // Assumes that it's never called on an index greater than a valid
 // cpu number. 
 int
@@ -66,14 +70,19 @@ get_cpu(int index, int striped)
 }
 
 int
-pin_thread(cpu_set_t *cpu) 
+pin_thread(int cpu)
 {
-    // Kill the program if we can't bind. 
-    pthread_t self = pthread_self();
-    if (pthread_setaffinity_np(self, sizeof(cpu_set_t), cpu) < 0) {
-	  std::cout << "Couldn't bind to my cpu!\n";
-	  return -1;
-    }
-	return 0;
+  numa_set_strict(1);
+  cpu_set_t binding;
+  CPU_ZERO(&binding);
+  CPU_SET(cpu, &binding);
+
+  // Kill the program if we can't bind. 
+  pthread_t self = pthread_self();
+  if (pthread_setaffinity_np(self, sizeof(cpu_set_t), &binding) < 0) {
+    std::cout << "Couldn't bind to my cpu!\n";
+    return -1;
+  }
+  return 0;
 }
 
