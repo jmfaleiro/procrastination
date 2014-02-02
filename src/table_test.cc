@@ -117,6 +117,16 @@ init_keys(uint32_t num_keys) {
 }
 
 void
+verify_table(uint64_t *keys, size_t size, HashTable<uint64_t, uint64_t> *tbl) {
+  for (size_t i = 0; i < size; ++i) {
+    if (tbl->Get(keys[i]) != keys[i]) {      
+      cout << "Error: Table does not contain inserted key " << i << "!!!\n";
+      exit (-1);
+    }
+  }
+}
+
+void
 multithreaded_test(uint32_t num_keys, 
 		   uint32_t table_size, 
 		   uint32_t num_threads) {
@@ -160,7 +170,10 @@ multithreaded_test(uint32_t num_keys,
   for (int i = 1; i < num_threads; ++i) {
     pthread_join(workers[i-1], NULL);
   }
-  
+
+  // Make sure that the table is consistent. 
+  verify_table(keys, current, tbl);
+
   // Output the results.
   for (int i = 0; i < num_threads; ++i) {
     double time_elapsed = args[i].elapsed_time.tv_sec + 
@@ -191,6 +204,8 @@ singlethreaded_test(uint32_t num_keys, uint32_t table_size) {
   // Find out write throughput. 
   clock_gettime(CLOCK_REALTIME, &insert_end);
 
+  verify_table(keys, num_keys, tbl);
+
   uint64_t counter = 0;
   // Make sure that all keys have been properly added. 
   for (int i = 0; i < num_keys; ++i) {
@@ -201,8 +216,8 @@ singlethreaded_test(uint32_t num_keys, uint32_t table_size) {
   clock_gettime(CLOCK_REALTIME, &read_end);
   cout << "Counter value: " << counter << "\n";
   insert_start = diff_time(insert_start, insert_end);
-  read_end = diff_time(insert_end, read_end);
-  
+  read_end = diff_time(insert_end, read_end);  
+
   // Dump the insertion time. 
   cout << "Insertion time: " << insert_start.tv_sec << ".";
   cout << insert_start.tv_nsec << "\n";
@@ -229,10 +244,11 @@ main(int argc, char **argv) {
 
   uint32_t num_keys = 1<<24;
   uint32_t table_size = 1<<22;
-  //  single_threaded_test(num_keys, table_size);
+  //  singlethreaded_test(num_keys, table_size);
   
   uint32_t num_threads = get_num_cpus();  
   cout << "Number of cpus: " << num_threads << "\n";
   multithreaded_test(num_keys, table_size, num_threads);
+  
   return 0;
 }
