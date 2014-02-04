@@ -28,7 +28,7 @@ public:
 
   virtual void
   Put(K key, V value) {
-    uint64_t index = hash_function(key) & this->m_mask;
+    uint64_t index = this->hash_function(key) & this->m_mask;
     BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, value);
     BucketItem<K, V> **table = this->m_table;
 
@@ -52,7 +52,7 @@ public:
   
   virtual V
   Get(K key) {
-    uint64_t index = hash_function(key) & this->m_mask;    
+    uint64_t index = this->hash_function(key) & this->m_mask;    
     V ret;
 
     BucketItem<K, V> **table = this->m_table;
@@ -75,7 +75,7 @@ public:
   
   virtual V
   Delete(K key) {
-    uint64_t index = hash_function(key) & this->m_mask;
+    uint64_t index = this->hash_function(key) & this->m_mask;
     BucketItem<K, V> **table = this->m_table;
 
     // Grab the chain lock. 

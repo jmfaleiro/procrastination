@@ -10,7 +10,8 @@
 #include <list>
 #include <vector>
 
-#include "action.h"
+#include <table.hh>
+#include <action.h>
 #include "concurrent_queue.h"
 #include "cpuinfo.h"
 #include "util.h"
@@ -34,10 +35,10 @@ class Heuristic {
 
 
 enum TxnState {
-    STICKY = 0,
-    ANALYZING = 1,
-    PROCESSING = 2,
-    SUBSTANTIATED = 3,
+  STICKY = 0,
+  ANALYZING = 1,
+  PROCESSING = 2,
+  SUBSTANTIATED = 3,
 };
 
 
@@ -69,7 +70,7 @@ class LazyScheduler {
     uint64_t* m_times;
     int m_times_ptr;
     
-    cpu_set_t* m_binding_info;
+    int m_binding_info;
     
     
     uint64_t* m_worker_flag;
@@ -80,6 +81,7 @@ class LazyScheduler {
     volatile uint64_t m_stick;
     uint64_t m_num_txns;
     
+    uint32_t m_table_size;
     int m_max_chain;
 
     int m_num_workers;
@@ -87,13 +89,10 @@ class LazyScheduler {
 
 	bool m_serial;
 
-  // Free list of struct queue_elems to use to communicate with workers. 
-  ElementStore *store;
-
-  volatile struct queue_elem* m_free_elems;
 
   // Last txns to touch a given record.
-  tr1::unordered_map<CompositeKey, struct Heuristic> m_last_txns;
+ Table<CompositeKey, struct Heuristic>  *m_last_txns;
+
 
   // Queue of actions to process.
   SimpleQueue** m_worker_input;
@@ -141,7 +140,7 @@ public:
 		uint64_t* worker_flag,
                 SimpleQueue** input,
                 SimpleQueue** output,
-                cpu_set_t* binding,
+                int binding,
                 SimpleQueue* sched_input,
                 SimpleQueue* sched_output);
   

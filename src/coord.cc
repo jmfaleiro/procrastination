@@ -14,7 +14,6 @@
 #include <pthread.h>
 #include <sched.h>
 
-#include "atomic.h"
 #include <iostream> 
 #include <fstream>
 #include <time.h>
@@ -26,7 +25,7 @@ std::vector<Action*>* last_txn_map = NULL;
 std::vector<int>* value_map = NULL;
 using namespace std;
 
-timespec diff_time(timespec start, timespec end) 
+static timespec diff_time(timespec start, timespec end) 
 {
     timespec temp;
     if ((end.tv_nsec - start.tv_nsec) < 0) {
@@ -77,19 +76,17 @@ initWorkers(Worker** workers,
 	
 	// Binding information for the current worker. 
 	int cpu_id = get_cpu(start_index + i, 1);
-	CPU_ZERO(&bindings[i]);
-	CPU_SET(cpu_id, &bindings[i]);
         	
 	// Start the worker. 
         if (info->experiment == PEAK_LOAD) {
             workers[i] = new Worker(SMALL_QUEUE,
-                                    &bindings[i], 
+                                    cpu_id,
                                     records,
 				    info->serial);
         }
         else {
             workers[i] = new Worker(LARGE_QUEUE,
-                                    &bindings[i], 
+                                    cpu_id,
                                     records,
 				    info->serial);            
         }
@@ -336,7 +333,7 @@ void initialize(ExperimentInfo* info,
 				   worker_flag,
                                    worker_inputs,
                                    NULL,
-                                   info->scheduler_bindings,
+                                   0,
                                    scheduler_input,
                                    NULL);
 

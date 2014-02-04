@@ -8,14 +8,32 @@
 
 class Action;
 
-typedef struct {
-  uint64_t table;
-  uint64_t key;
-} CompositeKey;
+class CompositeKey {
+ public:
+  uint64_t m_table;
+  uint64_t m_key;
 
+  CompositeKey(uint64_t table, uint64_t key) {
+    m_table = table;
+    m_key = key;
+  }
+  
+ CompositeKey() : CompositeKey(0, 0) { }
+
+  bool operator==(const CompositeKey &other) const {
+    return other.m_table == this->m_table && other.m_key == this->m_key;
+  }
+
+  bool operator!=(const CompositeKey &other) const {
+    return !(*this == other);
+  }
+};
+
+// The lazy scheduler has an entry of this type for every single record that is
+// read or written in the system.
 struct DependencyInfo {
-  int record;
-  Action* dependency;
+  CompositeKey record;
+  Action *dependency;
   bool is_write;
   int index;
 };
@@ -65,7 +83,9 @@ class Action {
   static inline uint64_t CheckState(Action* action) {
     return action->values[4];
   }
-
+  
+  virtual bool NowPhase() { }
+  virtual void LaterPhase() { }
 };
 
 #endif // ACTION_H

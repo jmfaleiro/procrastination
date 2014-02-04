@@ -69,7 +69,8 @@ class ShoppingCart : public WorkloadGenerator {
 
     // Both regular updates and check-outs write the shopping cart itself.
     struct DependencyInfo fake;
-    fake.record = cur_client;
+    fake.record.m_table = 0;
+    fake.record.m_key = cur_client;
     action->writeset.push_back(fake);
     action->is_blind = 0;
     action->materialize = false;
@@ -92,7 +93,8 @@ class ShoppingCart : public WorkloadGenerator {
 	for (std::set<int>::iterator it = cart->begin();
 	     it != cart->end();
 	     ++it) {
-	  blah.record = *it;
+          blah.record.m_table = 0;
+	  blah.record.m_key = *it;
 	  action->writeset.push_back(blah);
 	}
       }
@@ -117,7 +119,8 @@ class ShoppingCart : public WorkloadGenerator {
 	    break;
 	  }
 	}
-	temp.record = record;
+        temp.record.m_table = 0;
+	temp.record.m_key = record;
 	action->readset.push_back(temp);
 	cart->insert(record);
       }

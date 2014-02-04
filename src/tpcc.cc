@@ -4,90 +4,14 @@
 #include <tpcc.h>
 #include <string>
 #include <sstream>
+#include <iostream>
 
 using namespace std;
 
-static inline uint32_t
-tpcc::TPCCKeyGen::get_customer_key(uint64_t composite_key) {
-  return (uint32_t)((composite_key & s_customer_mask) >> s_customer_shift);
-}
-
-static inline uint32_t
-tpcc::TPCCKeyGen::get_warehouse_key(uint64_t composite_key) {
-  return (uint32_t)(composite_key & s_warehouse_mask);
-}
-
-static inline uint32_t
-tpcc::TPCCKeyGen::get_district_key(uint64_t composite_key) {
-  return (uint32_t)((composite_key & s_district_mask) >> s_district_shift);
-}
-
-// Expects: 	warehouse_id 	==> 	keys[0] 
-// 		district_id  	==> 	keys[1]
-//		customer_id  	==> 	keys[2]
-static inline uint64_t
-tpcc::TPCCKeyGen::create_customer_key(uint32_t *keys) {
-  return (
-          (keys[0])				|
-          (keys[1] << s_district_shift)		|
-          (keys[2] << s_customer_shift)		|
-         );
-}
-
-// Expects: 	warehouse_id 	==> 	keys[0]
-//		district_id 	==> 	keys[1]
-static inline uint64_t
-tpcc::TPCCKeyGen::create_district_key(uint32_t *keys) {
-  return (
-          (keys[0])				|
-          (keys[1] << s_district_shift)
-         );
-}
-
-// Expects: 	warehouse_id 	==> 	keys[0]
-// 		district_id 	==> 	keys[1]
-//		new_order_id	==> 	keys[2]
-static inline uint64_t
-tpcc::TPCCKeyGen::create_new_order_key(uint32_t *keys) {
-  return (
-          (keys[0])    				|
-          (keys[1] << s_district_shift)		|
-          (keys[2] << s_new_order_shift)
-         );
-}	
-
-// Expects: 	warehouse_id 	==> 	keys[0]
-// 		district_id 	==> 	keys[1]
-//		order_id	==> 	keys[2]
-static inline uint64_t
-tpcc::TPCCKeyGen::create_order_key(uint32_t *keys) {
-  return (
-          (keys[0])				|
-          (keys[1] << s_district_shift)		|
-          (keys[2] << s_order_shift)
-         );
-}
-
-static inline uint64_t
-tpcc::TPCCKeyGen::create_order_line_key(uint32_t *keys) {
-  return (
-          (keys[0]) 				| 
-          (keys[1] << s_district_shift) 	| 
-          (keys[2] << s_order_shift)		|
-          (keys[3] << s_order_line_shift)
-         );
-}
-
-static inline uint64_t
-tpcc::TPCCKeyGen::create_stock_key(uint32_t *keys) {
-  return (
-          (keys[0])				|
-          (keys[1] << s_stock_shift)		|
-         );
-}
 
 // Append table identifier to the primary key. Use this string to identify 
 // records in a transaction's read/write sets. 
+/*
 static inline string
 CreateKey(string table_name, string key) {
   ostringstream os;
@@ -108,7 +32,7 @@ GetPKey(string key) {
   int pkey_index = key.find("###");
   return key.substr(pkey_index);
 }
-
+*/
 
 /* Read the customer table <w_id, d_id, c_id> 
  * Read the warehouse table <w_id>
@@ -129,7 +53,11 @@ tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt,
                                int *orderQuantities) {
 
   uint32_t keys[10];
-  CompositeKey composite;
+  struct DependencyInfo dep_info;
+  dep_info.dependency = NULL;
+  dep_info.is_write = false;
+  dep_info.index = -1;
+
   uint64_t table_id;
 
   // Create the warehouse, customer, and district keys. 
@@ -137,23 +65,23 @@ tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt,
   keys[1] = d_id;
   keys[2] = c_id;
   uint64_t warehouse_key = w_id;
-  uint64_t customer_key = create_customer_key(keys);
-  uint64_t district_key = create_district_key(keys);
+  uint64_t customer_key = tpcc::TPCCKeyGen::create_customer_key(keys);
+  uint64_t district_key = tpcc::TPCCKeyGen::create_district_key(keys);
   
   // Insert the customer key in the read set. 
-  composite.table = CUSTOMER;
-  composite.key = customer_key;
-  m_read_set.push_back(composite);
+  dep_info.record.m_table = CUSTOMER;
+  dep_info.record.m_key = customer_key;
+  readset.push_back(dep_info);
   
   // Insert the warehouse key in the read set. 
-  composite.table = WAREHOUSE;
-  composite.key = warehouse_key;
-  m_read_set.push_back(composite);
+  dep_info.record.m_table = WAREHOUSE;
+  dep_info.record.m_key = warehouse_key;
+  readset.push_back(dep_info);
   
   // Insert the district key in the write set.
-  composite.table = DISTRICT;
-  composite.key = district_key;
-  m_write_set.push(composite);
+  dep_info.record.m_table = DISTRICT;
+  dep_info.record.m_key = district_key;
+  writeset.push_back(dep_info);
 
   // Create stock, and item keys for each item. 
   for (int i = 0; i < numItems; ++i) {
@@ -162,43 +90,41 @@ tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt,
     uint64_t item_key = itemIds[i];
     keys[0] = supplierWarehouseIDs[i];
     keys[1] = itemIds[i];
-    uint64_t stock_key = create_stock_key(keys);
-
+    uint64_t stock_key = tpcc::TPCCKeyGen::create_stock_key(keys);
 
     // Insert the item key into the read set. 
-    composite.key = item_key;
-    composite.table = ITEM;
-    m_read_set.push(composite);
+    dep_info.record.m_key = item_key;
+    dep_info.record.m_table = ITEM;
+    readset.push_back(dep_info);
 
     // Insert the stock key into the write set. 
-    composite.key = stock_key;
-    composite.table = STOCK;
-    m_write_set.push(composite);
+    dep_info.record.m_key = stock_key;
+    dep_info.record.m_table = STOCK;
+    writeset.push_back(dep_info);
   }
 }
 
 bool
 tpcc::NewOrderTxn::NowPhase() {
-  
   CompositeKey composite;
 
   // A NewOrder txn aborts if any of the item keys are invalid. 
-  int num_items = m_read_set.size();
+  int num_items = readset.size();
   for (int i = s_item_index; i < num_items; ++i) {
 
     // Make sure that all the items requested exist. 
-    composite = m_read_set[i];
-    uint64_t item_key = composite.key;
-    if (!s_item_tbl.Exists(item_key)) {
+    composite = readset[i].record;
+    uint64_t item_key = composite.m_key;
+    if (item_key == invalid_item_key) {
       return false;	// Abort the txn. 
     }
   }
   
   // We are guaranteed not to abort once we're here. Increment the highly 
   // contended next_order_id in the district table.
-  composite = m_write_set[s_district_index];
-  uint64_t district_key = get_district_key(composite.key);
-  uint64_t warehouse_key = get_warehouse_key(composite.key);  
+  composite = writeset[s_district_index].record;
+  uint64_t district_key = tpcc::TPCCKeyGen::get_district_key(composite.m_key);
+  uint64_t warehouse_key = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
   District *district_tbl = s_warehouse_tbl[warehouse_key].district_table;
   District *district = &district_tbl[district_key];
   
@@ -217,10 +143,10 @@ tpcc::NewOrderTxn::LaterPhase() {
   ostringstream os; 
   
   // Read the customer record.
-  composite = m_read_set[s_customer_index];
-  uint64_t w_id = get_warehouse_key(composite.key);
-  uint64_t d_id = get_district_key(composite.key);
-  uint64_t c_id = get_customer_key(composite.key);
+  composite = readset[s_customer_index].record;
+  uint64_t w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
+  uint64_t d_id = tpcc::TPCCKeyGen::get_district_key(composite.m_key);
+  uint64_t c_id = tpcc::TPCCKeyGen::get_customer_key(composite.m_key);
   
   Customer *customer = 
     &(s_warehouse_tbl[w_id].district_table[d_id].customer_table[c_id]);
@@ -230,16 +156,16 @@ tpcc::NewOrderTxn::LaterPhase() {
   string c_credit = customer->c_credit;
 
   // Read the warehouse record.
-  Warehouse *warehouse = s_warehouse_tbl[w_id];
+  Warehouse *warehouse = &s_warehouse_tbl[w_id];
   float w_tax = warehouse->w_tax;  
 
   // Create a NewOrder record. 
   // XXX: This is a potentially serializing call to malloc. Make sure to link
   // TCMalloc so that allocations can be (mostly) thread-local. 
-  NewOrder *new_order_record = (NewOrder*)malloc(sizeof(NewOrder));
-  new_order_record->no_w_id = w_id;
-  new_order_record->no_d_id = d_id;
-  new_order_record->no_o_id = m_order_id;
+  NewOrder new_order_record;
+  new_order_record.no_w_id = w_id;
+  new_order_record.no_d_id = d_id;
+  new_order_record.no_o_id = m_order_id;
   keys[0] = w_id;
   keys[1] = d_id;
   keys[2] = m_order_id;
@@ -247,35 +173,35 @@ tpcc::NewOrderTxn::LaterPhase() {
   // Generate the NewOrder key and insert the record.
   // XXX: This insertion has to be concurrent. Therefore, use a hash-table to 
   // implement it. 
-  uint64_t no_id = create_new_order_key(keys);
+  uint64_t no_id = tpcc::TPCCKeyGen::create_new_order_key(keys);
   s_new_order_tbl->Put(no_id, new_order_record);
   
   for (int i = 0; i < m_num_items; ++i) {
-    composite = m_write_set[s_stock_index+i];
-    uint64_t ol_s_id = get_stock_key(composite.key);
-    uint64_t ol_w_id = get_warehouse_key(composite.key);
-    uint64_t ol_i_id = m_write_set[s_item_index+i].key;
+    composite = writeset[s_stock_index+i].record;
+    uint64_t ol_s_id = tpcc::TPCCKeyGen::get_stock_key(composite.m_key);
+    uint64_t ol_w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
+    uint64_t ol_i_id = writeset[s_item_index+i].record.m_key;
     int ol_quantity = m_order_quantities[i];
     
     // Get the item and the stock records. 
-    Item *item = s_item_tbl->Get(ol_i_id);
-    Stock *stock = &(s_warehouse_tbl[ol_w_id].stock_table[ol_s_id]);
+    Item *item = &s_item_tbl[ol_i_id];
+    Stock *stock = &s_warehouse_tbl[ol_w_id].stock_table[ol_s_id];
     
     // Update the inventory for the item in question. 
-    if (stock->s_order_cnt - quantity >= 10) {
-      stock->s_quantity -= quantity;
+    if (stock->s_order_cnt - ol_quantity >= 10) {
+      stock->s_quantity -= ol_quantity;
     }
     else {
-      stock->s_quantity += -quantity + 91;
+      stock->s_quantity += -ol_quantity + 91;
     }    
     if (ol_w_id != w_id) {
       stock->s_remote_cnt += 1;
     }
-    stock->s_ytd += quantity;
+    stock->s_ytd += ol_quantity;
     total_amount += ol_quantity * (item->i_price);
     
     string ol_dist_info;
-    switch (m_d_id) {
+    switch (m_district_id) {
     case 1:
       ol_dist_info = stock->s_dist_01;
       break;
@@ -307,29 +233,30 @@ tpcc::NewOrderTxn::LaterPhase() {
       ol_dist_info = stock->s_dist_10;
       break;
     default:
-      assert(false);
+      std::cout << "Got unexpected district!!! Aborting...\n";
+      exit(0);
     }
     
     // Finally, insert an item into the order line table.
     // XXX: This memory allocation can serialize threads. Link TCMalloc to 
     // ensure that all allocations happen with minimal possible kernel-level 
     // synchronization.
-    OrderLine *new_order_line = (OrderLine*)malloc(sizeof(OrderLine));
-    new_order_line->ol_o_id = m_order_id;
-    new_order_line->ol_d_id = d_id;
-    new_order_line->ol_w_id = w_id;
-    new_order_line->ol_number = i + 1;
-    new_order_line->ol_i_id = item->i_id;
-    new_order_line->ol_supply_w_id = ol_w_id;
-    new_order_line->ol_quantity = m_order_quantities[i];
-    new_order_line->ol_amount = m_order_quantities[i] * (item->i_price);
-    new_order_line->ol_dist_info = ol_dist_info;
+    OrderLine new_order_line;
+    new_order_line.ol_o_id = m_order_id;
+    new_order_line.ol_d_id = d_id;
+    new_order_line.ol_w_id = w_id;
+    new_order_line.ol_number = i + 1;
+    new_order_line.ol_i_id = item->i_id;
+    new_order_line.ol_supply_w_id = ol_w_id;
+    new_order_line.ol_quantity = m_order_quantities[i];
+    new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
+    new_order_line.ol_dist_info = ol_dist_info;
     
     keys[0] = w_id;
     keys[1] = d_id;
     keys[2] = m_order_id;
     keys[3] = i+1;
-    uint64_t order_line_key = create_order_line_key(keys);
+    uint64_t order_line_key = tpcc::TPCCKeyGen::create_order_line_key(keys);
 
     // XXX: Make sure that the put operation is implemented on top of a 
     // concurrent hash table. 

@@ -14,7 +14,7 @@ LazyScheduler::LazyScheduler(bool serial,
 			     uint64_t* worker_flag,
                              SimpleQueue** worker_inputs,
                              SimpleQueue** worker_outputs,
-                             cpu_set_t* binding_info,
+                             int binding_info,
                              SimpleQueue* sched_input,
                              SimpleQueue* sched_output) {
     m_throughput = throughput;
@@ -45,7 +45,7 @@ LazyScheduler::LazyScheduler(bool serial,
 
 void* LazyScheduler::graphWalkFunction(void* arg) {
   LazyScheduler* sched = (LazyScheduler*)arg;
-  pin_thread(&sched->m_binding_info[1]);
+  pin_thread(sched->m_binding_info);
   
   SimpleQueue* input_queue = sched->m_walking_queue;	
   xchgq(&sched->m_walk_flag, 1);	
@@ -66,65 +66,39 @@ void* LazyScheduler::graphWalkFunction(void* arg) {
     return NULL;
 }
 
-
+// XXX: We need to figure out how to make the scheduler multithreaded. Not sure
+// how to do this because it seems like multiple scheduler threads will need a
+// way to co-ordinate among themselves. 
 void* LazyScheduler::schedulerFunction(void* arg) {
   numa_set_strict(1);
   LazyScheduler* sched = (LazyScheduler*)arg;
-  pin_thread(&sched->m_binding_info[0]);
+  pin_thread(sched->m_binding_info);    
+
+  // Hash table that points to the most recent writers of records in a txn. 
+  // XXX: Do we need inserts to count as writes? For now, I'm just assuming that
+  // reads+writes count as dependencies, insertions do not count. 
+  sched->m_last_txns = NULL;
+    //new HashTable<CompositeKey, Heuristic>(m_table_size, 10);
+
+  sched->m_num_txns = 0;
+  pthread_t walker_thread;
+
+  // Indicate that the thread is running and ready to go to the co-ordinator. 
+  xchgq(&(sched->m_start_flag), 1);
     
-    struct Heuristic empty;
-    empty.last_txn = NULL;
-    empty.chain_length = 0;
+  SimpleQueue* incoming_txns = sched->m_log_input;
+  Action* action = NULL;
+  while (true) {      
 
-    sched->store = new ElementStore(1000000);
-    sched->m_last_txns = 
-        new vector<struct Heuristic>(sched->m_num_records, empty);
-
-    for (int i = 0; i < sched->m_num_records; ++i) {
-        (*(sched->m_last_txns))[i].last_txn = NULL;
-        (*(sched->m_last_txns))[i].chain_length = 0;
-        (*(sched->m_last_txns))[i].index = 0;
-        (*(sched->m_last_txns))[i].is_write = false;
-    }
-
-    sched->m_num_txns = 0;
-    pthread_t walker_thread;
-    
-    /*
-    if (!sched->m_serial) {
-        
-        // Create a queue to communicate with the graph walking thread. 
-        int walk_queue_size = LARGE_QUEUE;
-        uint64_t* walk_queue_data = 
-            (uint64_t*)numa_alloc_local(CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
-        memset(walk_queue_data, 0, CACHE_LINE*sizeof(uint64_t)*walk_queue_size);
-        sched->m_walking_queue = new SimpleQueue(walk_queue_data, walk_queue_size);
-        
-        // Kick off the graph walking thread. 
-        xchgq(&sched->m_walk_flag, 0);
-        pthread_create(&walker_thread,
-                       NULL,
-                       graphWalkFunction, 
-                       sched);
-        
-        // Wait until the thread is ready..
-        while (sched->m_walk_flag == 0)
-            ;		
-    }
-    */
-
-    xchgq(&(sched->m_start_flag), 1);
-    
-    SimpleQueue* incoming_txns = sched->m_log_input;
-    Action* action = NULL;
-    //    sched->start_time = rdtsc();
-    while (true) {
-      Action* to_process = (Action*)incoming_txns->DequeueBlocking();
-      //to_process->sched_start_time = rdtsc();
-      sched->addGraph(to_process); 
-    }
+    // 1. Grab a transaction from the input queue 
+    // 2. Execute its now phase, and 
+    // 3. Add it to the dependency graph. 
+    Action* to_process = (Action*)incoming_txns->DequeueBlocking();      
+    to_process->NowPhase();
+    sched->addGraph(to_process); 
+  }
  
-    return NULL;
+  return NULL;
 }
 
 bool LazyScheduler::isDone(int* count) {
@@ -157,44 +131,46 @@ void LazyScheduler::addGraph(Action* action) {
         // Go through the read set. 
         bool force_materialize = action->materialize;
         for (int i = 0; i < num_reads; ++i) {
-            int record = action->readset[i].record;
+            CompositeKey record = action->readset[i].record;
+            Heuristic *dep_info = m_last_txns->GetPtr(record);            
             
-            // Keep the information about the previous txn around. 
-            action->readset[i].dependency = (*m_last_txns)[record].last_txn;
-            action->readset[i].is_write = (*m_last_txns)[record].is_write;
-            action->readset[i].index = (*m_last_txns)[record].index;
-            count_ptrs[i] = &((*m_last_txns)[record].chain_length);
+            // Keep the information about the previous txn around.
+            action->readset[i].dependency = dep_info->last_txn;
+            action->readset[i].is_write = dep_info->is_write;
+            action->readset[i].index = dep_info->index;
+            count_ptrs[i] = &(dep_info->chain_length);
             
             // Update the heuristic information. 
-            (*m_last_txns)[record].last_txn = action;
-            (*m_last_txns)[record].index = i;
-            (*m_last_txns)[record].is_write = false;
+            dep_info->last_txn = action;
+            dep_info->index = i;
+            dep_info->is_write = false;
             
             // Increment the length of the chain corresponding to this record, 
             // check if it exceeds our threshold value. 
-            (*m_last_txns)[record].chain_length += 1;		
-            force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+            dep_info->chain_length += 1;
+            force_materialize |= (dep_info->chain_length >= m_max_chain);
         }
         
         // Go through the write set. 
         for (int i = 0; i < num_writes; ++i) {
-            int record = action->writeset[i].record;
+            CompositeKey record = action->writeset[i].record;
+            Heuristic *dep_info = m_last_txns->GetPtr(record);
             
             // Keep the information about the previous txn around. 
-            action->writeset[i].dependency = (*m_last_txns)[record].last_txn;
-            action->writeset[i].is_write = (*m_last_txns)[record].is_write;
-            action->writeset[i].index = (*m_last_txns)[record].index;
-            count_ptrs[num_reads+i] = &((*m_last_txns)[record].chain_length);
+            action->writeset[i].dependency = dep_info->last_txn;
+            action->writeset[i].is_write = dep_info->is_write;
+            action->writeset[i].index = dep_info->index;
+            count_ptrs[num_reads+i] = &(dep_info->chain_length);
             
             // Update the heuristic information. 
-            (*m_last_txns)[record].last_txn = action;
-            (*m_last_txns)[record].index = i;
-            (*m_last_txns)[record].is_write = true;
+            dep_info->last_txn = action;
+            dep_info->index = i;
+            dep_info->is_write = true;
             
             // Increment the length of the chain corresponding to this record, 
             // check if it exceeds our threshold value. 
-            (*m_last_txns)[record].chain_length += 1;
-            force_materialize |= (*m_last_txns)[record].chain_length >= m_max_chain;        
+            dep_info->chain_length += 1;
+            force_materialize |= (dep_info->chain_length >= m_max_chain);
         }  
 
         if (force_materialize) {

@@ -30,7 +30,7 @@ class Worker {
   uint64_t m_done_flag;
 
   // Information used to bind to specific queues. 
-  cpu_set_t* m_binding_info;  
+  int m_binding_info;  
   
   // Signal the worker thread to start trying to dequeue elements to process. 
   volatile uint64_t m_run_flag;
@@ -49,7 +49,7 @@ class Worker {
 
  public:
   Worker(int queue_size,
-         cpu_set_t* binding_info,
+         int binding_info,
          int* records,
 	 bool serial);
   

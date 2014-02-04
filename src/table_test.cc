@@ -35,7 +35,7 @@ struct ThreadArgs {
   HashTable<uint64_t, uint64_t> *tbl;
 } __attribute__((aligned(CACHE_LINE)));
 
-timespec 
+static timespec 
 diff_time(timespec start, timespec end) 
 {
     timespec temp;
@@ -106,7 +106,7 @@ uint64_t*
 init_keys(uint32_t num_keys) {
   uint64_t *keys = (uint64_t*)malloc(sizeof(uint64_t)*num_keys);
   memset(keys, 0, sizeof(uint64_t)*num_keys);
-  for (int i = 0; i < num_keys; ++i) {
+  for (uint32_t i = 0; i < num_keys; ++i) {
     
     // Generate a 64-bit key
     uint64_t key = (uint64_t)rand();
@@ -151,7 +151,7 @@ multithreaded_test(uint32_t num_keys,
 
   int delta = num_keys / num_threads;
   int current = 0;
-  for (int i = 0; i < num_threads; ++i) {
+  for (uint32_t i = 0; i < num_threads; ++i) {
     args[i].keys = keys;
     args[i].is_master = i == 0? true : false;
     args[i].init_flag = &init_flag;
@@ -163,11 +163,11 @@ multithreaded_test(uint32_t num_keys,
     args[i].tbl = tbl;
     current += delta;
   }
-  for (int i = 1; i < num_threads; ++i) {
+  for (uint32_t i = 1; i < num_threads; ++i) {
     pthread_create(&workers[i-1], NULL, thread_function, &args[i]);
   }  
   thread_function(&args[0]);
-  for (int i = 1; i < num_threads; ++i) {
+  for (uint32_t i = 1; i < num_threads; ++i) {
     pthread_join(workers[i-1], NULL);
   }
 
@@ -175,7 +175,7 @@ multithreaded_test(uint32_t num_keys,
   verify_table(keys, current, tbl);
 
   // Output the results.
-  for (int i = 0; i < num_threads; ++i) {
+  for (uint32_t i = 0; i < num_threads; ++i) {
     double time_elapsed = args[i].elapsed_time.tv_sec + 
       (double)args[i].elapsed_time.tv_nsec/1000000000.0;
     double throughput = 
@@ -197,7 +197,7 @@ singlethreaded_test(uint32_t num_keys, uint32_t table_size) {
   clock_gettime(CLOCK_REALTIME, &insert_start);
 
   // Insert a bunch of items into the hash table. 
-  for (int i = 0; i < num_keys; ++i) {    
+  for (uint32_t i = 0; i < num_keys; ++i) {    
     tbl->Put(keys[i], keys[i]);
   }
   
@@ -208,7 +208,7 @@ singlethreaded_test(uint32_t num_keys, uint32_t table_size) {
 
   uint64_t counter = 0;
   // Make sure that all keys have been properly added. 
-  for (int i = 0; i < num_keys; ++i) {
+  for (uint32_t i = 0; i < num_keys; ++i) {
     counter += tbl->Get(keys[i]);
   }
 

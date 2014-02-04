@@ -318,8 +318,8 @@ public:
                 ++j;
             }
         }
-        
-	assert(j == to_wait);
+        assert(j > 0);
+	assert((uint64_t)j == to_wait);
         ofstream output_file;
         output_file.open("client_latencies.txt", ios::out);
         

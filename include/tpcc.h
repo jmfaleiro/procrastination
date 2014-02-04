@@ -1,11 +1,18 @@
 // Author: Jose M. Faleiro (faleiro.jose.manuel@gmail.com)
 // Adapted from oltpbench (git@github.com:oltpbenchmark/oltpbench.git)
 
-#include <hash_store.h>
+#include <stdint.h>
+
+#include <string>
+#include <vector>
+
+#include <table.hh>
+#include <keys.h>
+#include <action.h>
 
 namespace tpcc {
-  
-  typedef enum TPCCTable {
+
+  enum TPCCTable {
     WAREHOUSE = 0,
     DISTRICT,
     CUSTOMER,
@@ -17,188 +24,254 @@ namespace tpcc {
     STOCK,    
   };
   
-  class TPCCKeyGen : public KeyGen {
+  class TPCCKeyGen {
   private:
-    static int *m_composite_width;
-    static int **m_key_width;
-    
-    static uint32_t s_customer_shift = 		24;
-    static uint32_t s_district_shift = 		16;
-    static uint32_t s_new_order_shift = 	24;
-    static uint32_t s_order_shift = 		24;
-    static uint32_t s_order_line_shift = 	56;
-    static uint32_t s_stock_shift = 		16;
+    static const uint32_t s_customer_shift = 		24;
+    static const uint32_t s_district_shift = 		16;
+    static const uint32_t s_new_order_shift = 		24;
+    static const uint32_t s_order_shift = 		24;
+    static const uint32_t s_order_line_shift = 		56;
+    static const uint32_t s_stock_shift = 		16;
 
-    static uint64_t s_customer_mask = 		0x000000FFFF000000;
-    static uint64_t s_district_mask = 		0x0000000000FF0000;
-    static uint64_t s_warehouse_mask = 		0x000000000000FFFF;
-    static uint64_t s_stock_mask = 		0x00000000000000FF;
+    static const uint64_t s_customer_mask = 		0x000000FFFF000000;
+    static const uint64_t s_district_mask = 		0x0000000000FF0000;
+    static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
+    static const uint64_t s_stock_mask = 		0x00000000000000FF;
 
-    static uint32_t customer_key(uint64_t composite_key);
-    static uint32_t warehouse_key(uint64_t composite_key);
-    static uint32_t district_key(uint64_t composite_key);
 
   public:
-    
+    static inline uint32_t
+    get_stock_key(uint64_t composite_key) {
+      return (uint32_t)((composite_key & s_stock_mask) >> s_stock_shift);
+    }
+
+    static inline uint32_t
+    get_customer_key(uint64_t composite_key) {
+      return (uint32_t)((composite_key & s_customer_mask) >> s_customer_shift);
+    }
+
+    static inline uint32_t
+    get_warehouse_key(uint64_t composite_key) {
+      return (uint32_t)(composite_key & s_warehouse_mask);
+    }
+
+    static inline uint32_t
+    get_district_key(uint64_t composite_key) {
+      return (uint32_t)((composite_key & s_district_mask) >> s_district_shift);
+    }
+
+    // Expects: 	warehouse_id 	==> 	keys[0] 
+    // 		district_id  	==> 	keys[1]
+    //		customer_id  	==> 	keys[2]
+    static inline uint64_t
+    create_customer_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0])				|
+              ((uint64_t)keys[1] << s_district_shift)		|
+              ((uint64_t)keys[2] << s_customer_shift)		
+              );
+    }
+
+    // Expects: 	warehouse_id 	==> 	keys[0]
+    //		district_id 	==> 	keys[1]
+    static inline uint64_t
+    create_district_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0])				|
+              ((uint64_t)keys[1] << s_district_shift)
+              );
+    }
+
+    // Expects: 	warehouse_id 	==> 	keys[0]
+    // 		district_id 	==> 	keys[1]
+    //		new_order_id	==> 	keys[2]
+    static inline uint64_t
+    create_new_order_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0])    				|
+              ((uint64_t)keys[1] << s_district_shift)		|
+              ((uint64_t)keys[2] << s_new_order_shift)
+              );
+    }	
+
+    // Expects: 	warehouse_id 	==> 	keys[0]
+    // 		district_id 	==> 	keys[1]
+    //		order_id	==> 	keys[2]
+    static inline uint64_t
+    create_order_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0])				|
+              ((uint64_t)keys[1] << s_district_shift)		|
+              ((uint64_t)keys[2] << s_order_shift)
+              );
+    }
+
+    static inline uint64_t
+    create_order_line_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0]) 				| 
+              ((uint64_t)keys[1] << s_district_shift) 	| 
+              ((uint64_t)keys[2] << s_order_shift)		|
+              ((uint64_t)keys[3] << s_order_line_shift)
+              );
+    }
+
+    static inline uint64_t
+    create_stock_key(uint32_t *keys) {
+      return (
+              ((uint64_t)keys[0])				|
+              ((uint64_t)keys[1] << s_stock_shift)		
+              );
+    }
+
   };
 
   // Each of the following classes defines a TPC-C table. 
   typedef struct {
-    public int c_id;
-    public int c_d_id;
-    public int c_w_id;
-    public int c_payment_cnt;
-    public int c_delivery_cnt;
-    public string c_since;
-    public float c_discount;
-    public float c_credit_lim;
-    public float c_balance;
-    public float c_ytd_payment;
-    public string c_credit;
-    public string c_last;
-    public string c_first;
-    public string c_street_1;
-    public string c_street_2;
-    public string c_city;
-    public string c_state;
-    public string c_zip;
-    public string c_phone;
-    public string c_middle;
-    public string c_data;  
+    int c_id;
+    int c_d_id;
+    int c_w_id;
+    int c_payment_cnt;
+    int c_delivery_cnt;
+    std::string c_since;
+    float c_discount;
+    float c_credit_lim;
+    float c_balance;
+    float c_ytd_payment;
+    std::string c_credit;
+    std::string c_last;
+    std::string c_first;
+    std::string c_street_1;
+    std::string c_street_2;
+    std::string c_city;
+    std::string c_state;
+    std::string c_zip;
+    std::string c_phone;
+    std::string c_middle;
+    std::string c_data;  
   } Customer;
 
   typedef struct {
-    public int d_id;
-    public int d_w_id;
-    public int d_next_o_id;
-    public float d_ytd;
-    public float d_tax;
-    public string d_name;
-    public string d_street_1;
-    public string d_street_2;
-    public string d_city;
-    public string d_state;
-    public string d_zip;
+    int d_id;
+    int d_w_id;
+    int d_next_o_id;
+    float d_ytd;
+    float d_tax;
+    std::string d_name;
+    std::string d_street_1;
+    std::string d_street_2;
+    std::string d_city;
+    std::string d_state;
+    std::string d_zip;
+    Customer* customer_table;
   } District;
 
   typedef struct {
-    public int h_c_id;
-    public int h_c_d_id;
-    public int h_c_w_id;
-    public int h_d_id;
-    public int h_w_id;
-    public string h_date;
-    public float h_amount;
-    public string h_data;
+    int h_c_id;
+    int h_c_d_id;
+    int h_c_w_id;
+    int h_d_id;
+    int h_w_id;
+    std::string h_date;
+    float h_amount;
+    std::string h_data;
   } History;
 
   typedef struct {
-    public int i_id; // PRIMARY KEY
-    public int i_im_id;
-    public float i_price;
-    public String i_name;
-    public String i_data;
+    int i_id; // PRIMARY KEY
+    int i_im_id;
+    float i_price;
+    std::string i_name;
+    std::string i_data;
   } Item;
 
   typedef struct {
-    public int no_w_id;
-    pubilc int no_d_id;
-    public int no_o_id;
+    int no_w_id;
+    int no_d_id;
+    int no_o_id;
   } NewOrder;
 
   typedef struct {
-    public int o_id;
-    public int o_w_id;
-    public int o_d_id;
-    public int o_c_id;
-    public Integer o_carrier_id;
-    public int o_ol_cnt;
-    public int o_all_local;
-    public long o_entry_d;
+    int o_id;
+    int o_w_id;
+    int o_d_id;
+    int o_c_id;
+    int o_carrier_id;
+    int o_ol_cnt;
+    int o_all_local;
+    long o_entry_d;
   } Oorder;
 
   typedef struct { 
-    public int ol_w_id;
-    public int ol_d_id;
-    public int ol_o_id;
-    public int ol_number;
-    public int ol_i_id;
-    public int ol_supply_w_id;
-    public int ol_quantity;
-    public long ol_delivery_d;
-    public float ol_amount;
-    public string ol_dist_info;
+    int ol_w_id;
+    int ol_d_id;
+    int ol_o_id;
+    int ol_number;
+    int ol_i_id;
+    int ol_supply_w_id;
+    int ol_quantity;
+    long ol_delivery_d;
+    float ol_amount;
+    std::string ol_dist_info;
   } OrderLine;
 
   typedef struct {
-    public int s_i_id; // PRIMARY KEY 2
-    public int s_w_id; // PRIMARY KEY 1
-    public int s_order_cnt;
-    public int s_remote_cnt;
-    public int s_quantity;
-    public float s_ytd;
-    public String s_data;
-    public String s_dist_01;
-    public String s_dist_02;
-    public String s_dist_03;
-    public String s_dist_04;
-    public String s_dist_05;
-    public String s_dist_06;
-    public String s_dist_07;
-    public String s_dist_08;
-    public String s_dist_09;
-    public String s_dist_10;
+    int s_i_id; // PRIMARY KEY 2
+    int s_w_id; // PRIMARY KEY 1
+    int s_order_cnt;
+    int s_remote_cnt;
+    int s_quantity;
+    float s_ytd;
+    std::string s_data;
+    std::string s_dist_01;
+    std::string s_dist_02;
+    std::string s_dist_03;
+    std::string s_dist_04;
+    std::string s_dist_05;
+    std::string s_dist_06;
+    std::string s_dist_07;
+    std::string s_dist_08;
+    std::string s_dist_09;
+    std::string s_dist_10;
   } Stock;
 
   typedef struct {
-    public int w_id; // PRIMARY KEY
-    public float w_ytd;
-    public float w_tax;
-    public String w_name;
-    public String w_street_1;
-    public String w_street_2;
-    public String w_city;
-    public String w_state;
-    public String w_zip;
+    int w_id; // PRIMARY KEY
+    float w_ytd;
+    float w_tax;
+    std::string w_name;
+    std::string w_street_1;
+    std::string w_street_2;
+    std::string w_city;
+    std::string w_state;
+    std::string w_zip;
+    District *district_table;
+    Stock *stock_table;
   } Warehouse;
   
-  // Use this enum to disambiguate various types of TPCC transactions. 
-  typedef enum TxnType {
-    DELIVERY,
-    NEW_ORDER,
-    ORDER_STATUS,
-    PAYMENT,
-    STOCK_LEVEL,    
-  };
+  static Customer 				*s_customer_tbl;
+  static District 				*s_district_tbl;
+  static Warehouse 				*s_warehouse_tbl;
+  static Item 					*s_item_tbl;
   
-  static HashStore<string, Customer> 	*s_customer_tbl;
-  static HashStore<string, District> 	*s_district_tbl;
-  static HashStore<string, History> 	*s_history_tbl;
-  static HashStore<string, Item> 		*s_item_tbl;
-  static HashStore<string, NewOrder> 	*s_new_order_tbl;
-  static HashStore<string, Oorder> 		*s_oorder_tbl;
-  static HashStore<string, OrderLine> 	*s_order_line_tbl;
-  static HashStore<string, Stock> 		*s_stock_tbl;
-  static HashStore<string, Warehouse> 	*s_warehouse_tbl;
+  static Table<uint64_t, NewOrder> 		*s_new_order_tbl;
+  static Table<uint64_t, Oorder> 		*s_oorder_tbl;
+  static Table<uint64_t, OrderLine> 		*s_order_line_tbl;
+  static Table<uint64_t, Stock> 		*s_stock_tbl;
 
-  class StockLevelTxn : public ILazyTxn {
-  public:
-    StockLevelTxn(int w_id, int d_id, int threshold);
-    bool NowPhase();
-    void LaterPhase();
-  };
-
-  class NewOrderTxn : public ILazyTxn {
+  class NewOrderTxn : public Action {
     
   private:
     // Read set indices
-    static const s_customer_index = 0;
-    static const s_warehouse_index = 1;
-    static const s_item_index = 2;
+    static const uint32_t s_customer_index = 0;
+    static const uint32_t s_warehouse_index = 1;
+    static const uint32_t s_item_index = 2;
 
     // Write set indices
-    static const s_district_index = 0;
-    static const s_stock_index = 1;
+    static const uint32_t s_district_index = 0;
+    static const uint32_t s_stock_index = 1;
+
+    static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
 
     // Fields 
     int m_order_id;
@@ -210,45 +283,11 @@ namespace tpcc {
     int m_num_items;
 
   public:
-    NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt, int o_all_local,
-                vector<int> *itemIds, vector<int> *supplierWarehouseIDs, 
-                vector<int> *orderQuantities);
-
+    NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt, 
+                int o_all_local, int numItems, int *itemIds, 
+                int *supplierWarehouseIDs, int *orderQuantities);
     bool NowPhase();
     void LaterPhase();
   };
-
-  // Implement a single "run" function which runs a particular TPCC function. 
-  class Worker {
-  private:
-    HashStore<string, Customer> 	*m_customer_tbl;
-    HashStore<string, District> 	*m_district_tbl;
-    HashStore<string, History> 		*m_history_tbl;
-    HashStore<string, Item> 		*m_item_tbl;
-    HashStore<string, NewOrder> 	*m_new_order_tbl;
-    HashStore<string, Oorder> 		*m_oorder_tbl;
-    HashStore<string, OrderLine> 	*m_order_line_tbl;
-    HashStore<string, Stock> 		*m_stock_tbl;
-    HashStore<string, Warehouse> 	*m_warehouse_tbl;
-
-    void NewOrder(int w_id, int d_id, int c_id,
-                  int o_ol_cnt, int o_all_local, int[] itemIDs,
-                  int[] supplierWarehouseIDs, int[] orderQuantities);
-    
-    
-
-  public:
-    TPCCWorker(HashStore<string, Customer> 	*customer_tbl;
-               HashStore<string, District> 	*district_tbl;
-               HashStore<string, History> 	*history_tbl;
-               HashStore<string, Item> 		*item_tbl;
-               HashStore<string, NewOrder> 	*new_order_tbl;
-               HashStore<string, Oorder> 	*oorder_tbl;
-               HashStore<string, OrderLine> *order_line_tbl;
-               HashStore<string, Stock> 	*stock_tbl;
-               HashStore<string, Warehouse> *warehouse_tbl);
-
-  };
-
 }; // tpcc namespace. 
 

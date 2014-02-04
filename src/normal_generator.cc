@@ -60,16 +60,18 @@ Action* NormalGenerator::genNext() {
     // Generate the read and write sets. 
     for (int i = 0; i < m_read_set_size; ++i) {
         int record = genUnique(&generator, &distribution, &done);
-		struct DependencyInfo to_add;		
-		to_add.record = record;
-		ret->readset.push_back(to_add);
+        struct DependencyInfo to_add;		
+        to_add.record.m_table = 0;
+        to_add.record.m_key = record;
+        ret->readset.push_back(to_add);
     }
     for (int i = 0; i < m_write_set_size; ++i) {
         int record = genUnique(&generator, &distribution, &done);
-		struct DependencyInfo to_add;
-		to_add.record = record;
-		ret->writeset.push_back(to_add);
-		ret->real_writes.push_back(record);
+        struct DependencyInfo to_add;
+        to_add.record.m_table = 0;
+        to_add.record.m_key = record;
+        ret->writeset.push_back(to_add);
+        ret->real_writes.push_back(record);
     }
 
     if ((rand() % m_freq) == 0) {

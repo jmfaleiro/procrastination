@@ -47,16 +47,18 @@ Action* UniformGenerator::genNext() {
     // Generate elements to read. 
     for (int i = 0; i < m_read_set_size; ++i) {
         int record = genUnique(&done);
-		struct DependencyInfo to_add;
-		to_add.record = record;
-		ret->readset.push_back(to_add);
+        struct DependencyInfo to_add;
+        to_add.record.m_table = 0;
+        to_add.record.m_key = record;
+        ret->readset.push_back(to_add);
     }
     
     // Generate elements to write. 
     for (int i = 0; i < m_write_set_size; ++i) {
       int record = genUnique(&done);
       struct DependencyInfo to_add;
-      to_add.record = record;
+      to_add.record.m_table = 0;
+      to_add.record.m_key = record;
       ret->writeset.push_back(to_add);
       ret->real_writes.push_back(record);
     }    

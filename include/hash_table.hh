@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <table.hh>
 #include <city.h>
 
 
@@ -29,7 +30,29 @@ public:
 };
 
 template <class K, class V>
-class HashTable {
+class HashTable : public Table<K, V> {
+private:
+
+  BucketItem<K, V>*
+  PutInternal(K key, V value) {
+    uint64_t index = hash_function(key) & m_mask;
+    BucketItem<K, V> *to_insert = new BucketItem<K, V> (key, value);
+
+#ifndef NDEBUG
+    to_insert->m_next = m_table[2*index];
+    m_table[2*index] = to_insert;
+
+    // Ensure that the chain length is reasonable. 
+    uint64_t *counter_ptr = (uint64_t*)&m_table[2*index + 1];
+    *counter_ptr += 1;
+    assert(*counter_ptr <= m_chain_bound);
+#else
+    to_insert->m_next = m_table[index];
+    m_table[index] = to_insert;    
+#endif
+    return to_insert;
+  }
+
 protected:
   uint32_t m_size;
   uint32_t m_mask;
@@ -70,21 +93,7 @@ public:
 
   virtual void
   Put(K key, V value) {
-    uint64_t index = hash_function(key) & m_mask;
-    BucketItem<K, V> *to_insert = new BucketItem<K, V> (key, value);
-
-#ifndef NDEBUG
-    to_insert->m_next = m_table[2*index];
-    m_table[2*index] = to_insert;
-
-    // Ensure that the chain length is reasonable. 
-    uint64_t *counter_ptr = (uint64_t*)&m_table[2*index + 1];
-    *counter_ptr += 1;
-    assert(*counter_ptr <= m_chain_bound);
-#else
-    to_insert->m_next = m_table[index];
-    m_table[index] = to_insert;    
-#endif
+    PutInternal(key, value);
   }
   
   virtual V
@@ -105,6 +114,22 @@ public:
     }
     else {
       return to_ret->m_value;
+    }
+  }
+  
+  virtual V*
+  GetPtr(K key) {
+    uint64_t index = hash_function(key) & m_mask;
+    BucketItem<K, V> *item = m_table[index];
+    while (item != NULL && item->m_key != key) {
+      item = item->m_next;
+    }
+    if (item == NULL) {
+      item = PutInternal(key, V());
+      return &item->m_value;
+    }
+    else {
+      return &item->m_value;
     }
   }
 

@@ -7,6 +7,7 @@
 
 // For the microbenchmarks, read the values of the records in the read set and 
 // then add the sum to each of the records in the writeset. 
+/*
 void ProcessAction(Action* to_proc, int* records) {
   //  to_proc->start_time = rdtsc();
     int readset_size = to_proc->readset.size();
@@ -17,11 +18,11 @@ void ProcessAction(Action* to_proc, int* records) {
 
     for (int i = 0; i < readset_size; ++i) {
         int index = to_proc->readset[i].record;
-		/*
-		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
-			count += records[j];
-		}
-		*/
+
+        //		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
+	//		count += records[j];
+	//	}
+	
 		count += records[CACHE_LINE*index];        
 		count += records[CACHE_LINE*(index+1)];
 		count += records[CACHE_LINE*(index+2)];
@@ -33,12 +34,12 @@ void ProcessAction(Action* to_proc, int* records) {
     for (int i = 0; i < writeset_size; ++i) {
       int index = to_proc->writeset[i].record;
 
-	  /*
-		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
-			records[j] += count;
-			//			count += records[i];
-		}
-	  */
+
+      //		for (int j = 0; i < CACHE_LINE*(index+4); ++i) {
+      //			records[j] += count;
+      //						count += records[i];
+      //		}
+
 	  
 	  records[CACHE_LINE * index] += count;
 	  records[CACHE_LINE * (index+1)] += count;
@@ -48,9 +49,11 @@ void ProcessAction(Action* to_proc, int* records) {
     }   
     //    to_proc->end_time = rdtsc();
 }
+*/
+
 
 Worker::Worker(int queue_size,
-               cpu_set_t* binding_info,
+               int binding_info,
                int* records,
 	       bool serial) {
     m_queue_size = queue_size;
@@ -103,7 +106,8 @@ void* Worker::workerFunction(void* arg) {
     while (true) {
       Action* action = (Action*)input_queue->DequeueBlocking();
       //      action->system_start_time += rdtsc();
-      ProcessAction(action, worker->m_records);
+      action->LaterPhase();
+      //      ProcessAction(action, worker->m_records);
       output_queue->EnqueueBlocking((uint64_t)action);
       //      action->system_end_time += rdtsc();
       worker->m_num_done += 1;
@@ -222,7 +226,8 @@ void Worker::processBlindWrite(Action* action) {
   
   // Execute the blind-write and return it to the user. 
   action->state = SUBSTANTIATED;
-  ProcessAction(action, m_records);
+  action->LaterPhase();
+  //  ProcessAction(action, m_records);
   //  action->system_end_time = rdtsc();
   m_output_queue->EnqueueBlocking((uint64_t)action);
   m_num_done += 1;
@@ -259,12 +264,12 @@ uint64_t Worker::substantiate(Action* start) {
   Action::Unlock(start);
   
   if (txn_state != STICKY) {	// Wait for someone to finish the txn. 
-    while ((txn_state == Action::CheckState(start)) != SUBSTANTIATED) {
+    while ((txn_state = Action::CheckState(start)) != SUBSTANTIATED) {
       ;
     }      
   }
   else { 	// This thread's job to run the txn. 
-    ProcessAction(start, m_records);
+    start->LaterPhase();
     Action::Lock(start);
     Action::ChangeState(start, SUBSTANTIATED);
     Action::Unlock(start);
