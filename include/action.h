@@ -18,7 +18,10 @@ class CompositeKey {
     m_key = key;
   }
   
- CompositeKey() : CompositeKey(0, 0) { }
+  CompositeKey() {
+    m_table = 0;
+    m_key = 0;
+  }
 
   bool operator==(const CompositeKey &other) const {
     return other.m_table == this->m_table && other.m_key == this->m_key;
