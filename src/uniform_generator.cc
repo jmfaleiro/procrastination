@@ -13,10 +13,10 @@ UniformGenerator::UniformGenerator(int read_size,
     m_freq = freq;
 
     m_num_actions = 10000000;
-	m_action_set = new Action[m_num_actions];
-        memset(m_action_set, 0, sizeof(Action)*m_num_actions);
+    m_action_set = new Action[m_num_actions];
+    memset(m_action_set, 0, sizeof(Action)*m_num_actions);
 
-	m_use_next = 0;
+    m_use_next = 0;
 
     // Init rand number generator. 
     srand(time(NULL));
