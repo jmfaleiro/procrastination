@@ -41,12 +41,13 @@ public:
     table[CACHE_LINE*index] = to_insert;
 
     // Ensure that the chain length is reasonable. 
+    /*
 #ifndef NDEBUG
     uint64_t *counter_ptr = (uint64_t*)&table[2*index + 1];
     *counter_ptr += 1;
     assert(*counter_ptr <= m_chain_bound);
 #endif
-
+    */
     unlock(lock_word);
   }
   
@@ -91,11 +92,12 @@ public:
       to_remove = to_remove->m_next;
     }
     *prev = to_remove->m_next;
+    /*
 #ifndef NDEBUG
     uint64_t *counter_ptr = (uint64_t *)&table[*index + 1];
     *counter_ptr -= 1;
 #endif
-
+    */
     // Release the chain lock. 
     unlock(lock_word);
 

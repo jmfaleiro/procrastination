@@ -2,6 +2,7 @@
 // Adapted from oltpbench (git@github.com:oltpbenchmark/oltpbench.git)
 
 #include <tpcc.h>
+#include <cassert>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -11,7 +12,6 @@
 #include <string.h>
 
 using namespace std;
-
 
 tpcc::TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
                          uint32_t cust_per_dist, uint32_t item_count) {
@@ -116,7 +116,7 @@ tpcc::TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         gen_random_string(3, 3, customer[i].c_state);
         gen_random_string(4, 4, customer[i].c_zip);
         
-        for (int j = 4; j < 9; ++i) {
+        for (int j = 4; j < 9; ++j) {
             customer[i].c_zip[j] = '1';            
         }
         gen_random_string(16, 16, customer[i].c_phone);
@@ -140,7 +140,11 @@ tpcc::TPCCInit::init_order() {
     Oorder oorder;
     NewOrder new_order;
     OrderLine order_line;
-    
+
+    assert(s_oorder_tbl != NULL);
+    assert(s_new_order_tbl != NULL);
+    assert(s_order_line_tbl != NULL);
+
     // Use this array to construct a composite key for each of the Order, 
     // OrderLine and Oorder tables. 
     uint32_t keys[5];
@@ -267,7 +271,6 @@ tpcc::TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
     int randPct;
     int len;
     int start_original;
-    char original_str[] = {'O','R','I','G','I','N','A','L','\0'};
     for (uint32_t i = 0; i < m_item_count; ++i) {
         container.s_i_id = i;
         container.s_w_id = warehouse_id;
@@ -279,21 +282,21 @@ tpcc::TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
         // s_data
         randPct = rand() % 100;
         len = 26 + (rand() % 25);
-        if (randPct > 10) {
-            // 90% of time i_data isa random string of length [26 ..
-            // 50]
-            gen_random_string(len, len, container.s_data);
-        } 
-        else {
-            // 10% of time i_data has "ORIGINAL" crammed somewhere
-            // in middle
-            start_original = 2 + rand() % (len - 10);
-            gen_random_string(start_original, start_original, 
-                              container.s_data);
-            memcpy(&container.s_data+start_original, original_str, 8);
-            len - start_original - 9;
-            gen_random_string(len-start_original-9, len-start_original-9,
-                              container.s_data+start_original+8);
+        assert(len >= 26 && len <= 50);
+        gen_random_string(len, len, container.s_data);
+        if (randPct <= 10) {
+            
+            // 10% of the time, i_data has the string "ORIGINAL" crammed 
+            // somewhere in the middle.
+            start_original = 2 + (rand()%(len-10));
+            container.s_data[start_original] = 'O';
+            container.s_data[start_original+1] = 'R';
+            container.s_data[start_original+2] = 'I';
+            container.s_data[start_original+3] = 'G';
+            container.s_data[start_original+4] = 'I';
+            container.s_data[start_original+5] = 'N';
+            container.s_data[start_original+6] = 'A';
+            container.s_data[start_original+7] = 'L';            
         }
 
         gen_random_string(24, 24, container.s_dist_01);
@@ -311,7 +314,16 @@ tpcc::TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
 
 void
 tpcc::TPCCInit::do_init() {
-  
+    
+    s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<20, 20);
+    s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<20, 20);
+    s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<23, 20);
+
+    cout << "Num warehouses: " << m_num_warehouses << "\n";
+    cout << "Num districts: " << m_dist_per_wh << "\n";
+    cout << "Num customers: " << m_cust_per_dist << "\n";
+    cout << "Num items: " << m_item_count << "\n";
+
     init_order();
     Item *item = (Item*)malloc(sizeof(Item)*m_item_count);
     init_item(item);

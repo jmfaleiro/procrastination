@@ -144,6 +144,8 @@ class ExperimentInfo {
             if (i != 10 && i != 8 && i != 0 && i != 10 && i != 11 && i != 12 &&
                 i != 13 && i != 14) {
                 if (args_received.find(i) == args_received.end()) {
+                    cout << "Missing argument: ";
+                    cout << long_options[i].name << "\n";
                     argError(long_options, NUM_OPTS);
                 }
             }

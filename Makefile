@@ -13,7 +13,7 @@ TARGET=build/lazy_db
 
 all: $(TARGET)
 
-dev: CFLAGS = -g -Werror -Isrc -Wall -Wextra -std=c++0x
+dev: CFLAGS = -g -Werror -Isrc -Wextra -std=c++0x
 dev: all
 
 $(TARGET): build $(OBJECTS)

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include <table.hh>
+#include <concurrent_hash_table.hh>
 #include <keys.h>
 #include <action.h>
 
@@ -163,7 +163,7 @@ namespace tpcc {
         char d_street_2[25];
         char d_city[25];
         char d_state[5];
-        char d_zip[5];
+        char d_zip[10];
         Customer* d_customer_table;
     } District __attribute((aligned(CACHE_LINE)));
 
@@ -223,7 +223,7 @@ namespace tpcc {
         int s_remote_cnt;
         int s_quantity;
         float s_ytd;
-        char s_data[25];
+        char s_data[51];
         char s_dist_01[25];
         char s_dist_02[25];
         char s_dist_03[25];
@@ -254,9 +254,9 @@ namespace tpcc {
     static Warehouse 						*s_warehouse_tbl;
     static Item 							*s_item_tbl;
   
-    static Table<uint64_t, NewOrder> 		*s_new_order_tbl;
-    static Table<uint64_t, Oorder> 			*s_oorder_tbl;
-    static Table<uint64_t, OrderLine> 		*s_order_line_tbl;
+    static ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
+    static ConcurrentHashTable<uint64_t, Oorder> 			*s_oorder_tbl;
+    static ConcurrentHashTable<uint64_t, OrderLine> 		*s_order_line_tbl;
     
 
     class TPCCInit {

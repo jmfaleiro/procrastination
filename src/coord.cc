@@ -292,6 +292,12 @@ void initialize(ExperimentInfo* info,
 			     10000);
     }
     else if (info->experiment == TPCC) {
+        cout << "Initializing tpcc!\n";
+        cout << "Num warehouses: " << info->warehouses << "\n";
+        cout << "Num districts: " << info->districts << "\n";
+        cout << "Num customers: " << info->customers << "\n";
+        cout << "Num items: " << info->items << "\n";
+        
         tpcc::TPCCInit tpcc_initializer(info->warehouses, info->districts, 
                                         info->customers, info->items);
         tpcc_initializer.do_init();
@@ -357,12 +363,10 @@ void run_experiment(ExperimentInfo* info) {
     SimpleQueue* scheduler_input;
     WorkloadGenerator* gen;
     LazyScheduler* sched;
-    Worker** workers = (Worker**)malloc(sizeof(Worker*) * info->num_workers);
-    
+    Worker** workers = (Worker**)malloc(sizeof(Worker*) * info->num_workers);   
+    initialize(info, &scheduler_output, &scheduler_input, &sched, workers, &gen);
 
     if (info->experiment == THROUGHPUT) {
-        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
-                   &gen);
         int num_done;
         timespec input_time;
         timespec exec_time = wait(sched, 
@@ -378,8 +382,6 @@ void run_experiment(ExperimentInfo* info) {
         write_client_latencies(gen);
     }
     else if (info->experiment == LATENCY) {
-        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
-                   &gen);
         Client c(*workers, 
                  sched, 
                  scheduler_input, 
@@ -389,8 +391,6 @@ void run_experiment(ExperimentInfo* info) {
         c.Run();
     }
     else if (info->experiment == PEAK_LOAD) {
-        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
-                   &gen);
         Client c(*workers, 
                  sched, 
                  scheduler_input, 
