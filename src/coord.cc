@@ -9,6 +9,8 @@
 #include "machine.h"
 #include "client.h"
 #include "shopping_cart.h"
+#include <tpcc.h>
+
 
 #include <numa.h>
 #include <pthread.h>
@@ -239,6 +241,7 @@ void write_latencies(WorkloadGenerator* gen) {
     output_file.close();
 }
 
+
 void initialize(ExperimentInfo* info, 
                 SimpleQueue** output,
                 SimpleQueue** input,
@@ -280,13 +283,19 @@ void initialize(ExperimentInfo* info,
         new SimpleQueue(sched_input_data, sched_size);
 
     // Create a workload generator and generate txns to process. 
-    WorkloadGenerator* gen;
+    WorkloadGenerator* gen = NULL;
     if (info->blind_write_frequency != -1) {
       gen = new ShoppingCart(1000,
 			     info->num_records, 
 			     20,
 			     info->blind_write_frequency,
 			     10000);
+    }
+    else if (info->experiment == TPCC) {
+        tpcc::TPCCInit tpcc_initializer(info->warehouses, info->districts, 
+                                        info->customers, info->items);
+        tpcc_initializer.do_init();
+
     }
     else if (info->is_normal) {
         gen = new NormalGenerator(info->read_set_size,
@@ -330,7 +339,7 @@ void initialize(ExperimentInfo* info,
                                    info->num_workers, 
                                    info->num_records, 
                                    info->substantiate_threshold,
-				   worker_flag,
+                                   worker_flag,
                                    worker_inputs,
                                    NULL,
                                    0,
@@ -349,15 +358,11 @@ void run_experiment(ExperimentInfo* info) {
     WorkloadGenerator* gen;
     LazyScheduler* sched;
     Worker** workers = (Worker**)malloc(sizeof(Worker*) * info->num_workers);
-    initialize(info, 
-               &scheduler_output, 
-               &scheduler_input, 
-               &sched, 
-               workers, 
-               &gen);
     
-    if (info->experiment == THROUGHPUT) {
 
+    if (info->experiment == THROUGHPUT) {
+        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
+                   &gen);
         int num_done;
         timespec input_time;
         timespec exec_time = wait(sched, 
@@ -370,9 +375,11 @@ void run_experiment(ExperimentInfo* info) {
         std::cout << "here!\n";
         write_answers(info, exec_time, input_time, num_done);
         write_latencies(gen);     
-	write_client_latencies(gen);
+        write_client_latencies(gen);
     }
     else if (info->experiment == LATENCY) {
+        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
+                   &gen);
         Client c(*workers, 
                  sched, 
                  scheduler_input, 
@@ -382,6 +389,8 @@ void run_experiment(ExperimentInfo* info) {
         c.Run();
     }
     else if (info->experiment == PEAK_LOAD) {
+        initialize(info, &scheduler_output, &scheduler_input, &sched, workers, 
+                   &gen);
         Client c(*workers, 
                  sched, 
                  scheduler_input, 
@@ -389,6 +398,9 @@ void run_experiment(ExperimentInfo* info) {
                  gen, 
                  info->num_txns);
         c.RunPeak();
+    }
+    else if (info->experiment == TPCC) {
+        
     }
     exit(0);
 }

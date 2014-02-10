@@ -280,11 +280,11 @@ namespace tpcc {
         void init_stock(Stock *stock, uint32_t wh_id);
 
     public:
-        TPCCInit(uint32_t num_warehouses);
+        TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
+                 uint32_t cust_per_dist, uint32_t item_count);
 
         // Must be called before running any experiments. 
-        void
-            do_init();
+        void do_init();
     };
 
 

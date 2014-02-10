@@ -12,6 +12,15 @@
 
 using namespace std;
 
+
+tpcc::TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
+                         uint32_t cust_per_dist, uint32_t item_count) {
+    m_num_warehouses = num_warehouses;
+    m_dist_per_wh = dist_per_wh;
+    m_cust_per_dist = cust_per_dist;
+    m_item_count = item_count;
+}
+
 void
 tpcc::TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
     char base = 'a', max = 'z';
