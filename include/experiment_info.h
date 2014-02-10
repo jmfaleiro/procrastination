@@ -141,7 +141,8 @@ class ExperimentInfo {
         }
         
         for (int i = 0; i < NUM_OPTS; ++i) {
-            if (i != 10 && i != 8 && i != 0) {
+            if (i != 10 && i != 8 && i != 0 && i != 10 && i != 11 && i != 12 &&
+                i != 13 && i != 14) {
                 if (args_received.find(i) == args_received.end()) {
                     argError(long_options, NUM_OPTS);
                 }
