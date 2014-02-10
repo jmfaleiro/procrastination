@@ -8,12 +8,13 @@
 #include <string>
 #include <sstream>
 
-#define NUM_OPTS 11
+#define NUM_OPTS 15
 
 enum ExperimentType {
     THROUGHPUT,
     LATENCY,
     PEAK_LOAD,
+    TPCC,
 };
 
 // Use this class to parse command line arguments for our particular experiment
@@ -21,14 +22,14 @@ enum ExperimentType {
 class ExperimentInfo {    
 
     void argError(struct option* long_options, int count) {
-        std::cout << "lazy_db expects the following args (all are required):\n";
+        std::cout << "lazy_db expects the following args:\n";
         for (int i = 0; i < count; ++i) {
             std::cout << "\t" << long_options[i].name << "\n";
         }
         exit(0);
     }
 
-public:
+ public:
     ExperimentInfo(int argc, char** argv) {
 
         struct option long_options[] = {
@@ -42,9 +43,18 @@ public:
             {"num_runs", required_argument, NULL, 7},
             {"normal", required_argument, NULL, 8},
             {"experiment", required_argument, NULL, 9},
-	    {"blind_writes", required_argument, NULL, 10},
-            { NULL, no_argument, NULL, 11}
+            {"blind_writes", required_argument, NULL, 10},
+            {"warehouses", required_argument, NULL, 11},
+            {"districts", required_argument, NULL, 12},
+            {"customers", required_argument, NULL, 13},
+            {"items", required_argument, NULL, 14},
+            { NULL, no_argument, NULL, 15}
         };
+        
+        warehouses = -1;
+        districts = -1;
+        customers = -1;
+        items = -1;
 
         serial = true;
         substantiate_period = 1;
@@ -59,7 +69,7 @@ public:
         subst_stream << "eager";
 
         int exp_type = -1;
-	blind_write_frequency = -1;
+        blind_write_frequency = -1;
         int index;
         while (getopt_long_only(argc, argv, "", long_options, &index) != -1) {
             
@@ -110,9 +120,21 @@ public:
             case 9:
                 exp_type = atoi(optarg);
                 break;
-	    case 10:
-	      blind_write_frequency = atoi(optarg);
-	      break;
+            case 10:
+                blind_write_frequency = atoi(optarg);
+                break;
+            case 11:
+                warehouses = atoi(optarg);
+                break;
+            case 12:
+                districts = atoi(optarg);
+                break;
+            case 13:
+                customers = atoi(optarg);
+                break;
+            case 14:
+                items = atoi(optarg);
+                break;
             default:
                 argError(long_options, NUM_OPTS);
             }
@@ -128,12 +150,20 @@ public:
         
         if (exp_type != LATENCY && 
             exp_type != THROUGHPUT && 
-            exp_type != PEAK_LOAD) {
+            exp_type != PEAK_LOAD &&
+            exp_type != TPCC) {
             argError(long_options, NUM_OPTS);
         }
         else {
             experiment = (ExperimentType)exp_type;
         }
+        
+        if ((exp_type == TPCC) && 
+            (warehouses == -1 || districts == -1 || customers == -1 || 
+             items == -1)) {
+            argError(long_options, NUM_OPTS);
+        }
+
         // Allocate cpu_set_t's for binding threads. 
         // XXX: The scheduler is single threaded so we have just one for now. 
         worker_bindings = new cpu_set_t[num_workers];
@@ -145,21 +175,21 @@ public:
         }
 
         if (is_normal) {
-	  subst_stream << "_normal_" << std_dev;
-	  stick_stream << "_normal_" << std_dev;
+            subst_stream << "_normal_" << std_dev;
+            stick_stream << "_normal_" << std_dev;
         }
         else {
-	  subst_stream << "_uniform";
-	  stick_stream << "_uniform";
+            subst_stream << "_uniform";
+            stick_stream << "_uniform";
         }
 	
-	if (blind_write_frequency != -1) {
-	  subst_stream << "_blind_" << blind_write_frequency;
-	  stick_stream << "_blind_" << blind_write_frequency;
-	}
+        if (blind_write_frequency != -1) {
+            subst_stream << "_blind_" << blind_write_frequency;
+            stick_stream << "_blind_" << blind_write_frequency;
+        }
 	
-	subst_stream << ".txt";
-	stick_stream << ".txt";
+        subst_stream << ".txt";
+        stick_stream << ".txt";
 
         subst_file = subst_stream.str();
         stick_file = stick_stream.str();        
@@ -216,4 +246,10 @@ public:
     
     // Standard deviation of our normal distribution. 
     int std_dev;
+    
+    // TPCC specific data
+    int warehouses;
+    int districts;
+    int customers;
+    int items;
 };
