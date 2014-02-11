@@ -385,11 +385,11 @@ tpcc::TPCCInit::do_init() {
  * Write set: 	District key 
  *				Stock key (for each item)
  */
-tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt, 
-                               int o_all_local, int numItems, int *itemIds, 
-                               int *supplierWarehouseIDs, 
-                               int *orderQuantities) {
-
+tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
+                               uint64_t o_all_local, uint64_t numItems, 
+                               uint64_t *itemIds, 
+                               uint64_t *supplierWarehouseIDs, 
+                               uint32_t *orderQuantities) {
     uint32_t keys[10];
     struct DependencyInfo dep_info;
     dep_info.dependency = NULL;
@@ -422,7 +422,7 @@ tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt,
     writeset.push_back(dep_info);
 
     // Create stock, and item keys for each item. 
-    for (int i = 0; i < numItems; ++i) {
+    for (uint32_t i = 0; i < numItems; ++i) {
 
         // Create the item and stock keys. 
         uint64_t item_key = itemIds[i];
@@ -440,6 +440,8 @@ tpcc::NewOrderTxn::NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt,
         dep_info.record.m_table = STOCK;
         writeset.push_back(dep_info);
     }
+    m_order_quantities = orderQuantities;
+    m_supplierWarehouse_ids = supplierWarehouseIDs;
 }
 
 bool

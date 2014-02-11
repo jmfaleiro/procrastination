@@ -9,6 +9,8 @@
 #include "machine.h"
 #include "client.h"
 #include "shopping_cart.h"
+#include <tpcc_generator.hh>
+
 #include <tpcc.h>
 
 
@@ -301,6 +303,7 @@ void initialize(ExperimentInfo* info,
         tpcc::TPCCInit tpcc_initializer(info->warehouses, info->districts, 
                                         info->customers, info->items);
         tpcc_initializer.do_init();
+        
 
     }
     else if (info->is_normal) {

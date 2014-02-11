@@ -1,6 +1,9 @@
 // Author: Jose M. Faleiro (faleiro.jose.manuel@gmail.com)
 // Adapted from oltpbench (git@github.com:oltpbenchmark/oltpbench.git)
 
+#ifndef TPCC_H_
+#define TPCC_H_
+
 #include <stdint.h>
 
 #include <string>
@@ -267,10 +270,11 @@ namespace tpcc {
         uint32_t m_item_count;
         
         uint32_t s_first_unprocessed_o_id;
-        // Generate a random string of specified length (all chars are assumed to be
-        // lower case).
+        // Generate a random string of specified length (all chars are assumed 
+        // to be lower case).
         void gen_random_string(int min_len, int max_len, char *val);
-        // Each of the functions below initializes an apriori allocated single row.
+        // Each of the functions below initializes an apriori allocated single 
+        // row.
         void init_warehouse(Warehouse *wh);
         void init_district(District *district, uint32_t warehouse_id);
         void init_customer(Customer *customer, uint32_t d_id, uint32_t w_id);
@@ -300,23 +304,25 @@ namespace tpcc {
         static const uint32_t s_district_index = 0;
         static const uint32_t s_stock_index = 1;
 
-        static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
-
         // Fields 
         int m_order_id;
         int m_district_id;
         int m_warehouse_id;
         float m_district_tax;
-        int *m_order_quantities;
-        int *m_supplierWarehouse_ids;
+        uint32_t *m_order_quantities;
+        uint64_t *m_supplierWarehouse_ids;
         int m_num_items;
 
     public:
-        NewOrderTxn(int w_id, int d_id, int c_id, int o_ol_cnt, 
-                    int o_all_local, int numItems, int *itemIds, 
-                    int *supplierWarehouseIDs, int *orderQuantities);
+        NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
+                    uint64_t o_all_local, uint64_t numItems, uint64_t *itemIds,
+                    uint64_t *supplierWarehouseIDs, uint32_t *orderQuantities);
+
         bool NowPhase();
         void LaterPhase();
+
+        static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
     };
 }; // tpcc namespace. 
 
+#endif // TPCC_H_
