@@ -88,14 +88,23 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     
     SimpleQueue* incoming_txns = sched->m_log_input;
     Action* action = NULL;
-    while (true) {      
+    if (!m_serial) {
+        while (true) {      
 
-        // 1. Grab a transaction from the input queue 
-        // 2. Execute its now phase, and 
-        // 3. Add it to the dependency graph. 
-        Action* to_process = (Action*)incoming_txns->DequeueBlocking();      
-        to_process->NowPhase();
-        sched->addGraph(to_process); 
+            // 1. Grab a transaction from the input queue 
+            // 2. Execute its now phase, and 
+            // 3. Add it to the dependency graph. 
+            Action* to_process = (Action*)incoming_txns->DequeueBlocking();
+            to_process->NowPhase();
+            sched->addGraph(to_process); 
+        }
+    }
+    else {
+        while (true) {
+            Action *to_process = (Action*)incoming_txns->DequeueBlocking();
+            to_process->NowPhase();
+            to_process->LaterPhase();
+        }        
     }
  
     return NULL;
