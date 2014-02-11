@@ -22,9 +22,9 @@ public:
 
     Action*
     genNext() {
-        uint64_t w_id = 1+rand() % m_num_warehouses;
-        uint64_t d_id = 1+rand() % m_dist_per_wh;
-        uint64_t c_id = 1+rand() % m_cust_per_dist;
+        uint64_t w_id = 1+(rand() % m_num_warehouses);
+        uint64_t d_id = 1+(rand() % m_dist_per_wh);
+        uint64_t c_id = 1+(rand() % m_cust_per_dist);
         
         uint32_t num_items = 5 + rand() % 11;
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
@@ -49,13 +49,13 @@ public:
         // 1% of NewOrder transactions should abort.
         if (rand() % 100 == 1) {
             item_ids[num_items-1] = tpcc::NewOrderTxn::invalid_item_key;
-        }
-        
+        }        
         tpcc::NewOrderTxn *ret = new tpcc::NewOrderTxn(w_id, d_id, c_id, 
                                                        all_local, num_items, 
                                                        item_ids, 
                                                        supplier_wh_ids, 
                                                        quantities);
+        ret->materialize = true;
         return ret;
     }    
 };

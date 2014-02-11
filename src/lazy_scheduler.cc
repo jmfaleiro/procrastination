@@ -88,7 +88,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     
     SimpleQueue* incoming_txns = sched->m_log_input;
     Action* action = NULL;
-    if (!m_serial) {
+    if (!sched->m_serial) {
         while (true) {      
 
             // 1. Grab a transaction from the input queue 
@@ -101,10 +101,17 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     }
     else {
         while (true) {
-            Action *to_process = (Action*)incoming_txns->DequeueBlocking();
-            to_process->NowPhase();
-            to_process->LaterPhase();
-        }        
+            Action *to_process;
+            if (incoming_txns->Dequeue((uint64_t*)&to_process)) {
+                to_process->NowPhase();
+                to_process->LaterPhase();            
+            }
+            else {
+                cout << "DONE PROCESSING!\n";
+                break;
+            }
+        }
+        exit(0);
     }
  
     return NULL;

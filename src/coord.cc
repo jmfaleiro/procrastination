@@ -403,7 +403,8 @@ void run_experiment(ExperimentInfo* info) {
         c.RunPeak();
     }
     else if (info->experiment == TPCC) {
-        
+        while (true)
+            ;
     }
     exit(0);
 }
