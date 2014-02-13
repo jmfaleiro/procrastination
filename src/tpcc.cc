@@ -325,9 +325,9 @@ tpcc::TPCCInit::do_init() {
     cout << "Num items: " << m_item_count << "\n";
 
     init_order();
-    Item *item = (Item*)malloc(sizeof(Item)*m_item_count);
-    memset(item, 0, sizeof(Item)*m_item_count);
-    init_item(item);
+    s_item_tbl = (Item*)malloc(sizeof(Item)*m_item_count);
+    memset(s_item_tbl, 0, sizeof(Item)*m_item_count);
+    init_item(s_item_tbl);
 
     // First initialize all the warehouses in the system.
     s_warehouse_tbl = (Warehouse*)malloc(sizeof(Warehouse)*m_num_warehouses);

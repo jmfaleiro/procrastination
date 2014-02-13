@@ -40,7 +40,7 @@ namespace tpcc {
         static const uint64_t s_customer_mask = 		0x000000FFFF000000;
         static const uint64_t s_district_mask = 		0x0000000000FF0000;
         static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
-        static const uint64_t s_stock_mask = 		0x00000000000000FF;
+        static const uint64_t s_stock_mask = 			0xFFFFFFFFFFFF0000;
 
 
     public:
@@ -112,6 +112,7 @@ namespace tpcc {
 
         static inline uint64_t
             create_order_line_key(uint32_t *keys) {
+            
             return (
                     ((uint64_t)keys[0]) 				| 
                     ((uint64_t)keys[1] << s_district_shift) 	| 
@@ -258,8 +259,8 @@ namespace tpcc {
     static Item 							*s_item_tbl;
   
     static ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
-    static ConcurrentHashTable<uint64_t, Oorder> 			*s_oorder_tbl;
-    static ConcurrentHashTable<uint64_t, OrderLine> 		*s_order_line_tbl;
+    static ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
+    static ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
     
 
     class TPCCInit {
