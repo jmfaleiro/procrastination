@@ -40,7 +40,7 @@ tpcc::TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
 void
 tpcc::TPCCInit::init_warehouse(Warehouse *warehouse) {
     for (uint32_t i = 0; i < m_num_warehouses; ++i) {
-        warehouse[i].w_id = i+1;
+        warehouse[i].w_id = i;
         warehouse[i].w_ytd = 30000.0;
         warehouse[i].w_tax = (rand() % 2001) / 1000.0;
         
@@ -62,7 +62,7 @@ tpcc::TPCCInit::init_warehouse(Warehouse *warehouse) {
 void
 tpcc::TPCCInit::init_district(District *district, uint32_t warehouse_id) {
     for (uint32_t i = 0; i < m_dist_per_wh; ++i) {
-        district[i].d_id = i+1;
+        district[i].d_id = i;
         district[i].d_w_id = warehouse_id;
         district[i].d_ytd = 3000;
         district[i].d_tax = (rand() % 2001) / 1000.0;
@@ -84,7 +84,7 @@ void
 tpcc::TPCCInit::init_customer(Customer *customer, uint32_t d_id, 
                               uint32_t w_id) {
     for (uint32_t i = 0; i < m_cust_per_dist; ++i) {
-        customer[i].c_id = i+1;
+        customer[i].c_id = i;
         customer[i].c_d_id = d_id;
         customer[i].c_w_id = w_id;
         
@@ -149,18 +149,18 @@ tpcc::TPCCInit::init_order() {
     // OrderLine and Oorder tables. 
     uint32_t keys[5];
 
-    for (uint32_t w = 1; w <= m_num_warehouses+1; ++w) {
-        for (uint32_t d = 1; d <= m_dist_per_wh+1; ++d) {
+    for (uint32_t w = 0; w < m_num_warehouses; ++w) {
+        for (uint32_t d = 0; d < m_dist_per_wh; ++d) {
             
             // Initialize the customer id array. 
             std::vector<uint32_t> c_ids;
-            for (uint32_t k = 1; k <= m_cust_per_dist; ++k) {
+            for (uint32_t k = 0; k < m_cust_per_dist; ++k) {
                 c_ids.push_back(k);
             }
             std::shuffle(c_ids.begin(), c_ids.end(), 
                          std::default_random_engine((unsigned)time(NULL)));
 
-            for (uint32_t c = 1; c <= m_cust_per_dist; ++c) {
+            for (uint32_t c = 0; c < m_cust_per_dist; ++c) {
                 oorder.o_id = c;
                 oorder.o_w_id = w;
                 oorder.o_d_id = d;
@@ -203,7 +203,7 @@ tpcc::TPCCInit::init_order() {
                     s_new_order_tbl->Put(no_key, new_order);
                 }
 
-                for (uint32_t l = 1; l <= oorder.o_ol_cnt; ++l) {
+                for (uint32_t l = 0; l < oorder.o_ol_cnt; ++l) {
                     order_line.ol_w_id = w;
                     order_line.ol_d_id = d;
                     order_line.ol_o_id = c;
@@ -326,6 +326,7 @@ tpcc::TPCCInit::do_init() {
 
     init_order();
     Item *item = (Item*)malloc(sizeof(Item)*m_item_count);
+    memset(item, 0, sizeof(Item)*m_item_count);
     init_item(item);
 
     // First initialize all the warehouses in the system.
@@ -520,7 +521,7 @@ tpcc::NewOrderTxn::LaterPhase() {
         composite = writeset[s_stock_index+i].record;
         uint64_t ol_s_id = tpcc::TPCCKeyGen::get_stock_key(composite.m_key);
         uint64_t ol_w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
-        uint64_t ol_i_id = writeset[s_item_index+i].record.m_key;
+        uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
         int ol_quantity = m_order_quantities[i];
     
         // Get the item and the stock records. 
@@ -541,39 +542,40 @@ tpcc::NewOrderTxn::LaterPhase() {
         total_amount += ol_quantity * (item->i_price);
     
         char *ol_dist_info;
-        switch (m_district_id) {
-        case 1:
+        switch (d_id) {
+        case 0:
             ol_dist_info = stock->s_dist_01;
             break;
-        case 2:
+        case 1:
             ol_dist_info = stock->s_dist_02;
             break;
-        case 3:
+        case 2:
             ol_dist_info = stock->s_dist_03;
             break;
-        case 4:
+        case 3:
             ol_dist_info = stock->s_dist_04;
             break;
-        case 5:
+        case 4:
             ol_dist_info = stock->s_dist_05;
             break;
-        case 6:
+        case 5:
             ol_dist_info = stock->s_dist_06;
             break;
-        case 7:
+        case 6:
             ol_dist_info = stock->s_dist_07;
             break;
-        case 8:
+        case 7:
             ol_dist_info = stock->s_dist_08;
             break;
-        case 9:
+        case 8:
             ol_dist_info = stock->s_dist_09;
             break;
-        case 10:
+        case 9:
             ol_dist_info = stock->s_dist_10;
             break;
         default:
             std::cout << "Got unexpected district!!! Aborting...\n";
+            std::cout << m_district_id << "\n";
             exit(0);
         }
     
@@ -585,7 +587,7 @@ tpcc::NewOrderTxn::LaterPhase() {
         new_order_line.ol_o_id = m_order_id;
         new_order_line.ol_d_id = d_id;
         new_order_line.ol_w_id = w_id;
-        new_order_line.ol_number = i + 1;
+        new_order_line.ol_number = i;
         new_order_line.ol_i_id = item->i_id;
         new_order_line.ol_supply_w_id = ol_w_id;
         new_order_line.ol_quantity = m_order_quantities[i];
@@ -595,7 +597,7 @@ tpcc::NewOrderTxn::LaterPhase() {
         keys[0] = w_id;
         keys[1] = d_id;
         keys[2] = m_order_id;
-        keys[3] = i+1;
+        keys[3] = i;
         uint64_t order_line_key = tpcc::TPCCKeyGen::create_order_line_key(keys);
 
         // XXX: Make sure that the put operation is implemented on top of a 

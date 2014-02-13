@@ -109,7 +109,6 @@ timespec
 wait_num(SimpleQueue *output_queue, int num_waits) {
     for (int i = 0; i < num_waits; ++i) {
         output_queue->DequeueBlocking();
-        cout << i << "\n";
     }
     timespec ret;
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ret);

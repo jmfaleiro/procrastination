@@ -22,9 +22,9 @@ public:
 
     Action*
     genNext() {
-        uint64_t w_id = 1+(rand() % m_num_warehouses);
-        uint64_t d_id = 1+(rand() % m_dist_per_wh);
-        uint64_t c_id = 1+(rand() % m_cust_per_dist);
+        uint64_t w_id = rand() % m_num_warehouses;
+        uint64_t d_id = rand() % m_dist_per_wh;
+        uint64_t c_id = rand() % m_cust_per_dist;
         
         uint32_t num_items = 5 + rand() % 11;
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
@@ -40,7 +40,7 @@ public:
             }
             else {
                 do {
-                    supplier_wh_ids[i] = 1 + rand() % m_num_warehouses;
+                    supplier_wh_ids[i] = rand() % m_num_warehouses;
                 } while (supplier_wh_ids[i] == w_id && m_num_warehouses > 1);
                 all_local = 0;
             }
