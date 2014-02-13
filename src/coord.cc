@@ -24,12 +24,14 @@
 #include <algorithm>
 #include <sstream>
 #include <string>
+#include <iomanip>
 
 std::vector<Action*>* last_txn_map = NULL;
 std::vector<int>* value_map = NULL;
 using namespace std;
 
-static timespec diff_time(timespec start, timespec end) 
+static timespec 
+diff_time(timespec start, timespec end) 
 {
     timespec temp;
     if ((end.tv_nsec - start.tv_nsec) < 0) {
@@ -54,8 +56,7 @@ buildDependencies(WorkloadGenerator* generator,
         Action* gen = generator->genNext();
         gen->start_time = 0;
         gen->end_time = 0;
-        input_queue->EnqueueBlocking((uint64_t)gen);
-
+        input_queue->EnqueueBlocking((uint64_t)gen);   
         if (gen->materialize) {
             ++to_wait;
         }
@@ -102,15 +103,30 @@ initWorkers(Worker** workers,
   }
 }
 
-// Returns the time elapsed in processing a given workload. 
-timespec wait(LazyScheduler* sched,
-              SimpleQueue* scheduler_output, 
-              Worker** workers,
-              int num_workers,
-              timespec* stickification_time,
-              int* num_done,
-              ExperimentInfo* info) {
+// Wait for a specific number of txns to finish, returns the thread-local 
+// end-time.
+timespec
+wait_num(SimpleQueue *output_queue, int num_waits) {
+    for (int i = 0; i < num_waits; ++i) {
+        output_queue->DequeueBlocking();
+        cout << i << "\n";
+    }
+    timespec ret;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ret);
+    return ret;
+}
 
+
+// Returns the time elapsed in processing a given workload. 
+timespec 
+wait(LazyScheduler* sched,
+     SimpleQueue* scheduler_output, 
+     Worker** workers,
+     int num_workers,
+     timespec* stickification_time,
+     int* num_done,
+     ExperimentInfo* info) {
+    
     timespec start_time, end_time, input_time;
     sched->startScheduler();
     
@@ -140,10 +156,11 @@ timespec wait(LazyScheduler* sched,
 }
 
 // Append the timing information to an output file. 
-void write_answers(ExperimentInfo* info, 
-                   timespec subst_time, 
-                   timespec stick_time,
-                   int num_done) {
+void 
+write_answers(ExperimentInfo* info, 
+              timespec subst_time, 
+              timespec stick_time,
+              int num_done) {
     ofstream subst_file;
     subst_file.open(info->subst_file.c_str(), ios::app | ios::out);
     subst_file << subst_time.tv_sec << "." << subst_time.tv_nsec <<  "  " << num_done << "\n";
@@ -159,7 +176,8 @@ void write_answers(ExperimentInfo* info,
     }
 }
 
-void write_client_latencies(int num_waits, WorkloadGenerator* gen) {
+void 
+write_client_latencies(int num_waits, WorkloadGenerator* gen) {
     uint64_t* times = (uint64_t*)numa_alloc_local(sizeof(uint64_t)*num_waits);
     memset(times, 0, sizeof(uint64_t)*num_waits);
 
@@ -188,7 +206,8 @@ void write_client_latencies(int num_waits, WorkloadGenerator* gen) {
     output_file.close();
 }
 
-void write_client_latencies(WorkloadGenerator* gen) {
+void 
+write_client_latencies(WorkloadGenerator* gen) {
   vector<uint64_t> latencies;
   int action_count = gen->numUsed();
   Action* gen_actions = gen->getActions();
@@ -243,13 +262,20 @@ void write_latencies(WorkloadGenerator* gen) {
     output_file.close();
 }
 
+void
+print_timespec(timespec time, ostream &out) {
+    int nano_width = 9;
+    out << time.tv_sec << ".";
+    out << setfill('0') << setw(9) << left << time.tv_nsec << "\n";
+}
 
-void initialize(ExperimentInfo* info, 
-                SimpleQueue** output,
-                SimpleQueue** input,
-                LazyScheduler** scheduler,
-                Worker** workers,
-                WorkloadGenerator** generator) {
+timespec
+initialize(ExperimentInfo* info, 
+           SimpleQueue** output,
+           SimpleQueue** input,
+           LazyScheduler** scheduler,
+           Worker** workers,
+           WorkloadGenerator** generator) {
 
     init_cpuinfo();
     numa_set_strict(1);
@@ -303,17 +329,15 @@ void initialize(ExperimentInfo* info,
         tpcc::TPCCInit tpcc_initializer(info->warehouses, info->districts, 
                                         info->customers, info->items);
         tpcc_initializer.do_init();
-        
-
+        gen = new TPCCGenerator(info->warehouses, info->districts, 
+                                info->customers, info->items);
     }
     else if (info->is_normal) {
         gen = new NormalGenerator(info->read_set_size,
                                   info->write_set_size,
                                   info->num_records,
                                   info->substantiate_period,
-                                  info->std_dev);
-	  
-				 
+                                  info->std_dev);				 
     }
     else {
         gen = new UniformGenerator(info->read_set_size,
@@ -322,9 +346,10 @@ void initialize(ExperimentInfo* info,
                                    info->substantiate_period);
     }
     *generator = gen;
-    if (info->experiment == THROUGHPUT) {
+    if (info->experiment == THROUGHPUT || info->experiment == TPCC) {
       buildDependencies(gen, info->num_txns, scheduler_input);    
     }
+
     // Create and start worker threads. 
     uint64_t* worker_flag = initWorkers(workers,
 					1,
@@ -342,32 +367,63 @@ void initialize(ExperimentInfo* info,
     CPU_ZERO(&info->scheduler_bindings[1]);
     CPU_SET(1, &info->scheduler_bindings[1]);
 	
+    SimpleQueue *scheduler_output = NULL;
     bool throughput_expt = (info->experiment == THROUGHPUT);
-    *scheduler = new LazyScheduler(info->serial,
-                                   throughput_expt,
-                                   info->num_workers, 
-                                   info->num_records, 
-                                   info->substantiate_threshold,
-                                   worker_flag,
-                                   worker_inputs,
-                                   NULL,
-                                   0,
-                                   scheduler_input,
-                                   NULL);
+    if (info->experiment == TPCC) {
+        uint64_t *scheduler_output_data = 
+            (uint64_t*)malloc(sizeof(uint64_t)*LARGE_QUEUE);
+        memset(scheduler_output_data, 0, sizeof(uint64_t)*LARGE_QUEUE);
+        scheduler_output = 
+            new SimpleQueue(scheduler_output_data, LARGE_QUEUE);
 
-    (*scheduler)->startThread();
-    *output = worker_outputs[0];
+        *scheduler = new LazyScheduler(info->serial,
+                                       throughput_expt,
+                                       info->num_workers, 
+                                       info->num_records, 
+                                       info->substantiate_threshold,
+                                       worker_flag,
+                                       worker_inputs,
+                                       NULL,
+                                       0,
+                                       scheduler_input,
+                                       scheduler_output);
+    }
+    else {
+        *scheduler = new LazyScheduler(info->serial,
+                                       throughput_expt,
+                                       info->num_workers, 
+                                       info->num_records, 
+                                       info->substantiate_threshold,
+                                       worker_flag,
+                                       worker_inputs,
+                                       NULL,
+                                       0,
+                                       scheduler_input,
+                                       NULL);
+    }
+    if (info->experiment == TPCC) {
+        *output = scheduler_output;
+    }
+    else {
+        *output = worker_outputs[0];
+    }
     *input = scheduler_input;
+    (*scheduler)->startThread();
+    timespec ret;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ret);
+    return ret;
 }
 
-
-void run_experiment(ExperimentInfo* info) {
+void
+run_experiment(ExperimentInfo* info) {
     SimpleQueue* scheduler_output;
     SimpleQueue* scheduler_input;
     WorkloadGenerator* gen;
     LazyScheduler* sched;
     Worker** workers = (Worker**)malloc(sizeof(Worker*) * info->num_workers);   
-    initialize(info, &scheduler_output, &scheduler_input, &sched, workers, &gen);
+    timespec start_time = 
+        initialize(info, &scheduler_output, &scheduler_input, &sched, workers,
+                   &gen);
 
     if (info->experiment == THROUGHPUT) {
         int num_done;
@@ -403,8 +459,9 @@ void run_experiment(ExperimentInfo* info) {
         c.RunPeak();
     }
     else if (info->experiment == TPCC) {
-        while (true)
-            ;
+        timespec end_time = wait_num(scheduler_output, info->num_txns);
+        timespec diff = diff_time(start_time, end_time);
+        print_timespec(diff, std::cout);
     }
     exit(0);
 }

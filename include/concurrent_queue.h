@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <iostream>
 #include <cassert>
+#include <cstring>
 
 #include "util.h"
 #include "machine.h"
@@ -47,7 +48,7 @@ class SimpleQueue {
         m_values = values;
         m_size = (uint64_t)size;
         m_head = 0;
-        m_tail = 0;
+        m_tail = 0;        
     }
     
     bool isEmpty() {

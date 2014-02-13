@@ -87,6 +87,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     xchgq(&(sched->m_start_flag), 1);
     
     SimpleQueue* incoming_txns = sched->m_log_input;
+    SimpleQueue* outgoing_txns = sched->m_log_output;
     Action* action = NULL;
     if (!sched->m_serial) {
         while (true) {      
@@ -100,18 +101,15 @@ void* LazyScheduler::schedulerFunction(void* arg) {
         }
     }
     else {
+        uint64_t i = 0;
         while (true) {
-            Action *to_process;
-            if (incoming_txns->Dequeue((uint64_t*)&to_process)) {
-                to_process->NowPhase();
-                to_process->LaterPhase();            
-            }
-            else {
-                cout << "DONE PROCESSING!\n";
-                break;
-            }
+            cout << "LazyScheduler ==> " << i << "\n";
+            ++i;
+            Action *to_process = (Action*)incoming_txns->DequeueBlocking();
+            to_process->NowPhase();
+            to_process->LaterPhase();
+            outgoing_txns->EnqueueBlocking((uint64_t)to_process);
         }
-        exit(0);
     }
  
     return NULL;
