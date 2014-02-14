@@ -14,7 +14,14 @@
 
 using namespace std;
 
-tpcc::TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
+Warehouse 						*s_warehouse_tbl;
+Item 							*s_item_tbl;
+ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
+ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
+ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
+uint32_t s_num_items;  
+
+TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
                          uint32_t cust_per_dist, uint32_t item_count) {
     m_num_warehouses = num_warehouses;
     m_dist_per_wh = dist_per_wh;
@@ -23,7 +30,7 @@ tpcc::TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh,
 }
 
 void
-tpcc::TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
+TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
     char base = 'a', max = 'z';
     int char_range = max - base + 1;
 
@@ -39,7 +46,7 @@ tpcc::TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
 }
 
 void
-tpcc::TPCCInit::init_warehouse(Warehouse *warehouse) {
+TPCCInit::init_warehouse(Warehouse *warehouse) {
     for (uint32_t i = 0; i < m_num_warehouses; ++i) {
         warehouse[i].w_id = i;
         warehouse[i].w_ytd = 30000.0;
@@ -61,7 +68,7 @@ tpcc::TPCCInit::init_warehouse(Warehouse *warehouse) {
 
 // Initialize the district table of one particular warehouse. 
 void
-tpcc::TPCCInit::init_district(District *district, uint32_t warehouse_id) {
+TPCCInit::init_district(District *district, uint32_t warehouse_id) {
     for (uint32_t i = 0; i < m_dist_per_wh; ++i) {
         district[i].d_id = i;
         district[i].d_w_id = warehouse_id;
@@ -82,7 +89,7 @@ tpcc::TPCCInit::init_district(District *district, uint32_t warehouse_id) {
 }
 
 void
-tpcc::TPCCInit::init_customer(Customer *customer, uint32_t d_id, 
+TPCCInit::init_customer(Customer *customer, uint32_t d_id, 
                               uint32_t w_id) {
     for (uint32_t i = 0; i < m_cust_per_dist; ++i) {
         customer[i].c_id = i;
@@ -132,12 +139,12 @@ tpcc::TPCCInit::init_customer(Customer *customer, uint32_t d_id,
 }
 
 void
-tpcc::TPCCInit::init_history(History *history) {
+TPCCInit::init_history(History *history) {
 
 }
 
 void
-tpcc::TPCCInit::init_order() {
+TPCCInit::init_order() {
     Oorder oorder;
     NewOrder new_order;
     OrderLine order_line;
@@ -240,7 +247,7 @@ tpcc::TPCCInit::init_order() {
 }
 
 void
-tpcc::TPCCInit::init_item(Item *item) {
+TPCCInit::init_item(Item *item) {
     for (uint32_t i = 0; i < m_item_count; ++i) {
         item[i].i_id = i;
         gen_random_string(14, 24, item[i].i_name);
@@ -267,7 +274,7 @@ tpcc::TPCCInit::init_item(Item *item) {
 }
 
 void
-tpcc::TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
+TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
     Stock container;
     int randPct;
     int len;
@@ -314,8 +321,9 @@ tpcc::TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
 }
 
 void
-tpcc::TPCCInit::do_init() {
+TPCCInit::do_init() {
     
+    s_num_items = m_item_count;
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<20, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<20, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<23, 20);
@@ -387,7 +395,7 @@ tpcc::TPCCInit::do_init() {
  * Write set: 	District key 
  *				Stock key (for each item)
  */
-tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
+NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
                                uint64_t o_all_local, uint64_t numItems, 
                                uint64_t *itemIds, 
                                uint64_t *supplierWarehouseIDs, 
@@ -405,8 +413,8 @@ tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     keys[1] = d_id;
     keys[2] = c_id;
     uint64_t warehouse_key = w_id;
-    uint64_t customer_key = tpcc::TPCCKeyGen::create_customer_key(keys);
-    uint64_t district_key = tpcc::TPCCKeyGen::create_district_key(keys);
+    uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
   
     // Insert the customer key in the read set. 
     dep_info.record.m_table = CUSTOMER;
@@ -428,11 +436,13 @@ tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
 
         // Create the item and stock keys. 
         uint64_t item_key = itemIds[i];
+        assert(itemIds[i] == invalid_item_key || itemIds[i] < s_num_items);
         keys[0] = supplierWarehouseIDs[i];
         keys[1] = itemIds[i];
-        uint64_t stock_key = tpcc::TPCCKeyGen::create_stock_key(keys);
+        uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
 
         // Insert the item key into the read set. 
+        assert(item_key == invalid_item_key || item_key < s_num_items);
         dep_info.record.m_key = item_key;
         dep_info.record.m_table = ITEM;
         readset.push_back(dep_info);
@@ -448,7 +458,7 @@ tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
 }
 
 bool
-tpcc::NewOrderTxn::NowPhase() {
+NewOrderTxn::NowPhase() {
     CompositeKey composite;
 
     // A NewOrder txn aborts if any of the item keys are invalid. 
@@ -467,8 +477,8 @@ tpcc::NewOrderTxn::NowPhase() {
     // We are guaranteed not to abort once we're here. Increment the highly 
     // contended next_order_id in the district table.
     composite = writeset[s_district_index].record;
-    uint64_t district_key = tpcc::TPCCKeyGen::get_district_key(composite.m_key);
-    uint64_t warehouse_key = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
+    uint64_t district_key = TPCCKeyGen::get_district_key(composite.m_key);
+    uint64_t warehouse_key = TPCCKeyGen::get_warehouse_key(composite.m_key);
     District *district_tbl = s_warehouse_tbl[warehouse_key].w_district_table;
     District *district = &district_tbl[district_key];
   
@@ -480,7 +490,7 @@ tpcc::NewOrderTxn::NowPhase() {
 }
 
 void
-tpcc::NewOrderTxn::LaterPhase() {
+NewOrderTxn::LaterPhase() {
     float total_amount = 0;
     CompositeKey composite;
     uint32_t keys[5];
@@ -489,9 +499,9 @@ tpcc::NewOrderTxn::LaterPhase() {
     // Read the customer record.
     composite = readset[s_customer_index].record;
     assert(composite.m_table == CUSTOMER);
-    uint64_t w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
-    uint64_t d_id = tpcc::TPCCKeyGen::get_district_key(composite.m_key);
-    uint64_t c_id = tpcc::TPCCKeyGen::get_customer_key(composite.m_key);
+    uint64_t w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
+    uint64_t d_id = TPCCKeyGen::get_district_key(composite.m_key);
+    uint64_t c_id = TPCCKeyGen::get_customer_key(composite.m_key);
   
     Customer *customer = 
         &(s_warehouse_tbl[w_id].w_district_table[d_id].d_customer_table[c_id]);
@@ -518,17 +528,20 @@ tpcc::NewOrderTxn::LaterPhase() {
     // Generate the NewOrder key and insert the record.
     // XXX: This insertion has to be concurrent. Therefore, use a hash-table to 
     // implement it. 
-    uint64_t no_id = tpcc::TPCCKeyGen::create_new_order_key(keys);
+    uint64_t no_id = TPCCKeyGen::create_new_order_key(keys);
     s_new_order_tbl->Put(no_id, new_order_record);
   
     for (int i = 0; i < m_num_items; ++i) {
-        composite = writeset[1+i].record;
+        composite = writeset[s_stock_index+i].record;
         assert(composite.m_table == STOCK);
-        uint64_t ol_s_id = tpcc::TPCCKeyGen::get_stock_key(composite.m_key);
-        uint64_t ol_w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
+        uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
+        uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
         uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
+        assert(ol_i_id == ol_s_id);
         assert(readset[s_item_index+i].record.m_table == ITEM);
         int ol_quantity = m_order_quantities[i];
+
+        assert(ol_i_id < s_num_items);
     
         // Get the item and the stock records. 
         Item *item = &s_item_tbl[ol_i_id];
@@ -604,7 +617,7 @@ tpcc::NewOrderTxn::LaterPhase() {
         keys[1] = d_id;
         keys[2] = m_order_id;
         keys[3] = i;
-        uint64_t order_line_key = tpcc::TPCCKeyGen::create_order_line_key(keys);
+        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
 
         // XXX: Make sure that the put operation is implemented on top of a 
         // concurrent hash table. 
@@ -621,7 +634,7 @@ vv * Read set: 	District key
  *				Orderline key + Stock key (20 records)
  */
 /*
-  tpcc::StockLevelTxn::StockLevelTxn(int w_id, int d_id, int threshold) {
+  StockLevelTxn::StockLevelTxn(int w_id, int d_id, int threshold) {
   ostringsrream os;
   os << w_id << "###" << d_id;
   string district_key = os.str();
@@ -631,12 +644,12 @@ vv * Read set: 	District key
   }
 
   bool
-  tpcc::StockLevelTxn::NowPhase() {
+  StockLevelTxn::NowPhase() {
   return false;
   }
 
   void
-  tpcc::StockLevelTxn::LaterPhase() {
+  StockLevelTxn::LaterPhase() {
   
   }
 */

@@ -325,7 +325,7 @@ initialize(ExperimentInfo* info,
         cout << "Num customers: " << info->customers << "\n";
         cout << "Num items: " << info->items << "\n";
         
-        tpcc::TPCCInit tpcc_initializer(info->warehouses, info->districts, 
+        TPCCInit tpcc_initializer(info->warehouses, info->districts, 
                                         info->customers, info->items);
         tpcc_initializer.do_init();
         gen = new TPCCGenerator(info->warehouses, info->districts, 
