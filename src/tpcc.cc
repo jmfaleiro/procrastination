@@ -537,8 +537,14 @@ NewOrderTxn::LaterPhase() {
         uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
         uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
         uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
-        assert(ol_i_id == ol_s_id);
         assert(readset[s_item_index+i].record.m_table == ITEM);
+        
+        if (ol_s_id != ol_i_id) {
+            cout << "Stock item: " << ol_s_id;
+            cout << "Item: " << ol_i_id << "\n";
+        }
+        assert(ol_i_id == ol_s_id);
+
         int ol_quantity = m_order_quantities[i];
 
         assert(ol_i_id < s_num_items);

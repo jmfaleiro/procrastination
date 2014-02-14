@@ -103,8 +103,9 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     else {
         while (true) {
             Action *to_process = (Action*)incoming_txns->DequeueBlocking();
-            to_process->NowPhase();
-            to_process->LaterPhase();
+            if (to_process->NowPhase()) {
+                to_process->LaterPhase();
+            }
             outgoing_txns->EnqueueBlocking((uint64_t)to_process);
         }
     }
