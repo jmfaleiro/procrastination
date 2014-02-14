@@ -270,7 +270,7 @@ private:
     uint32_t m_cust_per_dist;
     uint32_t m_item_count;
         
-    uint32_t s_first_unprocessed_o_id;
+    static const uint32_t s_first_unprocessed_o_id = 2001;
     // Generate a random string of specified length (all chars are assumed 
     // to be lower case).
     void gen_random_string(int min_len, int max_len, char *val);

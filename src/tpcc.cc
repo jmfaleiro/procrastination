@@ -324,9 +324,14 @@ void
 TPCCInit::do_init() {
     
     s_num_items = m_item_count;
-    s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<20, 20);
-    s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<20, 20);
-    s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<23, 20);
+    s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
+    s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
+    s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
+
+    NewOrder blah;
+    for (uint64_t i = 0; i < 10000000; ++i) {
+        s_new_order_tbl->Put(0, blah);
+    }
 
     cout << "Num warehouses: " << m_num_warehouses << "\n";
     cout << "Num districts: " << m_dist_per_wh << "\n";
@@ -486,6 +491,9 @@ NewOrderTxn::NowPhase() {
     m_order_id = district->d_next_o_id;
     m_district_tax = district->d_tax;
     district->d_next_o_id += 1;
+    
+    NewOrder blah;
+    s_new_order_tbl->Put(0, blah);
     return true;		// The txn can be considered committed. 
 }
 
@@ -518,9 +526,10 @@ NewOrderTxn::LaterPhase() {
     // XXX: This is a potentially serializing call to malloc. Make sure to link
     // TCMalloc so that allocations can be (mostly) thread-local. 
     NewOrder new_order_record;
-    new_order_record.no_w_id = w_id;
-    new_order_record.no_d_id = d_id;
-    new_order_record.no_o_id = m_order_id;
+
+    //    new_order_record.no_w_id = w_id;
+    //    new_order_record.no_d_id = d_id;
+    //    new_order_record.no_o_id = m_order_id;
     keys[0] = w_id;
     keys[1] = d_id;
     keys[2] = m_order_id;
@@ -529,7 +538,7 @@ NewOrderTxn::LaterPhase() {
     // XXX: This insertion has to be concurrent. Therefore, use a hash-table to 
     // implement it. 
     uint64_t no_id = TPCCKeyGen::create_new_order_key(keys);
-    s_new_order_tbl->Put(no_id, new_order_record);
+    //    s_new_order_tbl->Put(m_order_id, new_order_record);
   
     for (int i = 0; i < m_num_items; ++i) {
         composite = writeset[s_stock_index+i].record;
@@ -566,7 +575,7 @@ NewOrderTxn::LaterPhase() {
         stock->s_ytd += ol_quantity;
         total_amount += ol_quantity * (item->i_price);
     
-        char *ol_dist_info;
+        char *ol_dist_info = NULL;
         switch (d_id) {
         case 0:
             ol_dist_info = stock->s_dist_01;
