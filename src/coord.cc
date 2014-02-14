@@ -11,7 +11,7 @@
 #include "shopping_cart.h"
 #include <tpcc_generator.hh>
 
-#include <tpcc.h>
+#include <tpcc.hh>
 
 
 #include <numa.h>

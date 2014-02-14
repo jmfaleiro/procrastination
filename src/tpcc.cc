@@ -1,7 +1,7 @@
 // Author: Jose M. Faleiro (faleiro.jose.manuel@gmail.com)
 // Adapted from oltpbench (git@github.com:oltpbenchmark/oltpbench.git)
 
-#include <tpcc.h>
+#include <tpcc.hh>
 #include <cassert>
 #include <string>
 #include <sstream>
@@ -10,6 +10,7 @@
 #include <random>
 #include <time.h>
 #include <string.h>
+#include <iomanip>
 
 using namespace std;
 
@@ -443,6 +444,7 @@ tpcc::NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     }
     m_order_quantities = orderQuantities;
     m_supplierWarehouse_ids = supplierWarehouseIDs;
+    m_num_items = numItems;
 }
 
 bool
@@ -455,6 +457,7 @@ tpcc::NewOrderTxn::NowPhase() {
 
         // Make sure that all the items requested exist. 
         composite = readset[i].record;
+        assert(composite.m_table == ITEM);
         uint64_t item_key = composite.m_key;
         if (item_key == invalid_item_key) {
             return false;	// Abort the txn. 
@@ -485,6 +488,7 @@ tpcc::NewOrderTxn::LaterPhase() {
     
     // Read the customer record.
     composite = readset[s_customer_index].record;
+    assert(composite.m_table == CUSTOMER);
     uint64_t w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
     uint64_t d_id = tpcc::TPCCKeyGen::get_district_key(composite.m_key);
     uint64_t c_id = tpcc::TPCCKeyGen::get_customer_key(composite.m_key);
@@ -518,10 +522,12 @@ tpcc::NewOrderTxn::LaterPhase() {
     s_new_order_tbl->Put(no_id, new_order_record);
   
     for (int i = 0; i < m_num_items; ++i) {
-        composite = writeset[s_stock_index+i].record;
+        composite = writeset[1+i].record;
+        assert(composite.m_table == STOCK);
         uint64_t ol_s_id = tpcc::TPCCKeyGen::get_stock_key(composite.m_key);
         uint64_t ol_w_id = tpcc::TPCCKeyGen::get_warehouse_key(composite.m_key);
         uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
+        assert(readset[s_item_index+i].record.m_table == ITEM);
         int ol_quantity = m_order_quantities[i];
     
         // Get the item and the stock records. 
@@ -611,7 +617,7 @@ tpcc::NewOrderTxn::LaterPhase() {
  * Read the Stock table 			<s_w_id, s_i_id>
  * Read the Orderline table 		<ol_w_id, ol_d_id, ol_o_id, ol_number>
  *
- * Read set: 	District key
+vv * Read set: 	District key
  *				Orderline key + Stock key (20 records)
  */
 /*

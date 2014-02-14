@@ -3,7 +3,6 @@
 #ifndef HASH_TABLE_HH_
 #define HASH_TABLE_HH_
 
-#define NDEBUG
 #define POWER_TWO(x) ((x) & ((x) - 1) == 0)
 
 #include <cassert>

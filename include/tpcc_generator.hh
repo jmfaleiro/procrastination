@@ -2,7 +2,8 @@
 #define TPCC_GENERATOR_HH_
 
 #include <workload_generator.h>
-#include <tpcc.h>
+#include <tpcc.hh>
+#include <iostream>
 
 class TPCCGenerator : public WorkloadGenerator {
 private:
@@ -49,12 +50,18 @@ public:
         // 1% of NewOrder transactions should abort.
         if (rand() % 100 == 1) {
             item_ids[num_items-1] = tpcc::NewOrderTxn::invalid_item_key;
-        }        
+        }
         tpcc::NewOrderTxn *ret = new tpcc::NewOrderTxn(w_id, d_id, c_id, 
                                                        all_local, num_items, 
                                                        item_ids, 
                                                        supplier_wh_ids, 
                                                        quantities);
+        assert(ret->writeset.size() == num_items+1);
+        assert(ret->readset.size() == num_items+2);
+        for (uint32_t i = 1; i < num_items+1; ++i) {
+            assert(ret->writeset[i].record.m_table == tpcc::STOCK);
+        }
+        
         ret->materialize = true;
         return ret;
     }    
