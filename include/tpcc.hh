@@ -308,6 +308,7 @@ private:
     static const uint32_t s_stock_index = 1;
 
     // Fields 
+    uint32_t m_all_local;
     int m_order_id;
     int m_district_id;
     int m_warehouse_id;
@@ -315,6 +316,7 @@ private:
     uint32_t *m_order_quantities;
     uint64_t *m_supplierWarehouse_ids;
     int m_num_items;
+    long m_timestamp;
 
 public:
     NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
@@ -326,5 +328,17 @@ public:
     static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
 };
 
+/*
+class PaymentTxn : public Action {
+    
+
+public:
+    PaymentTxn(uint64_t w_id, uint64_t c_w_id, float h_amount, int d_id, 
+               int c_d_id, int c_id, String c_last, bool c_by_name);
+    
+    bool NowPhase();
+    void LaterPhase();
+};
+*/
 
 #endif // TPCC_H_

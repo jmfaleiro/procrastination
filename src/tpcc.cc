@@ -401,10 +401,10 @@ TPCCInit::do_init() {
  *				Stock key (for each item)
  */
 NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
-                               uint64_t o_all_local, uint64_t numItems, 
-                               uint64_t *itemIds, 
-                               uint64_t *supplierWarehouseIDs, 
-                               uint32_t *orderQuantities) {
+                         uint64_t o_all_local, uint64_t numItems, 
+                         uint64_t *itemIds, 
+                         uint64_t *supplierWarehouseIDs, 
+                         uint32_t *orderQuantities) {
     uint32_t keys[10];
     struct DependencyInfo dep_info;
     dep_info.dependency = NULL;
@@ -460,6 +460,7 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     m_order_quantities = orderQuantities;
     m_supplierWarehouse_ids = supplierWarehouseIDs;
     m_num_items = numItems;
+    m_all_local = (int)o_all_local;
 }
 
 bool
@@ -494,6 +495,7 @@ NewOrderTxn::NowPhase() {
     
     NewOrder blah;
     s_new_order_tbl->Put(0, blah);
+    m_timestamp = time(NULL);
     return true;		// The txn can be considered committed. 
 }
 
@@ -638,7 +640,58 @@ NewOrderTxn::LaterPhase() {
         // concurrent hash table. 
         s_order_line_tbl->Put(order_line_key, new_order_line);
     }
+
+    // Insert an entry into the open order table.
+    /*
+    Oorder oorder;
+    oorder.o_id = m_order_id;
+    oorder.d_id = d_id;
+    oorder.w_id = w_id;
+    oorder.c_id = c_id;
+    oorder.o_entry_d = m_timestamp;
+    oorder.o_ol_cnt = m_num_items;
+    oorder.o_all_local = m_all_local;
+    */
 }
+/*
+PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
+                       int c_d_id, int c_id, char *c_last, bool c_by_name) {
+      uint32_t keys[10];
+      struct DependencyInfo dep_info;
+      dep_info.dependency = NULL;
+      dep_info.is_write = false;
+      dep_info.index = -1;
+
+      uint64_t table_id;
+
+      // Create the warehouse, and district keys. Add them to the write set.
+      keys[0] = w_id;
+      keys[1] = d_id;
+      uint64_t warehouse_key = w_id;
+      uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+    
+      dep_info.record.m_table = WAREHOUSE;
+      dep_info.record.m_key = warehouse_key;
+      writeset.push_back(dep_info);
+
+      dep_info.record.m_table = DISTRICT;
+      dep_info.record.m_key = district_key;
+      writeset.push_back(dep_info);
+
+      
+}    
+
+
+bool
+PaymentTxn::NowPhase() {
+    return false;
+}
+
+void
+PaymentTxn::LaterPhase() {
+
+}
+*/
 
 
 /* Read the district table 			<w_id, d_id> 
