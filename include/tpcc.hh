@@ -12,7 +12,7 @@
 #include <concurrent_hash_table.hh>
 #include <keys.h>
 #include <action.h>
-
+#include <ext/vstring.h>
 
 
 enum TPCCTable {
@@ -138,22 +138,22 @@ typedef struct {
     int c_w_id;
     int c_payment_cnt;
     int c_delivery_cnt;
-    char c_since[25];
+    std::string c_since;
     float c_discount;
     float c_credit_lim;
     float c_balance;
     float c_ytd_payment;
-    char c_credit[25];
-    char c_last[25];
-    char c_first[25];
-    char c_street_1[25];
-    char c_street_2[25];
-    char c_city[25];
-    char c_state[5];
-    char c_zip[10];
-    char c_phone[20];
-    char c_middle[5];
-    char c_data[501];  
+    std::string c_credit;
+    std::string c_last;
+    std::string c_first;
+    std::string c_street_1;
+    std::string c_street_2;
+    std::string c_city;
+    std::string c_state;
+    std::string c_zip;
+    std::string c_phone;
+    std::string c_middle;
+    std::string c_data;
 } Customer;
 
 typedef struct {
@@ -162,12 +162,12 @@ typedef struct {
     int d_next_o_id;
     float d_ytd;
     float d_tax;
-    char d_name[12];
-    char d_street_1[25];
-    char d_street_2[25];
-    char d_city[25];
-    char d_state[5];
-    char d_zip[10];
+    std::string d_name;
+    std::string d_street_1;
+    std::string d_street_2;
+    std::string d_city;
+    std::string d_state;
+    std::string d_zip;
     Customer* d_customer_table;
 } District __attribute((aligned(CACHE_LINE)));
 
@@ -186,8 +186,8 @@ typedef struct {
     int i_id; // PRIMARY KEY
     int i_im_id;
     float i_price;
-    char i_name[25];
-    char i_data[55];
+    std::string i_name;
+    std::string i_data;
 } Item;
 
 typedef struct {
@@ -217,7 +217,7 @@ typedef struct {
     uint32_t ol_quantity;
     long ol_delivery_d;
     float ol_amount;
-    char ol_dist_info[25];
+    std::string ol_dist_info;
 } OrderLine;
 
 typedef struct {
@@ -227,29 +227,29 @@ typedef struct {
     int s_remote_cnt;
     int s_quantity;
     float s_ytd;
-    char s_data[51];
-    char s_dist_01[25];
-    char s_dist_02[25];
-    char s_dist_03[25];
-    char s_dist_04[25];
-    char s_dist_05[25];
-    char s_dist_06[25];
-    char s_dist_07[25];
-    char s_dist_08[25];
-    char s_dist_09[25];
-    char s_dist_10[25];
+    std::string s_data;
+    std::string s_dist_01;
+    std::string s_dist_02;
+    std::string s_dist_03;
+    std::string s_dist_04;    
+    std::string s_dist_05;
+    std::string s_dist_06;
+    std::string s_dist_07;
+    std::string s_dist_08;
+    std::string s_dist_09;
+    std::string s_dist_10;
 } Stock __attribute__((aligned(CACHE_LINE)));
 
 typedef struct {
     int w_id; // PRIMARY KEY
     float w_ytd;
     float w_tax;
-    char w_name[11];
-    char w_street_1[25];
-    char w_street_2[25];
-    char w_city[25];
-    char w_state[4];
-    char w_zip[10];
+    std::string w_name;
+    std::string w_street_1;
+    std::string w_street_2;
+    std::string w_city;
+    std::string w_state;
+    std::string w_zip;
     District *w_district_table;
     Stock *w_stock_table;
 } Warehouse;
@@ -257,7 +257,8 @@ typedef struct {
     
 extern Warehouse 						*s_warehouse_tbl;
 extern Item 							*s_item_tbl;
-  
+
+extern HashTable<char*, Customer*>					*s_last_name_index;   
 extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
 extern ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
@@ -273,7 +274,7 @@ private:
     static const uint32_t s_first_unprocessed_o_id = 2001;
     // Generate a random string of specified length (all chars are assumed 
     // to be lower case).
-    void gen_random_string(int min_len, int max_len, char *val);
+    void gen_random_string(int min_len, int max_len, std::string &val);
     // Each of the functions below initializes an apriori allocated single 
     // row.
     void init_warehouse(Warehouse *wh);

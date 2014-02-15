@@ -29,20 +29,27 @@ TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh,
     m_item_count = item_count;
 }
 
+static int
+rand_range(int min, int max) {
+    int range_len = max - min + 1;
+    int ret = min + (rand() % range_len);
+    assert(ret >= min && ret <= max);
+    return ret;
+}
+
 void
-TPCCInit::gen_random_string(int min_len, int max_len, char *val) {
+TPCCInit::gen_random_string(int min_len, int max_len, std::string &val) {
     char base = 'a', max = 'z';
     int char_range = max - base + 1;
 
     // Decide on the length of the string. 
-    int len_range = max_len - min_len + 1;
-    int length = min_len + (rand() % len_range);
+    int length = rand_range(min_len, max_len);
     
     // Insert a random character into the output array. 
     for (int i = 0; i < length; ++i) {
-        val[i] = base + (rand() % char_range);
+        int to_add = rand_range((int)base, (int)max);
+        val += (char)to_add;
     }
-    val[length] = '\0';
 }
 
 void
@@ -59,8 +66,8 @@ TPCCInit::init_warehouse(Warehouse *warehouse) {
         gen_random_string(10, 20, warehouse[i].w_city);
         gen_random_string(3, 3, warehouse[i].w_state);
         
-        char stupid_zip[] = {'1','2','3','4','5','6','7','8','9','\0'};
-        strcpy(warehouse[i].w_zip, stupid_zip);
+        string stupid_zip = "123456789";
+        warehouse[i].w_zip = string(stupid_zip.data(), stupid_zip.length());
         warehouse[i].w_district_table = NULL;
         warehouse[i].w_stock_table = NULL;
     }
@@ -82,8 +89,9 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id) {
         gen_random_string(10, 20, district[i].d_city);
         gen_random_string(3, 3, district[i].d_state);
         
-        char contiguous_zip[] = {'1','2','3','4','5','6','7','8','9','\0'};
-        strcpy(district[i].d_zip, contiguous_zip);
+        string contiguous_zip = "123456789";
+        district[i].d_zip = string(contiguous_zip.data(), 
+                                   contiguous_zip.length());
         district[i].d_customer_table = NULL;
     }
 }
@@ -253,13 +261,13 @@ TPCCInit::init_item(Item *item) {
         gen_random_string(14, 24, item[i].i_name);
         item[i].i_price = (100 + (rand() % 9900)) / 100.0;
         int rand_pct = rand() % 100;
-        int len = 26 + rand() % (50 - 26 + 1);
+        int len = rand_range(26, 50);
         gen_random_string(len, len, item[i].i_data);
         if (rand_pct <= 10) {
 
             // 10% of the time i_data has "ORIGINAL" crammed somewhere in the
             // middle. 
-            int original_start = 2 + rand() % (len - 8 - 2);
+            int original_start = rand_range(2, len-8);
             item[i].i_data[original_start] = 'O';
             item[i].i_data[original_start+1] = 'R';
             item[i].i_data[original_start+2] = 'I';
@@ -289,14 +297,13 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
 
         // s_data
         randPct = rand() % 100;
-        len = 26 + (rand() % 25);
-        assert(len >= 26 && len <= 50);
+        len = rand_range(26, 50);
         gen_random_string(len, len, container.s_data);
         if (randPct <= 10) {
             
             // 10% of the time, i_data has the string "ORIGINAL" crammed 
             // somewhere in the middle.
-            start_original = 2 + (rand()%(len-10));
+            start_original = rand_range(2, len - 8);
             container.s_data[start_original] = 'O';
             container.s_data[start_original+1] = 'R';
             container.s_data[start_original+2] = 'I';
@@ -327,6 +334,8 @@ TPCCInit::do_init() {
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
+    //    s_last_name_index = new HashTable<char*, Customer*>(
+
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {
@@ -516,7 +525,6 @@ NewOrderTxn::LaterPhase() {
     Customer *customer = 
         &(s_warehouse_tbl[w_id].w_district_table[d_id].d_customer_table[c_id]);
 
-    char* c_last = customer->c_last;
     float c_discount = customer->c_discount;
     string c_credit = customer->c_credit;
 
@@ -577,37 +585,37 @@ NewOrderTxn::LaterPhase() {
         stock->s_ytd += ol_quantity;
         total_amount += ol_quantity * (item->i_price);
     
-        char *ol_dist_info = NULL;
+        string *ol_dist_info = NULL;
         switch (d_id) {
         case 0:
-            ol_dist_info = stock->s_dist_01;
+            ol_dist_info = &stock->s_dist_01;
             break;
         case 1:
-            ol_dist_info = stock->s_dist_02;
+            ol_dist_info = &stock->s_dist_02;
             break;
         case 2:
-            ol_dist_info = stock->s_dist_03;
+            ol_dist_info = &stock->s_dist_03;
             break;
         case 3:
-            ol_dist_info = stock->s_dist_04;
+            ol_dist_info = &stock->s_dist_04;
             break;
         case 4:
-            ol_dist_info = stock->s_dist_05;
+            ol_dist_info = &stock->s_dist_05;
             break;
         case 5:
-            ol_dist_info = stock->s_dist_06;
+            ol_dist_info = &stock->s_dist_06;
             break;
         case 6:
-            ol_dist_info = stock->s_dist_07;
+            ol_dist_info = &stock->s_dist_07;
             break;
         case 7:
-            ol_dist_info = stock->s_dist_08;
+            ol_dist_info = &stock->s_dist_08;
             break;
         case 8:
-            ol_dist_info = stock->s_dist_09;
+            ol_dist_info = &stock->s_dist_09;
             break;
         case 9:
-            ol_dist_info = stock->s_dist_10;
+            ol_dist_info = &stock->s_dist_10;
             break;
         default:
             std::cout << "Got unexpected district!!! Aborting...\n";
@@ -628,7 +636,11 @@ NewOrderTxn::LaterPhase() {
         new_order_line.ol_supply_w_id = ol_w_id;
         new_order_line.ol_quantity = m_order_quantities[i];
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
-        strcpy(new_order_line.ol_dist_info, ol_dist_info);
+        new_order_line.ol_dist_info = 
+            string(ol_dist_info->data(), ol_dist_info->length());
+        
+        // Be sure to avoid COW nonsense.
+        assert(new_order_line.ol_dist_info.c_str() != ol_dist_info->c_str());
     
         keys[0] = w_id;
         keys[1] = d_id;
@@ -641,18 +653,17 @@ NewOrderTxn::LaterPhase() {
         s_order_line_tbl->Put(order_line_key, new_order_line);
     }
 
-    // Insert an entry into the open order table.
-    /*
+    // Insert an entry into the open order table.    
     Oorder oorder;
     oorder.o_id = m_order_id;
-    oorder.d_id = d_id;
-    oorder.w_id = w_id;
-    oorder.c_id = c_id;
+    oorder.o_d_id = d_id;
+    oorder.o_w_id = w_id;
+    oorder.o_c_id = c_id;
     oorder.o_entry_d = m_timestamp;
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
-    */
 }
+
 /*
 PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
                        int c_d_id, int c_id, char *c_last, bool c_by_name) {
