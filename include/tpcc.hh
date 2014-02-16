@@ -28,6 +28,74 @@ enum TPCCTable {
     STOCK,    
 };
 
+class RandomGenerator {
+private:
+    static const int OL_I_ID_C = 7911; // in range [0, 8191]
+    static const int C_ID_C = 259; // in range [0, 1023]
+	// NOTE: TPC-C 2.1.6.1 specifies that abs(C_LAST_LOAD_C - C_LAST_RUN_C) must
+	// be within [65, 119]
+    static const int C_LAST_LOAD_C = 157; // in range [0, 255]
+    static const int C_LAST_RUN_C = 223; // in range [0, 255]
+
+    uint32_t m_seed;
+
+    static void
+    gen_last_name(int num, char *buf) {
+        static const char *name_tokens[] = {"BAR", "OUGHT", "ABLE", "PRI", 
+                                            "PRES", "ESE", "ANTI", "CALLY", 
+                                            "ATION", "EING" };
+        static const int token_lengths[] = {3, 5, 4, 3, 4, 3, 5, 5, 4};
+
+        int indices[] = { num/100, (num/10)%10, num%10 };
+        int offset = 0;
+
+        for (uint32_t i = 0; i < sizeof(indices)/sizeof(*indices); ++i) {
+            memcpy(buf+offset, name_tokens[indices[i]], 
+                   token_lengths[indices[i]]);
+            offset += token_lengths[indices[i]];
+        }
+        buf[offset] = '\0';
+    }
+
+    int
+    gen_non_uniform_rand(int A, int C, int min, int max) {
+        int range = max - min + 1;
+        int diff = 
+            ((gen_rand_range(0, A) | gen_rand_range(min, max)) + C) % range;
+        return diff + min;            
+    }
+    
+public:
+    RandomGenerator() {
+        m_seed = time(NULL);
+    }
+
+    int
+    gen_customer_id() {
+        return gen_non_uniform_rand(1023, C_ID_C, 1, 3000);
+    }    
+
+    void
+    gen_last_name_load(char *buf) {
+        gen_last_name(gen_non_uniform_rand(255, C_LAST_LOAD_C, 0, 999), buf);
+    }
+
+    void
+    gen_last_name_run(char *buf) {
+        gen_last_name(gen_non_uniform_rand(255, C_LAST_RUN_C, 0, 999), buf);
+    }
+
+    int
+    gen_item_id() {
+        return gen_non_uniform_rand(8191, OL_I_ID_C, 1, 100000);
+    }
+        
+    int
+    gen_rand_range(int min, int max) {
+        int range = max - min + 1;
+        return min + (rand_r(&m_seed) % range);
+    }    
+};
 
 class TPCCKeyGen {
 private:
