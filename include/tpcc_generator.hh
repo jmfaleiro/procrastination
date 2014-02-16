@@ -24,6 +24,11 @@ public:
 
     Action*
     genNext() {
+        return NULL;
+    }
+    
+    NewOrderTxn*
+    gen_new_order() {
         uint64_t w_id = rand() % m_num_warehouses;
         uint64_t d_id = rand() % m_dist_per_wh;
         uint64_t c_id = rand() % m_cust_per_dist;
@@ -76,7 +81,12 @@ public:
         }
         ret->materialize = true;
         return ret;
-    }    
+    }
+    
+    PaymentTxn*
+    gen_payment() {
+        return NULL;
+    }
 };
 
 #endif // TPCC_GENERATOR_HH_

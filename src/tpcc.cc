@@ -11,12 +11,14 @@
 #include <time.h>
 #include <string.h>
 #include <iomanip>
+#include <stdlib.h>
 
 using namespace std;
 
 Warehouse 									*s_warehouse_tbl;
 Item 										*s_item_tbl;
 StringTable<Customer*> 						*s_last_name_index;
+ConcurrentHashTable<uint64_t, History>		*s_history_tbl;
 ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
 ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
@@ -39,7 +41,7 @@ rand_range(int min, int max) {
 }
 
 void
-TPCCInit::init_warehouse(Warehouse *warehouse, RandomGenerator &random) {
+TPCCInit::init_warehouse(Warehouse *warehouse, TPCCUtil &random) {
     for (uint32_t i = 0; i < m_num_warehouses; ++i) {
         warehouse[i].w_id = i;
         warehouse[i].w_ytd = 30000.0;
@@ -63,7 +65,7 @@ TPCCInit::init_warehouse(Warehouse *warehouse, RandomGenerator &random) {
 // Initialize the district table of one particular warehouse. 
 void
 TPCCInit::init_district(District *district, uint32_t warehouse_id, 
-                        RandomGenerator &random) {
+                        TPCCUtil &random) {
     for (uint32_t i = 0; i < m_dist_per_wh; ++i) {
         district[i].d_id = i;
         district[i].d_w_id = warehouse_id;
@@ -85,7 +87,7 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id,
 
 void
 TPCCInit::init_customer(Customer *customer, uint32_t d_id, 
-                        uint32_t w_id, RandomGenerator &random) {
+                        uint32_t w_id, TPCCUtil &random) {
     for (uint32_t i = 0; i < m_cust_per_dist; ++i) {
         customer[i].c_id = i;
         customer[i].c_d_id = d_id;
@@ -135,12 +137,12 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
 }
 
 void
-TPCCInit::init_history(History *history, RandomGenerator &random) {
+TPCCInit::init_history(History *history, TPCCUtil &random) {
 
 }
 
 void
-TPCCInit::init_order(RandomGenerator &random) {
+TPCCInit::init_order(TPCCUtil &random) {
     Oorder oorder;
     NewOrder new_order;
     OrderLine order_line;
@@ -243,7 +245,7 @@ TPCCInit::init_order(RandomGenerator &random) {
 }
 
 void
-TPCCInit::init_item(Item *item, RandomGenerator &random) {
+TPCCInit::init_item(Item *item, TPCCUtil &random) {
     for (uint32_t i = 0; i < m_item_count; ++i) {
         item[i].i_id = i;
         random.gen_rand_string(14, 24, item[i].i_name);
@@ -272,7 +274,7 @@ TPCCInit::init_item(Item *item, RandomGenerator &random) {
 
 void
 TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id, 
-                     RandomGenerator &random) {
+                     TPCCUtil &random) {
     Stock container;
     int randPct;
     int len;
@@ -321,7 +323,7 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id,
 void
 TPCCInit::do_init() {
     
-    RandomGenerator random;
+    TPCCUtil random;
     s_num_items = m_item_count;
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
@@ -652,7 +654,6 @@ NewOrderTxn::LaterPhase() {
     */
 }
 
-/*
 PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
                        int c_d_id, int c_id, char *c_last, bool c_by_name) {
       uint32_t keys[10];
@@ -668,6 +669,11 @@ PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
       keys[1] = d_id;
       uint64_t warehouse_key = w_id;
       uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+
+      keys[0] = c_w_id;
+      keys[1] = c_d_id;
+      keys[2] = c_id;
+      uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
     
       dep_info.record.m_table = WAREHOUSE;
       dep_info.record.m_key = warehouse_key;
@@ -676,21 +682,94 @@ PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
       dep_info.record.m_table = DISTRICT;
       dep_info.record.m_key = district_key;
       writeset.push_back(dep_info);
-
       
-}    
+      dep_info.record.m_table = CUSTOMER;
+      dep_info.record.m_key = customer_key;
+      writeset.push_back(dep_info);
 
+      m_time = (uint32_t)time(NULL);
+      m_h_amount = h_amount;
+}    
 
 bool
 PaymentTxn::NowPhase() {
-    return false;
+    // Update the warehouse
+    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
+    uint64_t w_id = writeset[s_warehouse_index].record.m_key;
+    s_warehouse_tbl[w_id].w_ytd += m_h_amount;
+
+    // Update the district
+    assert(writeset[s_district_index].record.m_table == DISTRICT);
+    uint64_t d_id = writeset[s_district_index].record.m_key;
+    District *dist = &s_warehouse_tbl[w_id].w_district_table[d_id];
+    dist->d_ytd += m_h_amount;    
 }
 
 void
 PaymentTxn::LaterPhase() {
+    // Update the customer
+    assert(writeset[s_customer_index].record.m_table == CUSTOMER);
+    uint64_t d_id = 
+        TPCCKeyGen::get_warehouse_key(writeset[s_customer_index].record.m_key);
+    uint64_t w_id = 
+        TPCCKeyGen::get_district_key(writeset[s_customer_index].record.m_key);
+    uint64_t c_id = 
+        TPCCKeyGen::get_customer_key(writeset[s_customer_index].record.m_key);
+    
+    static const char *credit = "BC";
+    Customer *cust = 
+        &s_warehouse_tbl[w_id].w_district_table[d_id].d_customer_table[c_id];
+    if (strcmp(credit, cust->c_credit) == 0) {	// Bad credit
+        
+        static const char *space = " ";
+        char c_id_str[11];
+        sprintf(c_id_str, "%d", c_id);
+        char c_d_id_str[11]; 
+        sprintf(c_d_id_str, "%d", d_id);
+        char c_w_id_str[11];
+        sprintf(c_w_id_str, "%d", w_id);
+        char d_id_str[11]; 
+        sprintf(d_id_str, "%d", writeset[s_district_index].record.m_key);
+        char w_id_str[11];
+        sprintf(w_id_str, "%d", writeset[s_warehouse_index].record.m_key);
+        char h_amount_str[11];
+        sprintf(h_amount_str, "%d", (uint32_t)m_h_amount);
+        
+        static const char *holder[11] = {c_id_str, space, c_d_id_str, space, 
+                                         c_w_id_str, space, d_id_str, space, 
+                                         w_id_str, space, h_amount_str};
+        TPCCUtil::append_strings(cust->c_data, holder, 501, 11);
+    }
+    else {
+        cust->c_balance -= m_h_amount;
+        cust->c_ytd_payment += m_h_amount;
+        cust->c_payment_cnt += 1;
+    }
 
+    // Insert an item into the History table
+    History hist;
+    hist.h_c_id = c_id;
+    hist.h_c_d_id = d_id;
+    hist.h_c_w_id = w_id;
+    hist.h_d_id = 
+        TPCCKeyGen::get_district_key(writeset[s_district_index].record.m_key);
+    hist.h_w_id = writeset[s_warehouse_index].record.m_key;
+    hist.h_date = m_time;
+    hist.h_amount = m_h_amount;
+    
+    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
+    assert(writeset[s_district_index].record.m_table == DISTRICT);
+    uint64_t warehouse_index = writeset[s_warehouse_index].record.m_key;
+    uint64_t district_index = writeset[s_district_index].record.m_key;
+    Warehouse *wh = &s_warehouse_tbl[warehouse_index];
+    District *dist = 
+        &s_warehouse_tbl[warehouse_index].w_district_table[s_district_index];
+    
+    static const char *empty = "    ";
+    const char *holder[3] = {wh->w_name, empty, dist->d_name};
+    TPCCUtil::append_strings(hist.h_data, holder, 26, 3);
+    s_history_tbl->Put(writeset[s_customer_index].record.m_key, hist);
 }
-*/
 
 
 /* Read the district table 			<w_id, d_id> 

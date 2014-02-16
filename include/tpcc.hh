@@ -26,7 +26,7 @@ enum TPCCTable {
     STOCK,    
 };
 
-class RandomGenerator {
+class TPCCUtil {
 private:
     static const int OL_I_ID_C = 7911; // in range [0, 8191]
     static const int C_ID_C = 259; // in range [0, 1023]
@@ -64,7 +64,7 @@ private:
     }
     
 public:
-    RandomGenerator() {
+    TPCCUtil() {
         m_seed = time(NULL);
     }
 
@@ -102,6 +102,19 @@ public:
             buf[i] = (char)gen_rand_range(ch_first, ch_last);
         }
         buf[length] = '\0';        
+    }
+    
+    static void
+    append_strings(char *dest, const char **sources, int dest_len, 
+                   int num_sources) {
+        int offset = 0;
+        for (int i = 0; i < num_sources; ++i) {
+            offset += strlen(sources[i]);
+            assert(offset < dest_len);
+            strcpy(dest, sources[i]);
+            dest += offset;
+        }
+        dest[offset] = '\0';
     }
 };
 
@@ -249,14 +262,14 @@ typedef struct {
 } District __attribute((aligned(CACHE_LINE)));
 
 typedef struct {
-    int 		h_c_id;
-    int 		h_c_d_id;
-    int 		h_c_w_id;
-    int 		h_d_id;
-    int 		h_w_id;
-    char 		*h_date;
+    uint32_t	h_c_id;
+    uint32_t	h_c_d_id;
+    uint32_t	h_c_w_id;
+    uint32_t	h_d_id;
+    uint32_t	h_w_id;
+    uint32_t 	h_date;
     float 		h_amount;
-    char		*h_data;
+    char		h_data[26];
 } History;
 
 typedef struct {
@@ -335,6 +348,7 @@ typedef struct {
 extern Warehouse 									*s_warehouse_tbl;
 extern Item 										*s_item_tbl;
 extern StringTable<Customer*>						*s_last_name_index;   
+extern ConcurrentHashTable<uint64_t, History> 		*s_history_tbl;
 extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
 extern ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
@@ -351,15 +365,15 @@ private:
 
     // Each of the functions below initializes an apriori allocated single 
     // row.
-    void init_warehouse(Warehouse *wh, RandomGenerator &random);
+    void init_warehouse(Warehouse *wh, TPCCUtil &random);
     void init_district(District *district, uint32_t warehouse_id, 
-                       RandomGenerator &random);
+                       TPCCUtil &random);
     void init_customer(Customer *customer, uint32_t d_id, uint32_t w_id, 
-                       RandomGenerator &random);
-    void init_history(History *history, RandomGenerator &random);
-    void init_order(RandomGenerator &random);
-    void init_item(Item *item, RandomGenerator &random);
-    void init_stock(Stock *stock, uint32_t wh_id, RandomGenerator &random);
+                       TPCCUtil &random);
+    void init_history(History *history, TPCCUtil &random);
+    void init_order(TPCCUtil &random);
+    void init_item(Item *item, TPCCUtil &random);
+    void init_stock(Stock *stock, uint32_t wh_id, TPCCUtil &random);
 
 public:
     TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
@@ -405,17 +419,23 @@ public:
     static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
 };
 
-/*
+
 class PaymentTxn : public Action {
-    
+private:
+    static const int		s_warehouse_index = 0;
+    static const int		s_district_index = 1;
+    static const int 		s_customer_index = 2;
+
+    float m_h_amount;
+    uint32_t m_time;
 
 public:
-    PaymentTxn(uint64_t w_id, uint64_t c_w_id, float h_amount, int d_id, 
-               int c_d_id, int c_id, String c_last, bool c_by_name);
+    PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
+               int c_d_id, int c_id, char *c_last, bool c_by_name);
     
     bool NowPhase();
     void LaterPhase();
 };
-*/
+
 
 #endif // TPCC_H_
