@@ -22,7 +22,10 @@ ConcurrentHashTable<uint64_t, History>		*s_history_tbl;
 ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
 ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
-uint32_t s_num_items;  
+uint32_t 									s_num_items;  
+uint32_t 									s_num_warehouses;
+uint32_t 									s_districts_per_wh;
+uint32_t 									s_customers_per_dist;
 
 TPCCInit::TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
                          uint32_t cust_per_dist, uint32_t item_count) {
@@ -325,6 +328,10 @@ TPCCInit::do_init() {
     
     TPCCUtil random;
     s_num_items = m_item_count;
+    s_num_warehouses = m_num_warehouses;
+    s_districts_per_wh = m_dist_per_wh;
+    s_customers_per_dist = m_cust_per_dist;
+
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
@@ -722,18 +729,18 @@ PaymentTxn::LaterPhase() {
     if (strcmp(credit, cust->c_credit) == 0) {	// Bad credit
         
         static const char *space = " ";
-        char c_id_str[11];
-        sprintf(c_id_str, "%d", c_id);
-        char c_d_id_str[11]; 
-        sprintf(c_d_id_str, "%d", d_id);
-        char c_w_id_str[11];
-        sprintf(c_w_id_str, "%d", w_id);
-        char d_id_str[11]; 
-        sprintf(d_id_str, "%d", writeset[s_district_index].record.m_key);
-        char w_id_str[11];
-        sprintf(w_id_str, "%d", writeset[s_warehouse_index].record.m_key);
-        char h_amount_str[11];
-        sprintf(h_amount_str, "%d", (uint32_t)m_h_amount);
+        char c_id_str[17];
+        sprintf(c_id_str, "%lx", c_id);
+        char c_d_id_str[17]; 
+        sprintf(c_d_id_str, "%lx", d_id);
+        char c_w_id_str[17];
+        sprintf(c_w_id_str, "%lx", w_id);
+        char d_id_str[17]; 
+        sprintf(d_id_str, "%lx", writeset[s_district_index].record.m_key);
+        char w_id_str[17];
+        sprintf(w_id_str, "%lx", writeset[s_warehouse_index].record.m_key);
+        char h_amount_str[17];
+        sprintf(h_amount_str, "%lx", (uint64_t)m_h_amount);
         
         static const char *holder[11] = {c_id_str, space, c_d_id_str, space, 
                                          c_w_id_str, space, d_id_str, space, 

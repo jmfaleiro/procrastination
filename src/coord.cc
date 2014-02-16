@@ -330,8 +330,7 @@ initialize(ExperimentInfo* info,
         TPCCInit tpcc_initializer(info->warehouses, info->districts, 
                                         info->customers, info->items);
         tpcc_initializer.do_init();
-        gen = new TPCCGenerator(info->warehouses, info->districts, 
-                                info->customers, info->items);
+        gen = new TPCCGenerator();
     }
     else if (info->is_normal) {
         gen = new NormalGenerator(info->read_set_size,

@@ -7,20 +7,10 @@
 
 class TPCCGenerator : public WorkloadGenerator {
 private:
-    uint32_t m_num_warehouses;
-    uint32_t m_dist_per_wh;
-    uint32_t m_cust_per_dist;
-    uint32_t m_item_count;
-
     TPCCUtil m_util;
     
 public:
-    TPCCGenerator(uint32_t num_warehouses, uint32_t dist_per_wh, 
-                  uint32_t cust_per_dist, uint32_t item_count) {
-        m_num_warehouses = num_warehouses;
-        m_dist_per_wh = dist_per_wh;
-        m_cust_per_dist = cust_per_dist;
-        m_item_count = item_count;
+    TPCCGenerator() {
         std::cout << "Num items: " << s_num_items << "\n";
     }
 
@@ -37,9 +27,9 @@ public:
     
     NewOrderTxn*
     gen_new_order() {
-        uint64_t w_id = rand() % m_num_warehouses;
-        uint64_t d_id = rand() % m_dist_per_wh;
-        uint64_t c_id = rand() % m_cust_per_dist;
+        uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
+        uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
+        uint64_t c_id = (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1);
         
         uint32_t num_items = 5 + rand() % 11;
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
@@ -51,15 +41,16 @@ public:
         int all_local = 1;
 
 		for (uint32_t i = 0; i < num_items; i++) {
-            item_ids[i] = rand() % m_item_count;
+            item_ids[i] = (uint64_t)m_util.gen_rand_range(0, s_num_items-1);
             assert(item_ids[i] < s_num_items);
-            if (rand() % 100 > 1) {
+            int pct = m_util.gen_rand_range(0, 99);
+            if (pct > 1) {
                 supplier_wh_ids[i] = w_id;
             }
             else {
                 do {
-                    supplier_wh_ids[i] = rand() % m_num_warehouses;
-                } while (supplier_wh_ids[i] == w_id && m_num_warehouses > 1);
+                    supplier_wh_ids[i] = m_util.gen_rand_range(0, s_num_warehouses-1);
+                } while (supplier_wh_ids[i] == w_id && s_num_warehouses > 1);
                 all_local = 0;
             }
 		}
@@ -85,7 +76,7 @@ public:
         }
         for (uint32_t i = 2; i < num_items; ++i) {
             assert(ret->readset[i].record.m_table == ITEM);
-            assert(ret->readset[i].record.m_key < m_item_count);
+            assert(ret->readset[i].record.m_key < s_num_items);
         }
         ret->materialize = true;
         return ret;
@@ -94,12 +85,11 @@ public:
     PaymentTxn*
     gen_payment() {
         uint64_t warehouse_id = 
-            (uint64_t)m_util.gen_rand_range(0, m_num_warehouses-1);
+            (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
         uint64_t district_id = 
-            (uint64_t)m_util.gen_rand_range(0, m_dist_per_wh-1);
+            (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
         uint64_t customer_id = 
             (uint64_t)m_util.gen_customer_id();
-        
         int x = m_util.gen_rand_range(1, 100);
         uint64_t customer_d_id;
         uint64_t customer_w_id;
@@ -109,10 +99,10 @@ public:
             customer_w_id = warehouse_id;
         }
         else {
-            customer_d_id = (uint64_t)m_util.gen_rand_range(0, m_dist_per_wh-1);
+            customer_d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
             do {
                 customer_w_id = 
-                    (uint64_t)m_util.gen_rand_range(0, m_num_warehouses-1);
+                    (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
             } while (customer_w_id == warehouse_id);
         }
         
