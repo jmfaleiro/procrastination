@@ -11,6 +11,8 @@ private:
     uint32_t m_dist_per_wh;
     uint32_t m_cust_per_dist;
     uint32_t m_item_count;
+
+    TPCCUtil m_util;
     
 public:
     TPCCGenerator(uint32_t num_warehouses, uint32_t dist_per_wh, 
@@ -24,7 +26,13 @@ public:
 
     Action*
     genNext() {
-        return NULL;
+        int pct = m_util.gen_rand_range(1, 100);
+        if (pct <= 45) {
+            return gen_new_order();
+        }
+        else if (pct <= 100) {
+            return gen_payment();
+        }
     }
     
     NewOrderTxn*
@@ -85,7 +93,33 @@ public:
     
     PaymentTxn*
     gen_payment() {
-        return NULL;
+        uint64_t warehouse_id = 
+            (uint64_t)m_util.gen_rand_range(0, m_num_warehouses-1);
+        uint64_t district_id = 
+            (uint64_t)m_util.gen_rand_range(0, m_dist_per_wh-1);
+        uint64_t customer_id = 
+            (uint64_t)m_util.gen_customer_id();
+        
+        int x = m_util.gen_rand_range(1, 100);
+        uint64_t customer_d_id;
+        uint64_t customer_w_id;
+
+        if (x <= 85) {
+            customer_d_id = district_id;
+            customer_w_id = warehouse_id;
+        }
+        else {
+            customer_d_id = (uint64_t)m_util.gen_rand_range(0, m_dist_per_wh-1);
+            do {
+                customer_w_id = 
+                    (uint64_t)m_util.gen_rand_range(0, m_num_warehouses-1);
+            } while (customer_w_id == warehouse_id);
+        }
+        
+        float payment_amt = (float)m_util.gen_rand_range(100, 500000)/100.0;
+        return new PaymentTxn(warehouse_id, customer_w_id, payment_amt, 
+                              district_id, customer_d_id, customer_id, NULL, 
+                              false);
     }
 };
 
