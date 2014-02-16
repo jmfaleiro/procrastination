@@ -14,9 +14,10 @@
 
 using namespace std;
 
-Warehouse 						*s_warehouse_tbl;
-Item 							*s_item_tbl;
-ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
+Warehouse 									*s_warehouse_tbl;
+Item 										*s_item_tbl;
+StringTable<Customer*> 						*s_last_name_index;
+ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
 ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
 uint32_t s_num_items;  
@@ -38,18 +39,20 @@ rand_range(int min, int max) {
 }
 
 void
-TPCCInit::gen_random_string(int min_len, int max_len, std::string &val) {
+TPCCInit::gen_random_string(int min_len, int max_len, std::string *val) {
     char base = 'a', max = 'z';
     int char_range = max - base + 1;
 
     // Decide on the length of the string. 
     int length = rand_range(min_len, max_len);
+    char *data = (char*)malloc(sizeof(char)*length+1);
     
     // Insert a random character into the output array. 
     for (int i = 0; i < length; ++i) {
         int to_add = rand_range((int)base, (int)max);
-        val += (char)to_add;
+        data[i] = (char)to_add;
     }
+    data[length] = '\0';
 }
 
 void
@@ -60,6 +63,7 @@ TPCCInit::init_warehouse(Warehouse *warehouse) {
         warehouse[i].w_tax = (rand() % 2001) / 1000.0;
         
         // Generate a bunch of random strings for the string fields. 
+        /*
         gen_random_string(6, 10, warehouse[i].w_name);
         gen_random_string(10, 20, warehouse[i].w_street_1);
         gen_random_string(10, 20, warehouse[i].w_street_2);
@@ -68,8 +72,10 @@ TPCCInit::init_warehouse(Warehouse *warehouse) {
         
         string stupid_zip = "123456789";
         warehouse[i].w_zip = string(stupid_zip.data(), stupid_zip.length());
+        */
         warehouse[i].w_district_table = NULL;
         warehouse[i].w_stock_table = NULL;
+        
     }
 }
 
@@ -83,6 +89,7 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id) {
         district[i].d_tax = (rand() % 2001) / 1000.0;
         district[i].d_next_o_id = 3001;
         
+        /*
         gen_random_string(6, 10, district[i].d_name);
         gen_random_string(10, 20, district[i].d_street_1);
         gen_random_string(10, 20, district[i].d_street_2);
@@ -92,6 +99,7 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id) {
         string contiguous_zip = "123456789";
         district[i].d_zip = string(contiguous_zip.data(), 
                                    contiguous_zip.length());
+        */
         district[i].d_customer_table = NULL;
     }
 }
@@ -107,6 +115,7 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         // Discount in the range [0.0000 ... 0.5000]
         customer[i].c_discount = (rand() % 5001) / 10000.0;
         
+        /*
         if (rand() % 101 <= 10) {		// 10% Bad Credit
             customer[i].c_credit[0] = 'B';
             customer[i].c_credit[1] = 'C';
@@ -117,8 +126,8 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
             customer[i].c_credit[1] = 'C';
             customer[i].c_credit[2] = '\0';
         }        
-        
-        gen_random_string(8, 16, customer[i].c_first);
+        */
+        //        gen_random_string(8, 16, customer[i].c_first);
         
         customer[i].c_credit_lim = 50000;
         customer[i].c_balance = -10;
@@ -126,6 +135,7 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         customer[i].c_payment_cnt = 1;
         customer[i].c_delivery_cnt = 0;
 
+        /*
         gen_random_string(10, 20, customer[i].c_street_1);
         gen_random_string(10, 20, customer[i].c_street_2);
         gen_random_string(10, 20, customer[i].c_city);
@@ -142,7 +152,7 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         customer[i].c_middle[2] = '\0';
         
         gen_random_string(300, 500, customer[i].c_data);
-        
+        */
     }
 }
 
@@ -236,7 +246,7 @@ TPCCInit::init_order() {
                     }
                     order_line.ol_supply_w_id = order_line.ol_w_id;
                     order_line.ol_quantity = 5;
-                    gen_random_string(24, 24, order_line.ol_dist_info);
+                    //                    gen_random_string(24, 24, order_line.ol_dist_info);
                     
                     // Generate a key for the order line record and insert the 
                     // record into the table.
@@ -258,10 +268,11 @@ void
 TPCCInit::init_item(Item *item) {
     for (uint32_t i = 0; i < m_item_count; ++i) {
         item[i].i_id = i;
-        gen_random_string(14, 24, item[i].i_name);
+        //        gen_random_string(14, 24, item[i].i_name);
         item[i].i_price = (100 + (rand() % 9900)) / 100.0;
         int rand_pct = rand() % 100;
         int len = rand_range(26, 50);
+        /*
         gen_random_string(len, len, item[i].i_data);
         if (rand_pct <= 10) {
 
@@ -277,6 +288,7 @@ TPCCInit::init_item(Item *item) {
             item[i].i_data[original_start+6] = 'A';
             item[i].i_data[original_start+7] = 'L';
         }
+        */
         item[i].i_im_id = 1 + (rand() % 10000);
     }
 }
@@ -298,7 +310,8 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
         // s_data
         randPct = rand() % 100;
         len = rand_range(26, 50);
-        gen_random_string(len, len, container.s_data);
+        /*
+                gen_random_string(len, len, container.s_data);
         if (randPct <= 10) {
             
             // 10% of the time, i_data has the string "ORIGINAL" crammed 
@@ -324,6 +337,7 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
         gen_random_string(24, 24, container.s_dist_08);
         gen_random_string(24, 24, container.s_dist_09);
         gen_random_string(24, 24, container.s_dist_10);
+        */
     }
 }
 
@@ -334,8 +348,7 @@ TPCCInit::do_init() {
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
-    //    s_last_name_index = new HashTable<char*, Customer*>(
-
+    s_last_name_index = new StringTable<Customer*>(1<<19, 20);
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {
@@ -526,7 +539,7 @@ NewOrderTxn::LaterPhase() {
         &(s_warehouse_tbl[w_id].w_district_table[d_id].d_customer_table[c_id]);
 
     float c_discount = customer->c_discount;
-    string c_credit = customer->c_credit;
+    //    string c_credit = customer->c_credit;
 
     // Read the warehouse record.
     Warehouse *warehouse = &s_warehouse_tbl[w_id];
@@ -584,7 +597,8 @@ NewOrderTxn::LaterPhase() {
         }
         stock->s_ytd += ol_quantity;
         total_amount += ol_quantity * (item->i_price);
-    
+        
+        /*
         string *ol_dist_info = NULL;
         switch (d_id) {
         case 0:
@@ -622,7 +636,7 @@ NewOrderTxn::LaterPhase() {
             std::cout << m_district_id << "\n";
             exit(0);
         }
-    
+        */
         // Finally, insert an item into the order line table.
         // XXX: This memory allocation can serialize threads. Link TCMalloc to 
         // ensure that all allocations happen with minimal possible kernel-level 
@@ -636,11 +650,12 @@ NewOrderTxn::LaterPhase() {
         new_order_line.ol_supply_w_id = ol_w_id;
         new_order_line.ol_quantity = m_order_quantities[i];
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
+        /*
         new_order_line.ol_dist_info = 
             string(ol_dist_info->data(), ol_dist_info->length());
-        
+        */
         // Be sure to avoid COW nonsense.
-        assert(new_order_line.ol_dist_info.c_str() != ol_dist_info->c_str());
+        //        assert(new_order_line.ol_dist_info.c_str() != ol_dist_info->c_str());
     
         keys[0] = w_id;
         keys[1] = d_id;

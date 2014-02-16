@@ -37,7 +37,6 @@ public:
         BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, value);
         BucketItem<K, V> **table = this->m_table;
 
-
         uint64_t *lock_word = (uint64_t*)&table[CACHE_LINE*index+2];
         lock(lock_word);
     

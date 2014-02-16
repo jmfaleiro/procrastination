@@ -11,6 +11,8 @@
 #include "shopping_cart.h"
 #include <tpcc_generator.hh>
 
+#include <string_table.hh>
+
 #include <tpcc.hh>
 
 
