@@ -346,8 +346,8 @@ private:
     uint32_t m_time;
 
 public:
-    PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
-               int c_d_id, int c_id, char *c_last, bool c_by_name);
+    PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
+               uint32_t c_d_id, uint32_t c_id, char *c_last, bool c_by_name);
     
     bool NowPhase();
     void LaterPhase();
@@ -387,7 +387,7 @@ private:
         int range = max - min + 1;
         int diff = 
             ((gen_rand_range(0, A) | gen_rand_range(min, max)) + C) % range;
-        return diff + min;            
+        return diff;
     }
     
 public:
@@ -397,7 +397,7 @@ public:
 
     int
     gen_customer_id() {
-        int ret = gen_non_uniform_rand(1023, C_ID_C, 1, 3000);
+        int ret = gen_non_uniform_rand(1023, C_ID_C, 0, s_customers_per_dist-1);
         assert(ret >= 0 && ret < (int)s_customers_per_dist);
         return ret;
     }    

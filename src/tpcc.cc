@@ -336,6 +336,7 @@ TPCCInit::do_init() {
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
     s_last_name_index = new StringTable<Customer*>(1<<19, 20);
+    s_history_tbl = new ConcurrentHashTable<uint64_t, History>(1<<19, 20);
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {
@@ -647,7 +648,7 @@ NewOrderTxn::LaterPhase() {
         // concurrent hash table. 
         s_order_line_tbl->Put(order_line_key, new_order_line);
     }
-
+    
     // Insert an entry into the open order table.    
     /*
     Oorder oorder;
@@ -661,68 +662,83 @@ NewOrderTxn::LaterPhase() {
     */
 }
 
-PaymentTxn::PaymentTxn(int w_id, int c_w_id, float h_amount, int d_id,
-                       int c_d_id, int c_id, char *c_last, bool c_by_name) {
-      uint32_t keys[10];
-      struct DependencyInfo dep_info;
-      dep_info.dependency = NULL;
-      dep_info.is_write = false;
-      dep_info.index = -1;
+PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
+                       uint32_t c_d_id, uint32_t c_id, char *c_last, bool c_by_name) {
+    assert(w_id < s_num_warehouses);
+    assert(c_w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
 
-      uint64_t table_id;
+    uint32_t keys[10];
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
 
-      // Create the warehouse, and district keys. Add them to the write set.
-      keys[0] = w_id;
-      keys[1] = d_id;
-      uint64_t warehouse_key = w_id;
-      uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+    uint64_t table_id;
 
-      keys[0] = c_w_id;
-      keys[1] = c_d_id;
-      keys[2] = c_id;
-      uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+    // Create the warehouse, and district keys. Add them to the write set.
+    keys[0] = w_id;
+    keys[1] = d_id;
+    uint64_t warehouse_key = w_id;
+    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+
+    keys[0] = c_w_id;
+    keys[1] = c_d_id;
+    keys[2] = c_id;
+    uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
     
-      dep_info.record.m_table = WAREHOUSE;
-      dep_info.record.m_key = warehouse_key;
-      writeset.push_back(dep_info);
+    assert((uint32_t)c_w_id == TPCCKeyGen::get_warehouse_key(customer_key));
+    assert((uint32_t)c_d_id == TPCCKeyGen::get_district_key(customer_key));
+    assert((uint32_t)c_id == TPCCKeyGen::get_customer_key(customer_key));
 
-      dep_info.record.m_table = DISTRICT;
-      dep_info.record.m_key = district_key;
-      writeset.push_back(dep_info);
+    dep_info.record.m_table = WAREHOUSE;
+    dep_info.record.m_key = warehouse_key;
+    writeset.push_back(dep_info);
+
+    dep_info.record.m_table = DISTRICT;
+    dep_info.record.m_key = district_key;
+    writeset.push_back(dep_info);
       
-      dep_info.record.m_table = CUSTOMER;
-      dep_info.record.m_key = customer_key;
-      writeset.push_back(dep_info);
+    dep_info.record.m_table = CUSTOMER;
+    dep_info.record.m_key = customer_key;
+    writeset.push_back(dep_info);
 
-      m_time = (uint32_t)time(NULL);
-      m_h_amount = h_amount;
+    m_time = (uint32_t)time(NULL);
+    m_h_amount = h_amount;
 }    
 
 bool
 PaymentTxn::NowPhase() {
-    // Update the warehouse
-    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
     uint64_t w_id = writeset[s_warehouse_index].record.m_key;
-    s_warehouse_tbl[w_id].w_ytd += m_h_amount;
-
-    // Update the district
+    uint64_t d_id = TPCCKeyGen::get_district_key(writeset[s_district_index].record.m_key);
+    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
     assert(writeset[s_district_index].record.m_table == DISTRICT);
-    uint64_t d_id = writeset[s_district_index].record.m_key;
+    assert(w_id < s_num_warehouses);    
+    assert(d_id < s_districts_per_wh);
+
+    // Update the warehouse and district
+    s_warehouse_tbl[w_id].w_ytd += m_h_amount;
     District *dist = &s_warehouse_tbl[w_id].w_district_table[d_id];
-    dist->d_ytd += m_h_amount;    
+    dist->d_ytd += m_h_amount;
+    return true;
 }
 
 void
 PaymentTxn::LaterPhase() {
     // Update the customer
     assert(writeset[s_customer_index].record.m_table == CUSTOMER);
-    uint64_t d_id = 
-        TPCCKeyGen::get_warehouse_key(writeset[s_customer_index].record.m_key);
     uint64_t w_id = 
+        TPCCKeyGen::get_warehouse_key(writeset[s_customer_index].record.m_key);
+    uint64_t d_id = 
         TPCCKeyGen::get_district_key(writeset[s_customer_index].record.m_key);
     uint64_t c_id = 
         TPCCKeyGen::get_customer_key(writeset[s_customer_index].record.m_key);
     
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
     static const char *credit = "BC";
     Customer *cust = 
         &s_warehouse_tbl[w_id].w_district_table[d_id].d_customer_table[c_id];

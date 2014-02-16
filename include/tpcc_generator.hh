@@ -17,12 +17,15 @@ public:
     Action*
     genNext() {
         int pct = m_util.gen_rand_range(1, 100);
+        gen_payment();
+        /*
         if (pct <= 45) {
             return gen_new_order();
         }
         else if (pct <= 100) {
             return gen_payment();
         }
+        */
     }
     
     NewOrderTxn*
@@ -84,25 +87,25 @@ public:
     
     PaymentTxn*
     gen_payment() {
-        uint64_t warehouse_id = 
-            (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
-        uint64_t district_id = 
-            (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
-        uint64_t customer_id = 
-            (uint64_t)m_util.gen_customer_id();
+        uint32_t warehouse_id = 
+            (uint32_t)m_util.gen_rand_range(0, s_num_warehouses-1);
+        uint32_t district_id = 
+            (uint32_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
+        uint32_t customer_id = 
+            (uint32_t)m_util.gen_customer_id();
         int x = m_util.gen_rand_range(1, 100);
-        uint64_t customer_d_id;
-        uint64_t customer_w_id;
+        uint32_t customer_d_id;
+        uint32_t customer_w_id;
 
         if (x <= 85) {
             customer_d_id = district_id;
             customer_w_id = warehouse_id;
         }
         else {
-            customer_d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
+            customer_d_id = (uint32_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
             do {
                 customer_w_id = 
-                    (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
+                    (uint32_t)m_util.gen_rand_range(0, s_num_warehouses-1);
             } while (customer_w_id == warehouse_id);
         }
         
