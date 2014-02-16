@@ -107,6 +107,7 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         }                
         random.gen_rand_string(8, 16, customer[i].c_first);
         random.gen_last_name_load(customer[i].c_last);
+        s_last_name_index->Put(customer[i].c_last, &customer[i]);
 
         customer[i].c_credit_lim = 50000;
         customer[i].c_balance = -10;
