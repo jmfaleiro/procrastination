@@ -574,46 +574,44 @@ NewOrderTxn::LaterPhase() {
         }
         stock->s_ytd += ol_quantity;
         total_amount += ol_quantity * (item->i_price);
-        
-        /*
-        string *ol_dist_info = NULL;
+
+        char *ol_dist_info = NULL;
         switch (d_id) {
         case 0:
-            ol_dist_info = &stock->s_dist_01;
+            ol_dist_info = stock->s_dist_01;
             break;
         case 1:
-            ol_dist_info = &stock->s_dist_02;
+            ol_dist_info = stock->s_dist_02;
             break;
         case 2:
-            ol_dist_info = &stock->s_dist_03;
+            ol_dist_info = stock->s_dist_03;
             break;
         case 3:
-            ol_dist_info = &stock->s_dist_04;
+            ol_dist_info = stock->s_dist_04;
             break;
         case 4:
-            ol_dist_info = &stock->s_dist_05;
+            ol_dist_info = stock->s_dist_05;
             break;
         case 5:
-            ol_dist_info = &stock->s_dist_06;
+            ol_dist_info = stock->s_dist_06;
             break;
         case 6:
-            ol_dist_info = &stock->s_dist_07;
+            ol_dist_info = stock->s_dist_07;
             break;
         case 7:
-            ol_dist_info = &stock->s_dist_08;
+            ol_dist_info = stock->s_dist_08;
             break;
         case 8:
-            ol_dist_info = &stock->s_dist_09;
+            ol_dist_info = stock->s_dist_09;
             break;
         case 9:
-            ol_dist_info = &stock->s_dist_10;
+            ol_dist_info = stock->s_dist_10;
             break;
         default:
             std::cout << "Got unexpected district!!! Aborting...\n";
             std::cout << m_district_id << "\n";
             exit(0);
         }
-        */
         // Finally, insert an item into the order line table.
         // XXX: This memory allocation can serialize threads. Link TCMalloc to 
         // ensure that all allocations happen with minimal possible kernel-level 
@@ -627,13 +625,8 @@ NewOrderTxn::LaterPhase() {
         new_order_line.ol_supply_w_id = ol_w_id;
         new_order_line.ol_quantity = m_order_quantities[i];
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
-        /*
-        new_order_line.ol_dist_info = 
-            string(ol_dist_info->data(), ol_dist_info->length());
-        */
-        // Be sure to avoid COW nonsense.
-        //        assert(new_order_line.ol_dist_info.c_str() != ol_dist_info->c_str());
-    
+        strcpy(new_order_line.ol_dist_info, ol_dist_info);
+
         keys[0] = w_id;
         keys[1] = d_id;
         keys[2] = m_order_id;
@@ -646,6 +639,7 @@ NewOrderTxn::LaterPhase() {
     }
 
     // Insert an entry into the open order table.    
+    /*
     Oorder oorder;
     oorder.o_id = m_order_id;
     oorder.o_d_id = d_id;
@@ -654,6 +648,7 @@ NewOrderTxn::LaterPhase() {
     oorder.o_entry_d = m_timestamp;
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
+    */
 }
 
 /*
