@@ -17,7 +17,7 @@ public:
     Action*
     genNext() {
         int pct = m_util.gen_rand_range(1, 100);
-        gen_payment();
+        return gen_payment();
         /*
         if (pct <= 45) {
             return gen_new_order();
