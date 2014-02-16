@@ -39,74 +39,53 @@ rand_range(int min, int max) {
 }
 
 void
-TPCCInit::gen_random_string(int min_len, int max_len, std::string *val) {
-    char base = 'a', max = 'z';
-    int char_range = max - base + 1;
-
-    // Decide on the length of the string. 
-    int length = rand_range(min_len, max_len);
-    char *data = (char*)malloc(sizeof(char)*length+1);
-    
-    // Insert a random character into the output array. 
-    for (int i = 0; i < length; ++i) {
-        int to_add = rand_range((int)base, (int)max);
-        data[i] = (char)to_add;
-    }
-    data[length] = '\0';
-}
-
-void
-TPCCInit::init_warehouse(Warehouse *warehouse) {
+TPCCInit::init_warehouse(Warehouse *warehouse, RandomGenerator &random) {
     for (uint32_t i = 0; i < m_num_warehouses; ++i) {
         warehouse[i].w_id = i;
         warehouse[i].w_ytd = 30000.0;
         warehouse[i].w_tax = (rand() % 2001) / 1000.0;
         
         // Generate a bunch of random strings for the string fields. 
-        /*
-        gen_random_string(6, 10, warehouse[i].w_name);
-        gen_random_string(10, 20, warehouse[i].w_street_1);
-        gen_random_string(10, 20, warehouse[i].w_street_2);
-        gen_random_string(10, 20, warehouse[i].w_city);
-        gen_random_string(3, 3, warehouse[i].w_state);
+        random.gen_rand_string(6, 10, warehouse[i].w_name);
+        random.gen_rand_string(10, 20, warehouse[i].w_street_1);
+        random.gen_rand_string(10, 20, warehouse[i].w_street_2);
+        random.gen_rand_string(10, 20, warehouse[i].w_city);
+        random.gen_rand_string(3, 3, warehouse[i].w_state);
         
-        string stupid_zip = "123456789";
-        warehouse[i].w_zip = string(stupid_zip.data(), stupid_zip.length());
-        */
+        char stupid_zip[] = "123456789";
+        strcpy(warehouse[i].w_zip, stupid_zip);
+
         warehouse[i].w_district_table = NULL;
-        warehouse[i].w_stock_table = NULL;
-        
+        warehouse[i].w_stock_table = NULL;        
     }
 }
 
 // Initialize the district table of one particular warehouse. 
 void
-TPCCInit::init_district(District *district, uint32_t warehouse_id) {
+TPCCInit::init_district(District *district, uint32_t warehouse_id, 
+                        RandomGenerator &random) {
     for (uint32_t i = 0; i < m_dist_per_wh; ++i) {
         district[i].d_id = i;
         district[i].d_w_id = warehouse_id;
         district[i].d_ytd = 3000;
         district[i].d_tax = (rand() % 2001) / 1000.0;
         district[i].d_next_o_id = 3001;
+
+        random.gen_rand_string(6, 10, district[i].d_name);
+        random.gen_rand_string(10, 20, district[i].d_street_1);
+        random.gen_rand_string(10, 20, district[i].d_street_2);
+        random.gen_rand_string(10, 20, district[i].d_city);
+        random.gen_rand_string(3, 3, district[i].d_state);
         
-        /*
-        gen_random_string(6, 10, district[i].d_name);
-        gen_random_string(10, 20, district[i].d_street_1);
-        gen_random_string(10, 20, district[i].d_street_2);
-        gen_random_string(10, 20, district[i].d_city);
-        gen_random_string(3, 3, district[i].d_state);
-        
-        string contiguous_zip = "123456789";
-        district[i].d_zip = string(contiguous_zip.data(), 
-                                   contiguous_zip.length());
-        */
+        char contiguous_zip[] = "123456789";
+        strcpy(district[i].d_zip, contiguous_zip);
         district[i].d_customer_table = NULL;
     }
 }
 
 void
 TPCCInit::init_customer(Customer *customer, uint32_t d_id, 
-                              uint32_t w_id) {
+                        uint32_t w_id, RandomGenerator &random) {
     for (uint32_t i = 0; i < m_cust_per_dist; ++i) {
         customer[i].c_id = i;
         customer[i].c_d_id = d_id;
@@ -115,7 +94,7 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
         // Discount in the range [0.0000 ... 0.5000]
         customer[i].c_discount = (rand() % 5001) / 10000.0;
         
-        /*
+        
         if (rand() % 101 <= 10) {		// 10% Bad Credit
             customer[i].c_credit[0] = 'B';
             customer[i].c_credit[1] = 'C';
@@ -125,44 +104,42 @@ TPCCInit::init_customer(Customer *customer, uint32_t d_id,
             customer[i].c_credit[0] = 'G';
             customer[i].c_credit[1] = 'C';
             customer[i].c_credit[2] = '\0';
-        }        
-        */
-        //        gen_random_string(8, 16, customer[i].c_first);
-        
+        }                
+        random.gen_rand_string(8, 16, customer[i].c_first);
+        random.gen_last_name_load(customer[i].c_last);
+
         customer[i].c_credit_lim = 50000;
         customer[i].c_balance = -10;
         customer[i].c_ytd_payment = 10;
         customer[i].c_payment_cnt = 1;
-        customer[i].c_delivery_cnt = 0;
+        customer[i].c_delivery_cnt = 0;        
 
-        /*
-        gen_random_string(10, 20, customer[i].c_street_1);
-        gen_random_string(10, 20, customer[i].c_street_2);
-        gen_random_string(10, 20, customer[i].c_city);
-        gen_random_string(3, 3, customer[i].c_state);
-        gen_random_string(4, 4, customer[i].c_zip);
+        random.gen_rand_string(10, 20, customer[i].c_street_1);
+        random.gen_rand_string(10, 20, customer[i].c_street_2);
+        random.gen_rand_string(10, 20, customer[i].c_city);
+        random.gen_rand_string(3, 3, customer[i].c_state);
+        random.gen_rand_string(4, 4, customer[i].c_zip);
         
         for (int j = 4; j < 9; ++j) {
             customer[i].c_zip[j] = '1';            
         }
-        gen_random_string(16, 16, customer[i].c_phone);
+        random.gen_rand_string(16, 16, customer[i].c_phone);
         
         customer[i].c_middle[0] = 'O';
         customer[i].c_middle[1] = 'E';
         customer[i].c_middle[2] = '\0';
         
-        gen_random_string(300, 500, customer[i].c_data);
-        */
+        random.gen_rand_string(300, 500, customer[i].c_data);
     }
 }
 
 void
-TPCCInit::init_history(History *history) {
+TPCCInit::init_history(History *history, RandomGenerator &random) {
 
 }
 
 void
-TPCCInit::init_order() {
+TPCCInit::init_order(RandomGenerator &random) {
     Oorder oorder;
     NewOrder new_order;
     OrderLine order_line;
@@ -246,7 +223,7 @@ TPCCInit::init_order() {
                     }
                     order_line.ol_supply_w_id = order_line.ol_w_id;
                     order_line.ol_quantity = 5;
-                    //                    gen_random_string(24, 24, order_line.ol_dist_info);
+                    random.gen_rand_string(24, 24, order_line.ol_dist_info);
                     
                     // Generate a key for the order line record and insert the 
                     // record into the table.
@@ -265,15 +242,15 @@ TPCCInit::init_order() {
 }
 
 void
-TPCCInit::init_item(Item *item) {
+TPCCInit::init_item(Item *item, RandomGenerator &random) {
     for (uint32_t i = 0; i < m_item_count; ++i) {
         item[i].i_id = i;
-        //        gen_random_string(14, 24, item[i].i_name);
+        random.gen_rand_string(14, 24, item[i].i_name);
         item[i].i_price = (100 + (rand() % 9900)) / 100.0;
-        int rand_pct = rand() % 100;
-        int len = rand_range(26, 50);
-        /*
-        gen_random_string(len, len, item[i].i_data);
+        int rand_pct = random.gen_rand_range(0, 99);
+        int len = random.gen_rand_range(26, 50);
+        
+        random.gen_rand_string(len, len, item[i].i_data);
         if (rand_pct <= 10) {
 
             // 10% of the time i_data has "ORIGINAL" crammed somewhere in the
@@ -288,13 +265,13 @@ TPCCInit::init_item(Item *item) {
             item[i].i_data[original_start+6] = 'A';
             item[i].i_data[original_start+7] = 'L';
         }
-        */
         item[i].i_im_id = 1 + (rand() % 10000);
     }
 }
 
 void
-TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
+TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id, 
+                     RandomGenerator &random) {
     Stock container;
     int randPct;
     int len;
@@ -310,8 +287,8 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
         // s_data
         randPct = rand() % 100;
         len = rand_range(26, 50);
-        /*
-                gen_random_string(len, len, container.s_data);
+
+        random.gen_rand_string(len, len, container.s_data);
         if (randPct <= 10) {
             
             // 10% of the time, i_data has the string "ORIGINAL" crammed 
@@ -327,23 +304,23 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id) {
             container.s_data[start_original+7] = 'L';            
         }
 
-        gen_random_string(24, 24, container.s_dist_01);
-        gen_random_string(24, 24, container.s_dist_02);
-        gen_random_string(24, 24, container.s_dist_03);
-        gen_random_string(24, 24, container.s_dist_04);
-        gen_random_string(24, 24, container.s_dist_05);
-        gen_random_string(24, 24, container.s_dist_06);
-        gen_random_string(24, 24, container.s_dist_07);
-        gen_random_string(24, 24, container.s_dist_08);
-        gen_random_string(24, 24, container.s_dist_09);
-        gen_random_string(24, 24, container.s_dist_10);
-        */
+        random.gen_rand_string(24, 24, container.s_dist_01);
+        random.gen_rand_string(24, 24, container.s_dist_02);
+        random.gen_rand_string(24, 24, container.s_dist_03);
+        random.gen_rand_string(24, 24, container.s_dist_04);
+        random.gen_rand_string(24, 24, container.s_dist_05);
+        random.gen_rand_string(24, 24, container.s_dist_06);
+        random.gen_rand_string(24, 24, container.s_dist_07);
+        random.gen_rand_string(24, 24, container.s_dist_08);
+        random.gen_rand_string(24, 24, container.s_dist_09);
+        random.gen_rand_string(24, 24, container.s_dist_10);
     }
 }
 
 void
 TPCCInit::do_init() {
     
+    RandomGenerator random;
     s_num_items = m_item_count;
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
@@ -360,27 +337,27 @@ TPCCInit::do_init() {
     cout << "Num customers: " << m_cust_per_dist << "\n";
     cout << "Num items: " << m_item_count << "\n";
 
-    init_order();
+    init_order(random);
     s_item_tbl = (Item*)malloc(sizeof(Item)*m_item_count);
     memset(s_item_tbl, 0, sizeof(Item)*m_item_count);
-    init_item(s_item_tbl);
+    init_item(s_item_tbl, random);
 
     // First initialize all the warehouses in the system.
     s_warehouse_tbl = (Warehouse*)malloc(sizeof(Warehouse)*m_num_warehouses);
-    init_warehouse(s_warehouse_tbl);
+    init_warehouse(s_warehouse_tbl, random);
     for (uint32_t w = 0; w < m_num_warehouses; ++w) {
         s_warehouse_tbl[w].w_district_table = 
             (District*)malloc(sizeof(District)*m_dist_per_wh);
-        init_district(s_warehouse_tbl[w].w_district_table, w);
+        init_district(s_warehouse_tbl[w].w_district_table, w, random);
         for (uint32_t d = 0; d < m_dist_per_wh; ++d) {
             Customer *customer = 
                 (Customer*)malloc(sizeof(Customer)*m_cust_per_dist);
             s_warehouse_tbl[w].w_district_table[d].d_customer_table = customer; 
-            init_customer(customer, d, w);
+            init_customer(customer, d, w, random);
         }
         s_warehouse_tbl[w].w_stock_table = 
             (Stock*)malloc(sizeof(Stock)*m_item_count);
-        init_stock(s_warehouse_tbl[w].w_stock_table, w);
+        init_stock(s_warehouse_tbl[w].w_stock_table, w, random);
     }    
 }
 

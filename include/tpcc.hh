@@ -13,8 +13,6 @@
 #include <string_table.hh>
 #include <keys.h>
 #include <action.h>
-#include <ext/vstring.h>
-
 
 enum TPCCTable {
     WAREHOUSE = 0,
@@ -95,6 +93,16 @@ public:
         int range = max - min + 1;
         return min + (rand_r(&m_seed) % range);
     }    
+
+    void
+    gen_rand_string(int min, int max, char *buf) {
+        int ch_first = (int)'a', ch_last = (int)'z';
+        int length = gen_rand_range(min, max);
+        for (int i = 0; i < length; ++i) {
+            buf[i] = (char)gen_rand_range(ch_first, ch_last);
+        }
+        buf[length] = '\0';        
+    }
 };
 
 class TPCCKeyGen {
@@ -213,120 +221,119 @@ typedef struct {
     float 		c_balance;
     float 		c_ytd_payment;
     char 		c_credit[3];
-    char 		*c_last;
-    char 		*c_first;
+    char 		c_last[16];
+    char 		c_first[17];
     char 		c_street_1[21];
     char 		c_street_2[21];
     char 		c_city[21];
     char 		c_state[3];
     char 		c_zip[11];
-    char 		*c_phone;
-    char 		*c_middle;
+    char 		c_phone[17];
+    char 		c_middle[3];
     char 		c_data[501];
 } Customer;
 
 typedef struct {
-    int d_id;
-    int d_w_id;
-    int d_next_o_id;
-    float d_ytd;
-    float d_tax;
-    std::string *d_name;
-    std::string *d_street_1;
-    std::string *d_street_2;
-    std::string *d_city;
-    std::string *d_state;
-    std::string *d_zip;
-    Customer* d_customer_table;
+    int 		d_id;
+    int 		d_w_id;
+    int 		d_next_o_id;
+    float 		d_ytd;
+    float 		d_tax;
+    char 		d_name[11];
+    char 		d_street_1[21];
+    char 		d_street_2[21];
+    char 		d_city[21];
+    char 		d_state[4];
+    char 		d_zip[10];
+    Customer* 	d_customer_table;
 } District __attribute((aligned(CACHE_LINE)));
 
 typedef struct {
-    int h_c_id;
-    int h_c_d_id;
-    int h_c_w_id;
-    int h_d_id;
-    int h_w_id;
-    std::string *h_date;
-    float h_amount;
-    std::string *h_data;
+    int 		h_c_id;
+    int 		h_c_d_id;
+    int 		h_c_w_id;
+    int 		h_d_id;
+    int 		h_w_id;
+    char 		*h_date;
+    float 		h_amount;
+    char		*h_data;
 } History;
 
 typedef struct {
-    int i_id; // PRIMARY KEY
-    int i_im_id;
-    float i_price;
-    std::string *i_name;
-    std::string *i_data;
+    int 		i_id; // PRIMARY KEY
+    int 		i_im_id;
+    float 		i_price;
+    char 		i_name[25];
+    char 		i_data[51];
 } Item;
 
 typedef struct {
-    int no_w_id;
-    int no_d_id;
-    int no_o_id;
+    int 		no_w_id;
+    int 		no_d_id;
+    int 		no_o_id;
 } NewOrder;
 
 typedef struct {
-    uint32_t o_id;
-    uint32_t o_w_id;
-    uint32_t o_d_id;
-    uint32_t o_c_id;
-    uint32_t o_carrier_id;
-    uint32_t o_ol_cnt;
-    uint32_t o_all_local;
-    long o_entry_d;
+    uint32_t 	o_id;
+    uint32_t 	o_w_id;
+    uint32_t 	o_d_id;
+    uint32_t 	o_c_id;
+    uint32_t 	o_carrier_id;
+    uint32_t 	o_ol_cnt;
+    uint32_t 	o_all_local;
+    long 		o_entry_d;
 } Oorder;
 
 typedef struct { 
-    uint32_t ol_w_id;
-    uint32_t ol_d_id;
-    uint32_t ol_o_id;
-    uint32_t ol_number;
-    uint32_t ol_i_id;
-    uint32_t ol_supply_w_id;
-    uint32_t ol_quantity;
-    long ol_delivery_d;
-    float ol_amount;
-    std::string *ol_dist_info;
+    uint32_t 	ol_w_id;
+    uint32_t 	ol_d_id;
+    uint32_t 	ol_o_id;
+    uint32_t 	ol_number;
+    uint32_t 	ol_i_id;
+    uint32_t 	ol_supply_w_id;
+    uint32_t 	ol_quantity;
+    long 		ol_delivery_d;
+    float 		ol_amount;
+    char 		ol_dist_info[25];
 } OrderLine;
 
 typedef struct {
-    int s_i_id; // PRIMARY KEY 2
-    int s_w_id; // PRIMARY KEY 1
-    int s_order_cnt;
-    int s_remote_cnt;
-    int s_quantity;
-    float s_ytd;
-    std::string *s_data;
-    std::string *s_dist_01;
-    std::string *s_dist_02;
-    std::string *s_dist_03;
-    std::string *s_dist_04;    
-    std::string *s_dist_05;
-    std::string *s_dist_06;
-    std::string *s_dist_07;
-    std::string *s_dist_08;
-    std::string *s_dist_09;
-    std::string *s_dist_10;
+    int 		s_i_id; // PRIMARY KEY 2
+    int 		s_w_id; // PRIMARY KEY 1
+    int 		s_order_cnt;
+    int 		s_remote_cnt;
+    int 		s_quantity;
+    float 		s_ytd;
+    char 		s_data[51];
+    char		s_dist_01[25];
+    char 		s_dist_02[25];
+    char		s_dist_03[25];
+    char 		s_dist_04[25];    
+    char 		s_dist_05[25];
+    char 		s_dist_06[25];
+    char 		s_dist_07[25];
+    char 		s_dist_08[25];
+    char  		s_dist_09[25];
+    char 		s_dist_10[25];
 } Stock __attribute__((aligned(CACHE_LINE)));
 
 typedef struct {
-    int w_id; // PRIMARY KEY
-    float w_ytd;
-    float w_tax;
-    std::string *w_name;
-    std::string *w_street_1;
-    std::string *w_street_2;
-    std::string *w_city;
-    std::string *w_state;
-    std::string *w_zip;
-    District *w_district_table;
-    Stock *w_stock_table;
+    int 		w_id; // PRIMARY KEY
+    float 		w_ytd;
+    float 		w_tax;
+    char 		w_name[11];
+    char 		w_street_1[21];
+    char 		w_street_2[21];
+    char 		w_city[21];
+    char 		w_state[4];
+    char 		w_zip[10];
+    District 	*w_district_table;
+    Stock 		*w_stock_table;
 } Warehouse;
   
     
-extern Warehouse 						*s_warehouse_tbl;
-extern Item 							*s_item_tbl;
-
+extern Warehouse 									*s_warehouse_tbl;
+extern Item 										*s_item_tbl;
 extern StringTable<Customer*>						*s_last_name_index;   
 extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
 extern ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
@@ -341,18 +348,18 @@ private:
     uint32_t m_item_count;
         
     static const uint32_t s_first_unprocessed_o_id = 2001;
-    // Generate a random string of specified length (all chars are assumed 
-    // to be lower case).
-    void gen_random_string(int min_len, int max_len, std::string *val);
+
     // Each of the functions below initializes an apriori allocated single 
     // row.
-    void init_warehouse(Warehouse *wh);
-    void init_district(District *district, uint32_t warehouse_id);
-    void init_customer(Customer *customer, uint32_t d_id, uint32_t w_id);
-    void init_history(History *history);
-    void init_order();
-    void init_item(Item *item);
-    void init_stock(Stock *stock, uint32_t wh_id);
+    void init_warehouse(Warehouse *wh, RandomGenerator &random);
+    void init_district(District *district, uint32_t warehouse_id, 
+                       RandomGenerator &random);
+    void init_customer(Customer *customer, uint32_t d_id, uint32_t w_id, 
+                       RandomGenerator &random);
+    void init_history(History *history, RandomGenerator &random);
+    void init_order(RandomGenerator &random);
+    void init_item(Item *item, RandomGenerator &random);
+    void init_stock(Stock *stock, uint32_t wh_id, RandomGenerator &random);
 
 public:
     TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
