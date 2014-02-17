@@ -17,14 +17,15 @@ using namespace std;
 
 Warehouse 									*s_warehouse_tbl;
 Item 										*s_item_tbl;
+HashTable<uint64_t, Oorder>			 		*s_oorder_tbl;
 
 StringTable<Customer*> 						*s_last_name_index;
-ConcurrentHashTable<uint64_t, OrderLine*>	*s_order_line_index;
+HashTable<uint64_t, Oorder*>				*s_oorder_index;
 
 ConcurrentHashTable<uint64_t, History>		*s_history_tbl;
 ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
-ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
+
 uint32_t 									s_num_items;  
 uint32_t 									s_num_warehouses;
 uint32_t 									s_districts_per_wh;
@@ -336,7 +337,7 @@ TPCCInit::do_init() {
     s_customers_per_dist = m_cust_per_dist;
 
     s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
-    s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<19, 20);
+    s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<19, 20);
     s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
     s_last_name_index = new StringTable<Customer*>(1<<19, 20);
     s_history_tbl = new ConcurrentHashTable<uint64_t, History>(1<<19, 20);
@@ -803,101 +804,147 @@ StockLevelTxn::StockLevelTxn(uint32_t warehouse_id, uint32_t district_id,
     assert(warehouse_id < s_num_warehouses);
     assert(district_id < s_districts_per_wh);
 
-    struct DependencyInfo dep_info;
-    dep_info.dependency = NULL;
-    dep_info.is_write = false;
-    dep_info.index = -1;
-
     m_threshold = threshold;
     m_stock_count = 0;
     m_warehouse_id = warehouse_id;
-
-    uint32_t keys[10];
-    keys[0] = warehouse_id;
-    keys[1] = district_id;
-    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
-    dep_info.record.m_table = DISTRICT;
-    dep_info.record.m_key = district_key;
-    readset.push_back(dep_info);
+    m_district_id = district_id;
 }
 
 bool
 StockLevelTxn::NowPhase() {
-    assert(readset[s_district_index].record.m_table == DISTRICT);
     struct DependencyInfo dep_info;
     dep_info.dependency = NULL;
     dep_info.is_write = false;
     dep_info.index = -1;
 
-    uint32_t d_id = 
-        TPCCKeyGen::get_district_key(readset[s_district_index].record.m_key);
-    uint32_t w_id = 
-        TPCCKeyGen::get_warehouse_key(readset[s_district_index].record.m_key);
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
     
-    assert(d_id < s_districts_per_wh);
-    assert(w_id < s_num_warehouses);
-    
-    District *dist = &s_warehouse_tbl[w_id].w_district_table[d_id];
-    int next_order_id = dist->d_next_o_id;
-    uint32_t keys[3];
-    keys[0] = w_id;
-    keys[1] = d_id;
+    uint32_t next_order_id = 
+        s_warehouse_tbl[m_warehouse_id].
+        w_district_table[m_district_id].d_next_o_id;
+    assert(next_order_id > 20);
+
     for (int i = 0; i < 20; ++i) {
         keys[2] = next_order_id - 1 - i;
-        uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
-        dep_info.record.m_table = ORDER_LINE_INDEX;
-        dep_info.record.m_key = new_order_key;
+        uint64_t oorder_key = TPCCKeyGen::create_new_order_key(keys);
+        Oorder *open_order = s_oorder_tbl->GetPtr(oorder_key);
+        for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j) {
+            keys[3] = j;
+            dep_info.record.m_key = TPCCKeyGen::create_order_line_key(keys);
+        }
         readset.insert(readset.begin() + i, dep_info);
     }    
 }
 
 void
 StockLevelTxn::LaterPhase() {
-    uint32_t num_orders = readset.size();
-    for (uint32_t i = 0; i < num_orders; ++i) {
-        assert(readset[i].record.m_table == ORDER_LINE_INDEX);
+    uint32_t num_orderlines = readset.size();
+    for (uint32_t i = 0; i < num_orderlines; ++i) {
+        assert(readset[i].record.m_table == ORDER_LINE);
         uint64_t key = readset[i].record.m_key;
-        TableIterator<uint64_t, OrderLine*> iter = 
-            s_order_line_index->GetIterator(key);
-        OrderLine *ol = NULL;
-        while (!iter.Done()) {
-            OrderLine *ol = iter.Value();
-            uint32_t item_id = ol->ol_i_id;
-            Stock *stock = 
-                &s_warehouse_tbl[m_warehouse_id].w_stock_table[item_id];
-            
-            // Extremely hacky way to avoid a branch!!!
-            m_stock_count += 
-                ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
-        }
+        OrderLine *ol = s_order_line_tbl->GetPtr(key);        
+        uint32_t item_id = ol->ol_i_id;
+        Stock *stock = 
+            &s_warehouse_tbl[m_warehouse_id].w_stock_table[item_id];
+        m_stock_count += 
+            ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
     }
 }
 
-/* Read the district table 			<w_id, d_id> 
- * Read the Stock table 			<s_w_id, s_i_id>
- * Read the Orderline table 		<ol_w_id, ol_d_id, ol_o_id, ol_number>
- *
-vv * Read set: 	District key
- *				Orderline key + Stock key (20 records)
- */
-/*
-  StockLevelTxn::StockLevelTxn(int w_id, int d_id, int threshold) {
-  ostringsrream os;
-  os << w_id << "###" << d_id;
-  string district_key = os.str();
-  os.str(std::string());
-  
-  
-  }
+OrderStatusTxn::OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
+                               char *c_last, bool c_by_name) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
+    
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_customer_id = c_id;
+    m_c_by_name = c_by_name;
+    m_c_last = c_last;
+}
 
-  bool
-  StockLevelTxn::NowPhase() {
-  return false;
-  }
+bool
+OrderStatusTxn::NowPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = ORDER_LINE;
 
-  void
-  StockLevelTxn::LaterPhase() {
-  
-  }
-*/
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;    
+    Oorder *open_order = s_oorder_index->Get(m_customer_id);
+    keys[2] = open_order->o_id;
+    for (uint32_t i = 0; i < open_order->o_ol_cnt; ++i) {
+        keys[3] = i;
+        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+        dep_info.record.m_key = order_line_key;
+        readset.push_back(dep_info);
+    }
+    return true;
+}
+
+void
+OrderStatusTxn::LaterPhase() {    
+    int num_items = readset.size();
+    for (int i = 0; i < num_items; ++i) {
+        uint64_t order_line_key = readset[i].record.m_key;
+        OrderLine *ol = s_order_line_tbl->GetPtr(order_line_key);
+        m_order_line_quantity += ol->ol_quantity;
+    }
+}
+
+
+DeliveryTxn::DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_carrier_id = carrier_id;
+}
+
+bool
+DeliveryTxn::NowPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+
+    uint32_t keys[3];
+    District *districts = s_warehouse_tbl[m_warehouse_id].w_district_table;
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        assert(districts->d_next_o_id >= districts->d_next_d_id);
+        if (districts->d_next_o_id > districts->d_next_d_id) {
+            
+            // Add the new order record to the writeset
+            keys[0] = m_warehouse_id;
+            keys[1] = i;
+            keys[2] = districts->d_next_d_id;            
+            uint64_t open_order_id = TPCCKeyGen::create_new_order_key(keys);
+            dep_info.record.m_key = open_order_id;
+            dep_info.record.m_table = NEW_ORDER;
+            writeset.push_back(dep_info);
+
+            // Add the customer to the writeset
+            Oorder *oorder = s_oorder_tbl->GetPtr(open_order_id);            
+            keys[2] = oorder->o_c_id;
+            uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+            dep_info.record.m_key = customer_key;
+            dep_info.record.m_table = CUSTOMER;
+            writeset.push_back(dep_info);
+
+            // Write to the open order and district tables
+            oorder->o_carrier_id = m_carrier_id;
+            districts->d_next_d_id += 1;
+        }
+    }
+    return true;
+}
+
+void
+DeliveryTxn::LaterPhase() {
+    
+}
 

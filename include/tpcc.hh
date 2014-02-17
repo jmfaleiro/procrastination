@@ -20,7 +20,7 @@ enum TPCCTable {
     CUSTOMER,
     HISTORY,
     NEW_ORDER,
-    ORDER,
+    OPEN_ORDER,
     ORDER_LINE,
     ITEM,
     STOCK,    
@@ -140,6 +140,7 @@ typedef struct {
     int 		c_payment_cnt;
     int 		c_delivery_cnt;
     char 		*c_since;
+    uint32_t 	c_latest_o_id;
     float 		c_discount;
     float 		c_credit_lim;
     float 		c_balance;
@@ -161,6 +162,7 @@ typedef struct {
     int 		d_id;
     int 		d_w_id;
     int 		d_next_o_id;
+    int 		d_next_d_id;
     float 		d_ytd;
     float 		d_tax;
     char 		d_name[11];
@@ -260,17 +262,17 @@ typedef struct {
     uint64_t order_id;
 } OrderLineIndex;
 
-// Base tables
+// Now phase tables
 extern Warehouse 									*s_warehouse_tbl;
 extern Item 										*s_item_tbl;
+extern HashTable<uint64_t, Oorder>			 		*s_oorder__tbl;
+extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
+extern StringTable<Customer*>						*s_last_name_index;
+
+// Later phase tables
 extern ConcurrentHashTable<uint64_t, History> 		*s_history_tbl;
 extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
-extern ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
-
-// Extra indices
-extern StringTable<Customer*>						*s_last_name_index;
-extern ConcurrentHashTable<uint64_t, OrderLine*> 	*s_order_line_index;
 
 // Experiment parameters
 extern uint32_t 									s_num_items;  
@@ -365,9 +367,10 @@ public:
 class StockLevelTxn : public Action {
 private:
     static const int s_district_index = 0;
-    int m_threshold;
-    int m_stock_count;
-    uint64_t m_warehouse_id;
+    int 			m_threshold;
+    int 			m_stock_count;
+    uint32_t 		m_warehouse_id;
+    uint32_t 		m_district_id;
 
 public:
     StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, int threshold);
@@ -377,11 +380,27 @@ public:
 
 class OrderStatusTxn : public Action {
 private:
+    uint32_t 		m_warehouse_id;
+    uint32_t 		m_district_id;
+    uint32_t 		m_customer_id;
+    bool 			m_c_by_name;
+    char 			*m_c_last;
+    uint64_t 		m_order_line_quantity;
 
 public:
     OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
                    bool c_by_name);
+    bool NowPhase();
+    void LaterPhase();
+};
 
+class DeliveryTxn : public Action {
+private:
+    uint32_t 		m_warehouse_id;
+    uint32_t 		m_district_id;
+    uint32_t 		m_carrier_id;
+public:
+    DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
     bool NowPhase();
     void LaterPhase();
 };
