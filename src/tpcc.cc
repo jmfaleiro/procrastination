@@ -794,6 +794,61 @@ PaymentTxn::LaterPhase() {
     s_history_tbl->Put(writeset[s_customer_index].record.m_key, hist);
 }
 
+StockLevelTxn::StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, 
+                             int threshold) {
+    assert(warehouse_id < s_num_warehouses);
+    assert(district_id < s_districts_per_wh);
+
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+
+    m_threshold = threshold;
+
+    uint32_t keys[10];
+    keys[0] = warehouse_id;
+    keys[1] = district_id;
+    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+    dep_info.record.m_table = DISTRICT;
+    dep_info.record.m_key = district_key;
+    readset.push_back(dep_info);
+}
+
+bool
+StockLevelTxn::NowPhase() {
+    assert(readset[s_district_index].record.m_table == DISTRICT);
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+
+    uint32_t d_id = 
+        TPCCKeyGen::get_district_key(readset[s_district_index].record.m_key);
+    uint32_t w_id = 
+        TPCCKeyGen::get_warehouse_key(readset[s_district_index].record.m_key);
+    
+    assert(d_id < s_districts_per_wh);
+    assert(w_id < s_num_warehouses);
+    
+    District *dist = &s_warehouse_tbl[w_id].w_district_table[d_id];
+    int next_order_id = dist->d_next_o_id;
+    uint32_t keys[3];
+    keys[0] = w_id;
+    keys[1] = d_id;
+    for (int i = 0; i < 20; ++i) {
+        keys[2] = next_order_id - 1 - i;
+        uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
+        dep_info.record.m_table = NEW_ORDER;
+        dep_info.record.m_key = new_order_key;
+        readset.insert(readset.begin() + i, dep_info);
+    }    
+}
+
+void
+StockLevelTxn::LaterPhase() {
+    
+}
 
 /* Read the district table 			<w_id, d_id> 
  * Read the Stock table 			<s_w_id, s_i_id>

@@ -112,8 +112,7 @@ public:
     }
 
     static inline uint64_t
-    create_order_line_key(uint32_t *keys) {
-            
+    create_order_line_key(uint32_t *keys) {            
         return (
                 ((uint64_t)keys[0]) 				| 
                 (((uint64_t)keys[1]) << s_district_shift) 	| 
@@ -255,14 +254,26 @@ typedef struct {
     Stock 		*w_stock_table;
 } Warehouse;
   
+typedef struct {
+    uint64_t customer_id;
+    uint64_t order_id;
+} OrderLineIndex;
+
+// Base tables
 extern Warehouse 									*s_warehouse_tbl;
 extern Item 										*s_item_tbl;
-extern StringTable<Customer*>						*s_last_name_index;   
 extern ConcurrentHashTable<uint64_t, History> 		*s_history_tbl;
 extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
 extern ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
 extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
 
+// Extra indices
+extern StringTable<Customer*>						*s_last_name_index;
+
+extern 
+ConcurrentHashTable<OrderLineIndex, OrderLine*> 	*s_order_line_index;
+
+// Experiment parameters
 extern uint32_t 									s_num_items;  
 extern uint32_t 									s_num_warehouses;
 extern uint32_t 									s_districts_per_wh;
@@ -303,7 +314,6 @@ public:
 class NewOrderTxn : public Action {
     
 private:
-
 
     // Read set indices
     static const uint32_t s_customer_index = 0;
@@ -349,6 +359,27 @@ public:
     PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
                uint32_t c_d_id, uint32_t c_id, char *c_last, bool c_by_name);
     
+    bool NowPhase();
+    void LaterPhase();
+};
+
+class StockLevelTxn : public Action {
+private:
+    static const int s_district_index = 0;
+    int m_threshold;
+public:
+    StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, int threshold);
+    bool NowPhase();
+    void LaterPhase();
+};
+
+class OrderStatusTxn : public Action {
+private:
+
+public:
+    OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
+                   bool c_by_name);
+
     bool NowPhase();
     void LaterPhase();
 };
