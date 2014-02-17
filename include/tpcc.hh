@@ -399,6 +399,7 @@ private:
     uint32_t 		m_warehouse_id;
     uint32_t 		m_district_id;
     uint32_t 		m_carrier_id;
+    std::vector<int>		m_num_order_lines;
 public:
     DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
     bool NowPhase();

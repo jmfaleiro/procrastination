@@ -936,7 +936,8 @@ DeliveryTxn::NowPhase() {
                 dep_info.record.m_table = ORDER_LINE;
                 dep_info.record.m_key = order_line_key;
             }
-
+            
+            m_num_order_lines.push_back(oorder->o_ol_cnt);
             // Add the customer to the writeset            
             keys[2] = oorder->o_c_id;
             uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
@@ -954,14 +955,26 @@ DeliveryTxn::NowPhase() {
 
 void
 DeliveryTxn::LaterPhase() {
-    int num_order_lines = readset.size();
-    uint32_t amount = 0;
-    for (int i = 0; i < num_order_lines; ++i) {
-        assert(readset[i].record.m_table == ORDER_LINE);
-        uint64_t order_line_key = readset[i].record.m_key;
-        OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
-        amount += orderline->ol_amount;
+    int done = 0;
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        uint32_t amount = 0;
+        int num_order_lines = m_num_order_lines[i];
+        for (int j = done; j < num_order_lines; ++j, ++done) {
+            assert(readset[i].record.m_table == ORDER_LINE);
+            uint64_t order_line_key = readset[i].record.m_key;
+            OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
+            amount += orderline->ol_amount;
+        }
+        assert(writeset[2*i+1].record.m_table == CUSTOMER);
+        uint64_t cust_key = writeset[2*i+1].record.m_key;
+        uint32_t w_id = TPCCKeyGen::get_warehouse_key(cust_key);
+        uint32_t d_id = TPCCKeyGen::get_district_key(cust_key);
+        uint32_t c_id = TPCCKeyGen::get_customer_key(cust_key);
+        Customer *cust = 
+            &s_warehouse_tbl[w_id].w_district_table[d_id].
+            d_customer_table[c_id];
+        cust->c_balance += amount;
+        cust->c_delivery_cnt += 1;
     }
-    
 }
 
