@@ -926,9 +926,18 @@ DeliveryTxn::NowPhase() {
             dep_info.record.m_key = open_order_id;
             dep_info.record.m_table = NEW_ORDER;
             writeset.push_back(dep_info);
+            
+            // Add the order line items to the read set
+            Oorder *oorder = s_oorder_tbl->GetPtr(open_order_id);
+            for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
+                keys[3] = j;
+                uint64_t order_line_key = 
+                    TPCCKeyGen::create_order_line_key(keys);
+                dep_info.record.m_table = ORDER_LINE;
+                dep_info.record.m_key = order_line_key;
+            }
 
-            // Add the customer to the writeset
-            Oorder *oorder = s_oorder_tbl->GetPtr(open_order_id);            
+            // Add the customer to the writeset            
             keys[2] = oorder->o_c_id;
             uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
             dep_info.record.m_key = customer_key;
@@ -945,6 +954,14 @@ DeliveryTxn::NowPhase() {
 
 void
 DeliveryTxn::LaterPhase() {
+    int num_order_lines = readset.size();
+    uint32_t amount = 0;
+    for (int i = 0; i < num_order_lines; ++i) {
+        assert(readset[i].record.m_table == ORDER_LINE);
+        uint64_t order_line_key = readset[i].record.m_key;
+        OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
+        amount += orderline->ol_amount;
+    }
     
 }
 
