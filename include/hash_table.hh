@@ -18,6 +18,8 @@ string_hash_helper(char *str) {
     return CityHash64(str, len);
 }
 
+
+
 template <class K, class V>
 class BucketItem {
 public:
@@ -31,6 +33,35 @@ public:
         m_next = NULL;
     }
     ~BucketItem() {}
+};
+
+template<class K, class V>
+class TableIterator {
+private:
+    BucketItem<K, V> *m_cur;
+    K m_key;
+public:
+    TableIterator(BucketItem<K, V> *cur) {
+        m_cur = cur;
+        m_key = cur->m_key;
+    }
+
+    V
+    Value() {
+        return m_cur->m_value;
+    }
+    
+    void
+    Next() {
+        do {
+            m_cur = m_cur->next;
+        } while(m_cur != NULL && m_cur->m_key != m_key);
+    }
+    
+    bool
+    Done() {
+        return m_cur == NULL;
+    }
 };
 
 template <class K, class V>
@@ -77,6 +108,16 @@ protected:
         m_table = (BucketItem<K, V>**)tbl;
     }
 
+    virtual BucketItem<K, V>*
+    GetBucket(K key) {
+        uint64_t index = m_hash_function(key) & m_mask;
+        BucketItem<K, V> *to_ret = m_table[index];
+        while (to_ret != NULL && to_ret->m_key != key) {
+            to_ret = to_ret->m_next;
+        }
+        return to_ret;
+    }
+
 public:
     HashTable(uint32_t size, uint32_t chain_bound, 
               uint64_t (*hash)(K key) = NULL) {
@@ -102,19 +143,22 @@ public:
   
     virtual V
     Get(K key) {
-        uint64_t index = m_hash_function(key) & m_mask;
-        BucketItem<K, V> *to_ret = m_table[index];
-        while (to_ret != NULL && to_ret->m_key != key) {
-            to_ret = to_ret->m_next;
-        }
-        if (to_ret == NULL) {
+        BucketItem<K, V> *bucket = GetBucket(key);
+        if (bucket == NULL) {
             return V();
         }
         else {
-            return to_ret->m_value;
+            return bucket->m_value;
         }
     }
-  
+    
+    virtual TableIterator<K, V>
+    GetIterator(K key) {
+        BucketItem<K, V> *bucket = GetBucket(key);
+        TableIterator<K, V> ret(bucket);
+        return ret;
+    }
+
     virtual V*
     GetPtr(K key) {
         uint64_t index = m_hash_function(key) & m_mask;

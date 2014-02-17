@@ -712,7 +712,8 @@ PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t 
 bool
 PaymentTxn::NowPhase() {
     uint64_t w_id = writeset[s_warehouse_index].record.m_key;
-    uint64_t d_id = TPCCKeyGen::get_district_key(writeset[s_district_index].record.m_key);
+    uint64_t d_id = 
+        TPCCKeyGen::get_district_key(writeset[s_district_index].record.m_key);
     assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
     assert(writeset[s_district_index].record.m_table == DISTRICT);
     assert(w_id < s_num_warehouses);    

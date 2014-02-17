@@ -18,6 +18,24 @@ class ConcurrentHashTable : public HashTable<K, V> {
     //
     // *u means that the 8-byte word is unused. 
 
+private:
+    virtual BucketItem<K, V>*
+    GetBucket(K key) {
+        uint64_t index = this->m_hash_function(key) & this->m_mask;    
+        BucketItem<K, V> **table = this->m_table;
+        uint64_t *lock_word = (uint64_t*)&table[CACHE_LINE*index+2];
+        lock(lock_word);
+
+        BucketItem<K, V> *to_ret = table[CACHE_LINE*index];
+        
+        unlock(lock_word);
+        
+        while (to_ret != NULL && to_ret->m_key != key) {
+            to_ret = to_ret->m_next;
+        }
+        return to_ret;
+    }
+
 public:
     ConcurrentHashTable(uint32_t size, uint32_t chain_bound, 
                         uint64_t (*hash)(K key) = NULL) 
@@ -57,27 +75,17 @@ public:
   
     virtual V
     Get(K key) {
-        uint64_t index = this->m_hash_function(key) & this->m_mask;    
-        V ret;
-
-        BucketItem<K, V> **table = this->m_table;
-        uint64_t *lock_word = (uint64_t*)&table[CACHE_LINE*index+2];
-        lock(lock_word);
-
-        BucketItem<K, V> *to_ret = table[CACHE_LINE*index];
-        while (to_ret != NULL && to_ret->m_key != key) {
-            to_ret = to_ret->m_next;
-        }
-        if (to_ret == NULL) {
-            ret = V();
-        }
-        else {
-            ret = to_ret->m_value;
-        }
-        unlock(lock_word);
+        BucketItem<K, V> *bucket = GetBucket(key);
+        return bucket->m_value;
+    }
+    
+    virtual TableIterator<K, V>
+    GetIterator(K key) {
+        BucketItem<K, V> *bucket = GetBucket(key);
+        TableIterator<K, V> ret(bucket);
         return ret;
     }
-  
+
     virtual V
     Delete(K key) {
         uint64_t index = this->m_hash_function(key) & this->m_mask;
