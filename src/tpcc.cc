@@ -17,7 +17,10 @@ using namespace std;
 
 Warehouse 									*s_warehouse_tbl;
 Item 										*s_item_tbl;
+
 StringTable<Customer*> 						*s_last_name_index;
+ConcurrentHashTable<uint64_t, OrderLine*>	*s_order_line_index;
+
 ConcurrentHashTable<uint64_t, History>		*s_history_tbl;
 ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
 ConcurrentHashTable<uint64_t, Oorder> 		*s_oorder_tbl;
@@ -806,6 +809,8 @@ StockLevelTxn::StockLevelTxn(uint32_t warehouse_id, uint32_t district_id,
     dep_info.index = -1;
 
     m_threshold = threshold;
+    m_stock_count = 0;
+    m_warehouse_id = warehouse_id;
 
     uint32_t keys[10];
     keys[0] = warehouse_id;
@@ -840,7 +845,7 @@ StockLevelTxn::NowPhase() {
     for (int i = 0; i < 20; ++i) {
         keys[2] = next_order_id - 1 - i;
         uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
-        dep_info.record.m_table = NEW_ORDER;
+        dep_info.record.m_table = ORDER_LINE_INDEX;
         dep_info.record.m_key = new_order_key;
         readset.insert(readset.begin() + i, dep_info);
     }    
@@ -848,7 +853,24 @@ StockLevelTxn::NowPhase() {
 
 void
 StockLevelTxn::LaterPhase() {
-    
+    uint32_t num_orders = readset.size();
+    for (uint32_t i = 0; i < num_orders; ++i) {
+        assert(readset[i].record.m_table == ORDER_LINE_INDEX);
+        uint64_t key = readset[i].record.m_key;
+        TableIterator<uint64_t, OrderLine*> iter = 
+            s_order_line_index->GetIterator(key);
+        OrderLine *ol = NULL;
+        while (!iter.Done()) {
+            OrderLine *ol = iter.Value();
+            uint32_t item_id = ol->ol_i_id;
+            Stock *stock = 
+                &s_warehouse_tbl[m_warehouse_id].w_stock_table[item_id];
+            
+            // Extremely hacky way to avoid a branch!!!
+            m_stock_count += 
+                ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
+        }
+    }
 }
 
 /* Read the district table 			<w_id, d_id> 

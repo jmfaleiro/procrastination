@@ -24,6 +24,7 @@ enum TPCCTable {
     ORDER_LINE,
     ITEM,
     STOCK,    
+    ORDER_LINE_INDEX,
 };
 
 
@@ -269,9 +270,7 @@ extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
 
 // Extra indices
 extern StringTable<Customer*>						*s_last_name_index;
-
-extern 
-ConcurrentHashTable<OrderLineIndex, OrderLine*> 	*s_order_line_index;
+extern ConcurrentHashTable<uint64_t, OrderLine*> 	*s_order_line_index;
 
 // Experiment parameters
 extern uint32_t 									s_num_items;  
@@ -367,6 +366,9 @@ class StockLevelTxn : public Action {
 private:
     static const int s_district_index = 0;
     int m_threshold;
+    int m_stock_count;
+    uint64_t m_warehouse_id;
+
 public:
     StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, int threshold);
     bool NowPhase();
