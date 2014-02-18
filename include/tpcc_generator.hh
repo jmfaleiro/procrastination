@@ -18,14 +18,24 @@ public:
     genNext() {
         int pct = m_util.gen_rand_range(1, 100);
         return gen_payment();
-        /*
         if (pct <= 45) {
             return gen_new_order();
         }
-        else if (pct <= 100) {
+        else if (pct <= 88) {
             return gen_payment();
         }
-        */
+        else {
+            int swtch_rand = m_util.gen_rand_range(1, 3);
+            switch (swtch_rand) {
+            case 1:
+                return gen_stock_level();
+            case 2:
+                return gen_delivery();
+            case 3:
+                return gen_order_status();
+            }
+        }
+        assert(false);
     }
     
     NewOrderTxn*
@@ -113,6 +123,30 @@ public:
         return new PaymentTxn(warehouse_id, customer_w_id, payment_amt, 
                               district_id, customer_d_id, customer_id, NULL, 
                               false);
+    }
+
+    StockLevelTxn*
+    gen_stock_level() {
+        uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses);
+        uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh);
+        int threshold = 1000;
+        return new StockLevelTxn(warehouse_id, district_id, threshold);
+    }
+    
+    DeliveryTxn*
+    gen_delivery() {
+        uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses);
+        uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh);
+        return new DeliveryTxn(warehouse_id, district_id, 0);
+    }
+
+    OrderStatusTxn*
+    gen_order_status() {
+        uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses);
+        uint32_t district_id = m_util.gen_ran_range(0, s_districts_per_wh);
+        uint32_t customer_id = (uint32_t)m_util.gen_customer_id();
+        return new OrderStatusTxn(warehouse_id, district_id, customer_id, NULL, 
+                                  false);        
     }
 };
 
