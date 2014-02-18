@@ -143,7 +143,7 @@ public:
     OrderStatusTxn*
     gen_order_status() {
         uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses);
-        uint32_t district_id = m_util.gen_ran_range(0, s_districts_per_wh);
+        uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh);
         uint32_t customer_id = (uint32_t)m_util.gen_customer_id();
         return new OrderStatusTxn(warehouse_id, district_id, customer_id, NULL, 
                                   false);        
