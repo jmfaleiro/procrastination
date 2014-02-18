@@ -369,12 +369,12 @@ TPCCInit::do_init() {
     s_districts_per_wh = m_dist_per_wh;
     s_customers_per_dist = m_cust_per_dist;
 
-    s_new_order_tbl = new HashTable<uint64_t, NewOrder>(1<<19, 20);
-    s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<19, 20);
-    s_order_line_tbl = new HashTable<uint64_t, OrderLine>(1<<19, 20);
-    s_last_name_index = new StringTable<Customer*>(1<<19, 20);
-    s_history_tbl = new HashTable<uint64_t, History>(1<<19, 20);
-    s_oorder_index = new HashTable<uint64_t, Oorder*>(1<<19, 20);
+    s_new_order_tbl = new HashTable<uint64_t, NewOrder>(1<<24, 20);
+    s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<24, 20);
+    s_order_line_tbl = new HashTable<uint64_t, OrderLine>(1<<24, 20);
+    s_last_name_index = new StringTable<Customer*>(1<<24, 20);
+    s_history_tbl = new HashTable<uint64_t, History>(1<<24, 20);
+    s_oorder_index = new HashTable<uint64_t, Oorder*>(1<<24, 20);
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {
@@ -702,7 +702,10 @@ NewOrderTxn::LaterPhase() {
     keys[1] = d_id;
     keys[2] = m_order_id;
     uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
-    s_oorder_tbl->Put(oorder_key, oorder);
+    Oorder *new_oorder = s_oorder_tbl->Put(oorder_key, oorder);
+
+    Oorder **old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
+    *old_index = new_oorder;
 }
 
 PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
