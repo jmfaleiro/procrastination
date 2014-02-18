@@ -78,8 +78,9 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id,
         district[i].d_w_id = warehouse_id;
         district[i].d_ytd = 3000;
         district[i].d_tax = (rand() % 2001) / 1000.0;
-        district[i].d_next_o_id = 3001;
-
+        district[i].d_next_o_id = 3000;
+        district[i].d_next_d_id = 2000;
+        
         random.gen_rand_string(6, 10, district[i].d_name);
         random.gen_rand_string(10, 20, district[i].d_street_1);
         random.gen_rand_string(10, 20, district[i].d_street_2);
@@ -201,7 +202,12 @@ TPCCInit::init_order(TPCCUtil &random) {
                 keys[1] = oorder.o_d_id;
                 keys[2] = oorder.o_id;
                 uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
-                s_oorder_tbl->Put(oorder_key, oorder);
+                Oorder *inserted = s_oorder_tbl->Put(oorder_key, oorder);
+                Oorder *inserted_verify = s_oorder_tbl->GetPtr(oorder_key);
+                assert(inserted == inserted_verify && inserted != NULL);
+                keys[2] = oorder.o_c_id;
+                uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);                
+                s_oorder_index->Put(customer_key, inserted);
 
                 if (c >= s_first_unprocessed_o_id) {
                     new_order.no_w_id = w;
@@ -328,6 +334,33 @@ TPCCInit::init_stock(Stock *stock, uint32_t warehouse_id,
 }
 
 void
+TPCCInit::test_init() {
+    uint32_t keys[4];
+    for (uint32_t i = 0; i < s_num_warehouses; ++i) {
+        keys[0] = i;	// Warehouse number
+        for (uint32_t j = 0; j < s_districts_per_wh; ++j) {            
+            keys[1] = j;	// District number
+            District *dist = &s_warehouse_tbl[i].w_district_table[j];
+            uint32_t next_order_id = dist->d_next_o_id;
+
+            // Make sure that a stock level txn won't fail
+            for (uint32_t k = 0; k < 20; ++k) {
+                keys[2] = next_order_id - 1 - k;
+                uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
+                assert(s_oorder_tbl->GetPtr(open_order_key) != NULL);
+            }
+            
+            // Make sure that each customer has a sensible open order
+            for (uint32_t k = 0; k < s_customers_per_dist; ++k) {
+                keys[2] = k;
+                uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+                assert(s_oorder_index->GetPtr(customer_key) != NULL);
+            }
+        }
+    }
+}
+
+void
 TPCCInit::do_init() {
     
     TPCCUtil random;
@@ -341,6 +374,7 @@ TPCCInit::do_init() {
     s_order_line_tbl = new HashTable<uint64_t, OrderLine>(1<<19, 20);
     s_last_name_index = new StringTable<Customer*>(1<<19, 20);
     s_history_tbl = new HashTable<uint64_t, History>(1<<19, 20);
+    s_oorder_index = new HashTable<uint64_t, Oorder*>(1<<19, 20);
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {
@@ -374,6 +408,7 @@ TPCCInit::do_init() {
             (Stock*)malloc(sizeof(Stock)*m_item_count);
         init_stock(s_warehouse_tbl[w].w_stock_table, w, random);
     }    
+    test_init();
 }
 
 // Append table identifier to the primary key. Use this string to identify 
@@ -654,16 +689,20 @@ NewOrderTxn::LaterPhase() {
     }
     
     // Insert an entry into the open order table.    
-    /*
     Oorder oorder;
     oorder.o_id = m_order_id;
-    oorder.o_d_id = d_id;
     oorder.o_w_id = w_id;
+    oorder.o_d_id = d_id;
     oorder.o_c_id = c_id;
-    oorder.o_entry_d = m_timestamp;
+    oorder.o_carrier_id = 0;
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
-    */
+    oorder.o_entry_d = m_timestamp;
+    keys[0] = w_id;
+    keys[1] = d_id;
+    keys[2] = m_order_id;
+    uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
+    s_oorder_tbl->Put(oorder_key, oorder);
 }
 
 PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
@@ -816,6 +855,7 @@ StockLevelTxn::NowPhase() {
     dep_info.dependency = NULL;
     dep_info.is_write = false;
     dep_info.index = -1;
+    dep_info.record.m_table = ORDER_LINE;
 
     uint32_t keys[4];
     keys[0] = m_warehouse_id;
@@ -828,13 +868,19 @@ StockLevelTxn::NowPhase() {
 
     for (int i = 0; i < 20; ++i) {
         keys[2] = next_order_id - 1 - i;
-        uint64_t oorder_key = TPCCKeyGen::create_new_order_key(keys);
+        uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
         Oorder *open_order = s_oorder_tbl->GetPtr(oorder_key);
+        if (open_order == NULL) {
+            std::cout << "Warehouse: " << m_warehouse_id << "\nDistrict: ";
+            std::cout << m_district_id << "\nOrder ID: " << keys[2] << "\n";
+            assert(open_order != NULL);
+        }
         for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j) {
             keys[3] = j;
             dep_info.record.m_key = TPCCKeyGen::create_order_line_key(keys);
+            readset.push_back(dep_info);
         }
-        readset.insert(readset.begin() + i, dep_info);
+
     }    
 }
 
@@ -877,7 +923,9 @@ OrderStatusTxn::NowPhase() {
     uint32_t keys[4];
     keys[0] = m_warehouse_id;
     keys[1] = m_district_id;    
-    Oorder *open_order = s_oorder_index->Get(m_customer_id);
+    keys[2] = m_customer_id;
+    uint64_t cust_key = TPCCKeyGen::create_customer_key(keys);
+    Oorder *open_order = s_oorder_index->Get(cust_key);
     keys[2] = open_order->o_id;
     for (uint32_t i = 0; i < open_order->o_ol_cnt; ++i) {
         keys[3] = i;
@@ -935,6 +983,7 @@ DeliveryTxn::NowPhase() {
                     TPCCKeyGen::create_order_line_key(keys);
                 dep_info.record.m_table = ORDER_LINE;
                 dep_info.record.m_key = order_line_key;
+                readset.push_back(dep_info);
             }
             
             m_num_order_lines.push_back(oorder->o_ol_cnt);

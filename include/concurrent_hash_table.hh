@@ -49,7 +49,7 @@ public:
                this->m_hash_function == this->default_hash_function);
     }
 
-    virtual void
+    virtual V*
     Put(K key, V value) {
         uint64_t index = this->m_hash_function(key) & this->m_mask;
         BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, value);
@@ -71,6 +71,7 @@ public:
           #endif
         */
         unlock(lock_word);
+        return &to_insert->m_value;
     }
   
     virtual V

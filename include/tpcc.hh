@@ -302,6 +302,9 @@ private:
     void init_order(TPCCUtil &random);
     void init_item(Item *item, TPCCUtil &random);
     void init_stock(Stock *stock, uint32_t wh_id, TPCCUtil &random);
+    
+    // Makes sure that everything is in order.
+    void test_init();
 
 public:
     TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 

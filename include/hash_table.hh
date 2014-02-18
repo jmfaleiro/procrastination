@@ -136,9 +136,10 @@ public:
         memset(m_table, 0, size);
     }
 
-    virtual void
+    virtual V*
     Put(K key, V value) {
-        PutInternal(key, value);
+        BucketItem<K, V> *temp = PutInternal(key, value);
+        return &temp->m_value;
     }
   
     virtual V
@@ -167,8 +168,7 @@ public:
             item = item->m_next;
         }
         if (item == NULL) {
-            item = PutInternal(key, V());
-            return &item->m_value;
+            return NULL;
         }
         else {
             return &item->m_value;

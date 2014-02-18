@@ -20,13 +20,14 @@ public:
         memset(this->m_table, 0, sizeof(BucketItem<char*, V>*)*this->m_size);
     }
 
-    virtual void
+    virtual V*
     Put(char* key, V value) {
         uint64_t index = string_hash_function(key) & (this->m_size - 1);
         BucketItem<char*, V> *to_insert = new BucketItem<char*, V>(key, value);
         BucketItem<char*, V> **table = this->m_table;        
         to_insert->m_next = table[index];
         table[index] = to_insert;
+        return &to_insert->m_value;
     }
     
     virtual V

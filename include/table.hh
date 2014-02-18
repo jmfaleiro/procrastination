@@ -5,7 +5,7 @@ template<class K, class V>
 class Table {
 public:
 
-  virtual void
+  virtual V*
   Put(K key, V value) = 0;
 
   virtual V
