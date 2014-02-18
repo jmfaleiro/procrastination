@@ -301,9 +301,9 @@ initialize(ExperimentInfo* info,
         sched_size = LARGE_QUEUE;
     }
 
-    uint64_t* sched_input_data = 
-        (uint64_t*)malloc(CACHE_LINE*sizeof(uint64_t)*sched_size);
-    memset(sched_input_data, 0, CACHE_LINE*sizeof(uint64_t)*sched_size);
+    char* sched_input_data = 
+        (char*)malloc(CACHE_LINE*sched_size);
+    memset(sched_input_data, 0, CACHE_LINE*sched_size);
 
     assert(sched_input_data != NULL);
 
@@ -370,9 +370,9 @@ initialize(ExperimentInfo* info,
     SimpleQueue *scheduler_output = NULL;
     bool throughput_expt = (info->experiment == THROUGHPUT);
     if (info->experiment == TPCC) {
-        uint64_t *scheduler_output_data = 
-            (uint64_t*)malloc(sizeof(uint64_t)*LARGE_QUEUE);
-        memset(scheduler_output_data, 0, sizeof(uint64_t)*LARGE_QUEUE);
+        char *scheduler_output_data = 
+            (char*)malloc(CACHE_LINE*LARGE_QUEUE);
+        memset(scheduler_output_data, 0, CACHE_LINE*LARGE_QUEUE);
         scheduler_output = 
             new SimpleQueue(scheduler_output_data, LARGE_QUEUE);
 

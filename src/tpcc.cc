@@ -22,9 +22,9 @@ HashTable<uint64_t, Oorder>			 		*s_oorder_tbl;
 StringTable<Customer*> 						*s_last_name_index;
 HashTable<uint64_t, Oorder*>				*s_oorder_index;
 
-ConcurrentHashTable<uint64_t, History>		*s_history_tbl;
-ConcurrentHashTable<uint64_t, NewOrder> 	*s_new_order_tbl;
-ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
+HashTable<uint64_t, History>				*s_history_tbl;
+HashTable<uint64_t, NewOrder> 				*s_new_order_tbl;
+HashTable<uint64_t, OrderLine> 				*s_order_line_tbl;
 
 uint32_t 									s_num_items;  
 uint32_t 									s_num_warehouses;
@@ -336,11 +336,11 @@ TPCCInit::do_init() {
     s_districts_per_wh = m_dist_per_wh;
     s_customers_per_dist = m_cust_per_dist;
 
-    s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<19, 20);
+    s_new_order_tbl = new HashTable<uint64_t, NewOrder>(1<<19, 20);
     s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<19, 20);
-    s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<19, 20);
+    s_order_line_tbl = new HashTable<uint64_t, OrderLine>(1<<19, 20);
     s_last_name_index = new StringTable<Customer*>(1<<19, 20);
-    s_history_tbl = new ConcurrentHashTable<uint64_t, History>(1<<19, 20);
+    s_history_tbl = new HashTable<uint64_t, History>(1<<19, 20);
 
     NewOrder blah;
     for (uint64_t i = 0; i < 10000000; ++i) {

@@ -77,12 +77,12 @@ void* Worker::workerFunction(void* arg) {
 
   // Initialize the input and output queues. 
   int size = worker->m_queue_size;
-  uint64_t* input_queue_data = 
-      (uint64_t*)numa_alloc_local(size*CACHE_LINE*sizeof(uint64_t));
-  uint64_t* output_queue_data = 
-      (uint64_t*)numa_alloc_local(LARGE_QUEUE*CACHE_LINE*sizeof(uint64_t));
-  memset(input_queue_data, 0, size*CACHE_LINE*sizeof(uint64_t));
-  memset(output_queue_data, 0, LARGE_QUEUE*CACHE_LINE*sizeof(uint64_t));
+  char* input_queue_data = 
+      (char*)numa_alloc_local(size*CACHE_LINE);
+  char* output_queue_data = 
+      (char*)numa_alloc_local(LARGE_QUEUE*CACHE_LINE);
+  memset(input_queue_data, 0, size*CACHE_LINE);
+  memset(output_queue_data, 0, LARGE_QUEUE*CACHE_LINE);
 
   assert(input_queue_data != NULL);
   assert(output_queue_data != NULL);

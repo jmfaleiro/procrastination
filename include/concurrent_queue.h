@@ -17,9 +17,9 @@
 
 #define CACHE_PAD 64
 #define PAD(t)								\
-	union __attribute__((__packed__,  __aligned__(CACHE_PAD))) {	\
-	       t v;							\
-	       char __p[CACHE_PAD + (sizeof(t) / CACHE_PAD) * CACHE_PAD];	\
+	union __attribute__((__packed__,  __aligned__(CACHE_PAD))) {        \
+        t v;                                                            \
+        char __p[CACHE_PAD + (sizeof(t) / CACHE_PAD) * CACHE_PAD];      \
 	}
 
 
@@ -32,21 +32,22 @@
 // 
 
 struct queue_elem {
-  uint64_t m_data;						// Pointer to data (app specific).
-  volatile struct queue_elem* m_next;
+    uint64_t m_data;						// Pointer to data (app specific).
+    volatile struct queue_elem* m_next;
 } __attribute__((aligned(64)));
 
 
 class SimpleQueue {
-    uint64_t* m_values;
+    char* m_values;
     uint64_t m_size;
     volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_head;    
     volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_tail;    
 
  public:
-    SimpleQueue(uint64_t* values, int size) {
+    SimpleQueue(char* values, uint64_t size) {
         m_values = values;
         m_size = (uint64_t)size;
+        assert(!(m_size & (m_size-1)));
         m_head = 0;
         m_tail = 0;        
     }
@@ -64,7 +65,7 @@ class SimpleQueue {
             uint64_t index = m_head & (m_size-1);
             assert(index < m_size);
             
-            m_values[index*CACHE_LINE] = data;
+            (*(uint64_t*)&m_values[index*CACHE_LINE]) = data;
             fetch_and_increment(&m_head);
             return true;
         }
@@ -77,7 +78,7 @@ class SimpleQueue {
         uint64_t index = m_head & (m_size - 1);
         assert(index < m_size);
         assert(index <= ((m_size - 1) << 6));
-        m_values[index*CACHE_LINE] = data;
+        (*(uint64_t*)&m_values[index*CACHE_LINE]) = data;
         fetch_and_increment(&m_head);
     }
     
@@ -88,7 +89,7 @@ class SimpleQueue {
         uint64_t index = m_tail & (m_size - 1);
         assert(index < m_size);
         assert(index <= ((m_size - 1) << 6));
-        uint64_t ret = m_values[index*CACHE_LINE];
+        uint64_t ret = (*(uint64_t*)&m_values[index*CACHE_LINE]);
         fetch_and_increment(&m_tail);
         return ret;
     }
@@ -102,7 +103,7 @@ class SimpleQueue {
             uint64_t index = m_tail & (m_size - 1);            
             assert(index < m_size);
             assert(index <= ((m_size - 1) << 6));
-            *value = m_values[index*CACHE_LINE];
+            *value = (*(uint64_t*)&m_values[index*CACHE_LINE]);
             fetch_and_increment(&m_tail);
             return true;
         }

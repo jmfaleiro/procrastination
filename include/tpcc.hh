@@ -270,9 +270,9 @@ extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
 extern StringTable<Customer*>						*s_last_name_index;
 
 // Later phase tables
-extern ConcurrentHashTable<uint64_t, History> 		*s_history_tbl;
-extern ConcurrentHashTable<uint64_t, NewOrder> 		*s_new_order_tbl;
-extern ConcurrentHashTable<uint64_t, OrderLine> 	*s_order_line_tbl;
+extern HashTable<uint64_t, History> 				*s_history_tbl;
+extern HashTable<uint64_t, NewOrder> 				*s_new_order_tbl;
+extern HashTable<uint64_t, OrderLine> 				*s_order_line_tbl;
 
 // Experiment parameters
 extern uint32_t 									s_num_items;  
