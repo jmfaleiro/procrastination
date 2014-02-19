@@ -160,8 +160,7 @@ typedef struct {
 typedef struct {
     int 		d_id;
     int 		d_w_id;
-    int 		d_next_o_id;
-    int 		d_next_d_id;
+    uint32_t	d_next_o_id;
     float 		d_ytd;
     float 		d_tax;
     char 		d_name[11];
@@ -170,7 +169,6 @@ typedef struct {
     char 		d_city[21];
     char 		d_state[4];
     char 		d_zip[10];
-    Customer* 	d_customer_table;
 } District __attribute((aligned(CACHE_LINE)));
 
 typedef struct {
@@ -267,10 +265,11 @@ extern HashTable<uint64_t, District> 				*s_district_tbl;
 extern HashTable<uint64_t, Customer> 				*s_customer_tbl;
 extern HashTable<uint64_t, Item> 					*s_item_tbl;
 
-extern HashTable<uint64_t, Oorder>			 		*s_oorder__tbl;
+extern HashTable<uint64_t, Oorder>			 		*s_oorder_tbl;
 extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
 extern HashTable<uint64_t, Stock> 					*s_stock_tbl;
 extern StringTable<Customer*>						*s_last_name_index;
+extern HashTable<uint64_t, uint32_t>				*s_next_delivery_tbl;
 
 // Later phase tables
 extern HashTable<uint64_t, History> 				*s_history_tbl;

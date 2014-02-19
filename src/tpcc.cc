@@ -25,6 +25,7 @@ HashTable<uint64_t, Stock> 							*s_stock_tbl;
 HashTable<uint64_t, History> 						*s_history_tbl;
 HashTable<uint64_t, NewOrder> 						*s_new_order_tbl;
 HashTable<uint64_t, OrderLine> 						*s_order_line_tbl;
+HashTable<uint64_t, uint32_t>						*s_next_delivery_tbl;
 
 // Secondary indices
 StringTable<Customer*>								*s_last_name_index;
@@ -80,7 +81,6 @@ TPCCInit::init_districts(TPCCUtil &random) {
             district.d_ytd = 3000;
             district.d_tax = (rand() % 2001) / 1000.0;
             district.d_next_o_id = 3000;
-            district.d_next_d_id = s_first_unprocessed_o_id;
         
             random.gen_rand_string(6, 10, district.d_name);
             random.gen_rand_string(10, 20, district.d_street_1);
@@ -94,7 +94,8 @@ TPCCInit::init_districts(TPCCUtil &random) {
             keys[1] = i;
             uint64_t district_key = TPCCKeyGen::create_district_key(keys);
             District *verif = s_district_tbl->Put(district_key, district);
-            assert(s_district_tbl->GetPtr(district_key) == verif);
+            assert(s_district_tbl->GetPtr(district_key) == verif);            
+            s_next_delivery_tbl->Put(district_key, s_first_unprocessed_o_id);
         }
     }
 }
@@ -384,7 +385,7 @@ TPCCInit::test_init() {
             }
             
             // Make sure that the delivery txn won't fail
-            uint32_t next_delivery_order = dist->d_next_d_id;
+            uint32_t next_delivery_order = s_next_delivery_tbl->Get(district_key);
             keys[2] = next_delivery_order;
             uint64_t next_d_order_key = TPCCKeyGen::create_order_key(keys);
             assert(next_delivery_order == s_first_unprocessed_o_id);
@@ -413,6 +414,7 @@ TPCCInit::do_init() {
     s_customer_tbl = new HashTable<uint64_t, Customer>(1<<24, 20);
     s_stock_tbl = new HashTable<uint64_t, Stock>(1<<24, 20);
     s_item_tbl = new HashTable<uint64_t, Item>(1<<24, 20);
+    s_next_delivery_tbl = new HashTable<uint64_t, uint32_t>(1<<10, 20);
 
     s_new_order_tbl = new HashTable<uint64_t, NewOrder>(1<<24, 20);
     s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<24, 20);
@@ -935,12 +937,13 @@ DeliveryTxn::NowPhase() {
     for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
         keys[1] = i;
         uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+        uint32_t *next_delivery = s_next_delivery_tbl->GetPtr(district_key);
         District *district = s_district_tbl->GetPtr(district_key);
-        assert(district->d_next_o_id >= district->d_next_d_id);
-        if (district->d_next_o_id > district->d_next_d_id) {
+        assert(district->d_next_o_id >= *next_delivery);
+        if (district->d_next_o_id > *next_delivery) {
             
             // Add the new order record to the writeset
-            keys[2] = district->d_next_d_id;
+            keys[2] = *next_delivery;
             uint64_t open_order_id = TPCCKeyGen::create_order_key(keys);
             //            dep_info.record.m_key = open_order_id;
             //            dep_info.record.m_table = NEW_ORDER;
@@ -969,7 +972,7 @@ DeliveryTxn::NowPhase() {
 
             // Write to the open order and district tables
             oorder->o_carrier_id = m_carrier_id;
-            district->d_next_d_id += 1;
+            *next_delivery += 1;
         }
     }
     return true;
