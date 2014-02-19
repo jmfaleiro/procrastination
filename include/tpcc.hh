@@ -504,10 +504,8 @@ public:
                    int num_sources) {
         int offset = 0;
         for (int i = 0; i < num_sources; ++i) {
+            strcpy(dest+offset, sources[i]);
             offset += strlen(sources[i]);
-            assert(offset < dest_len);
-            strcpy(dest, sources[i]);
-            dest += offset;
         }
         dest[offset] = '\0';
     }
