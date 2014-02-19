@@ -79,7 +79,7 @@ TPCCInit::init_district(District *district, uint32_t warehouse_id,
         district[i].d_ytd = 3000;
         district[i].d_tax = (rand() % 2001) / 1000.0;
         district[i].d_next_o_id = 3000;
-        district[i].d_next_d_id = 2000;
+        district[i].d_next_d_id = s_first_unprocessed_o_id;
         
         random.gen_rand_string(6, 10, district[i].d_name);
         random.gen_rand_string(10, 20, district[i].d_street_1);
@@ -158,6 +158,7 @@ TPCCInit::init_order(TPCCUtil &random) {
     assert(s_oorder_tbl != NULL);
     assert(s_new_order_tbl != NULL);
     assert(s_order_line_tbl != NULL);
+    assert(s_first_unprocessed_o_id < m_cust_per_dist);
 
     // Use this array to construct a composite key for each of the Order, 
     // OrderLine and Oorder tables. 
@@ -350,12 +351,21 @@ TPCCInit::test_init() {
                 assert(s_oorder_tbl->GetPtr(open_order_key) != NULL);
             }
             
+            // Make sure that the delivery txn won't fail
+            uint32_t next_delivery_order = dist->d_next_d_id;
+            keys[2] = next_delivery_order;
+            uint64_t next_d_order_key = TPCCKeyGen::create_order_key(keys);
+            assert(next_delivery_order == s_first_unprocessed_o_id);
+            assert(s_oorder_tbl->GetPtr(next_d_order_key) != NULL);
+
             // Make sure that each customer has a sensible open order
             for (uint32_t k = 0; k < s_customers_per_dist; ++k) {
                 keys[2] = k;
                 uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
                 assert(s_oorder_index->GetPtr(customer_key) != NULL);
             }
+            
+            
         }
     }
 }
@@ -951,6 +961,9 @@ OrderStatusTxn::LaterPhase() {
 
 
 DeliveryTxn::DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+
     m_warehouse_id = w_id;
     m_district_id = d_id;
     m_carrier_id = carrier_id;
@@ -963,23 +976,25 @@ DeliveryTxn::NowPhase() {
     dep_info.is_write = false;
     dep_info.index = -1;
 
-    uint32_t keys[3];
+    uint32_t keys[4];
     District *districts = s_warehouse_tbl[m_warehouse_id].w_district_table;
+    uint32_t done = 0;
     for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
-        assert(districts->d_next_o_id >= districts->d_next_d_id);
-        if (districts->d_next_o_id > districts->d_next_d_id) {
+        assert(districts[i].d_next_o_id >= districts[i].d_next_d_id);
+        if (districts[i].d_next_o_id > districts[i].d_next_d_id) {
             
             // Add the new order record to the writeset
             keys[0] = m_warehouse_id;
             keys[1] = i;
-            keys[2] = districts->d_next_d_id;            
-            uint64_t open_order_id = TPCCKeyGen::create_new_order_key(keys);
-            dep_info.record.m_key = open_order_id;
-            dep_info.record.m_table = NEW_ORDER;
-            writeset.push_back(dep_info);
+            keys[2] = districts[i].d_next_d_id;            
+            uint64_t open_order_id = TPCCKeyGen::create_order_key(keys);
+            //            dep_info.record.m_key = open_order_id;
+            //            dep_info.record.m_table = NEW_ORDER;
+            //            writeset.push_back(dep_info);
             
             // Add the order line items to the read set
             Oorder *oorder = s_oorder_tbl->GetPtr(open_order_id);
+            assert(oorder != NULL);
             for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
                 keys[3] = j;
                 uint64_t order_line_key = 
@@ -987,9 +1002,10 @@ DeliveryTxn::NowPhase() {
                 dep_info.record.m_table = ORDER_LINE;
                 dep_info.record.m_key = order_line_key;
                 readset.push_back(dep_info);
-            }
-            
-            m_num_order_lines.push_back(oorder->o_ol_cnt);
+            }            
+            done += oorder->o_ol_cnt;
+            m_num_order_lines.push_back(done);            
+
             // Add the customer to the writeset            
             keys[2] = oorder->o_c_id;
             uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
@@ -999,7 +1015,7 @@ DeliveryTxn::NowPhase() {
 
             // Write to the open order and district tables
             oorder->o_carrier_id = m_carrier_id;
-            districts->d_next_d_id += 1;
+            districts[i].d_next_d_id += 1;
         }
     }
     return true;
@@ -1008,17 +1024,18 @@ DeliveryTxn::NowPhase() {
 void
 DeliveryTxn::LaterPhase() {
     int done = 0;
-    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+    uint32_t write_count = writeset.size();
+    for (uint32_t i = 0; i < write_count; ++i) {
         uint32_t amount = 0;
         int num_order_lines = m_num_order_lines[i];
         for (int j = done; j < num_order_lines; ++j, ++done) {
-            assert(readset[i].record.m_table == ORDER_LINE);
-            uint64_t order_line_key = readset[i].record.m_key;
+            assert(readset[j].record.m_table == ORDER_LINE);
+            uint64_t order_line_key = readset[j].record.m_key;
             OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
             amount += orderline->ol_amount;
         }
-        assert(writeset[2*i+1].record.m_table == CUSTOMER);
-        uint64_t cust_key = writeset[2*i+1].record.m_key;
+        assert(writeset[i].record.m_table == CUSTOMER);
+        uint64_t cust_key = writeset[i].record.m_key;
         uint32_t w_id = TPCCKeyGen::get_warehouse_key(cust_key);
         uint32_t d_id = TPCCKeyGen::get_district_key(cust_key);
         uint32_t c_id = TPCCKeyGen::get_customer_key(cust_key);

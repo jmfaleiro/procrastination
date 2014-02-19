@@ -289,7 +289,7 @@ private:
     uint32_t m_cust_per_dist;
     uint32_t m_item_count;
         
-    static const uint32_t s_first_unprocessed_o_id = 2001;
+    static const uint32_t s_first_unprocessed_o_id = 2101;
 
     // Each of the functions below initializes an apriori allocated single 
     // row.

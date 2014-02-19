@@ -30,7 +30,7 @@ public:
             case 1:
                 return gen_stock_level();
             case 2:
-                return gen_order_status();
+                return gen_delivery();
             case 3:
                 return gen_order_status();
             }
@@ -137,7 +137,7 @@ public:
     gen_delivery() {
         uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses-1);
         uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh-1);
-        return new DeliveryTxn(warehouse_id, district_id, 0);
+        return new DeliveryTxn(warehouse_id, district_id, 10);
     }
 
     OrderStatusTxn*
