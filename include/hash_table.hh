@@ -54,7 +54,7 @@ public:
     void
     Next() {
         do {
-            m_cur = m_cur->next;
+            m_cur = m_cur->m_next;
         } while(m_cur != NULL && m_cur->m_key != m_key);
     }
     

@@ -438,6 +438,36 @@ TPCCInit::do_init() {
     test_init();
 }
 
+Customer*
+customer_by_name(char *name, uint32_t c_w_id, uint32_t c_d_id) {
+    assert(c_w_id < s_num_warehouses);
+    assert(c_d_id < s_districts_per_wh);
+
+    static Customer *seen[100];
+    int num_seen = 0;
+    TableIterator<char*, Customer*> iter = s_last_name_index->GetIterator(name);
+    while (!iter.Done()) {
+        Customer *cust = iter.Value();
+        if (cust->c_w_id == c_w_id && cust->c_d_id == c_d_id) {
+            seen[num_seen++] = cust;
+        }
+        iter.Next();
+    }
+
+    if (num_seen != 0) {
+        // TPC-C 2.5.2.2: Position n / 2 rounded up to the next integer, but 
+        // that counts starting from 1.    
+        int index = num_seen / 2;
+        if (num_seen % 2 == 0) {
+            index -= 1;
+        }
+        return seen[index];
+    }
+    else {
+        return NULL;
+    }
+}
+
 NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
                          uint64_t o_all_local, uint64_t numItems, 
                          uint64_t *itemIds, 
@@ -691,45 +721,16 @@ PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t 
     assert(c_d_id < s_districts_per_wh);
     assert(c_id < s_customers_per_dist);
 
+    m_w_id = w_id;
+    m_d_id = d_id;
+    m_c_id = c_id;
+    m_c_w_id = c_w_id;
+    m_c_d_id = c_d_id;
 
-    m_warehouse_id = w_id;
-    m_district_id = d_id;
-    m_customer_id = c_id;
+    m_last_name = c_last;
+    m_by_name = c_by_name;
 
     uint32_t keys[10];
-    struct DependencyInfo dep_info;
-    dep_info.dependency = NULL;
-    dep_info.is_write = false;
-    dep_info.index = -1;
-
-    uint64_t table_id;
-
-    // Create the warehouse, and district keys. Add them to the write set.
-    keys[0] = w_id;
-    keys[1] = d_id;
-    uint64_t warehouse_key = w_id;
-    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
-
-    keys[0] = c_w_id;
-    keys[1] = c_d_id;
-    keys[2] = c_id;
-    uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
-    
-    assert((uint32_t)c_w_id == TPCCKeyGen::get_warehouse_key(customer_key));
-    assert((uint32_t)c_d_id == TPCCKeyGen::get_district_key(customer_key));
-    assert((uint32_t)c_id == TPCCKeyGen::get_customer_key(customer_key));
-
-    dep_info.record.m_table = WAREHOUSE;
-    dep_info.record.m_key = warehouse_key;
-    writeset.push_back(dep_info);
-
-    dep_info.record.m_table = DISTRICT;
-    dep_info.record.m_key = district_key;
-    writeset.push_back(dep_info);
-      
-    dep_info.record.m_table = CUSTOMER;
-    dep_info.record.m_key = customer_key;
-    writeset.push_back(dep_info);
 
     m_time = (uint32_t)time(NULL);
     m_h_amount = h_amount;
@@ -737,43 +738,62 @@ PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t 
 
 bool
 PaymentTxn::NowPhase() {
-    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
-    assert(writeset[s_district_index].record.m_table == DISTRICT);
-
-    // Update the warehouse
-    uint64_t w_id = writeset[s_warehouse_index].record.m_key;
-    Warehouse *warehouse = s_warehouse_tbl->GetPtr(w_id);
-    warehouse->w_ytd += m_h_amount;
-
-    // Update the district
-    uint64_t d_id = writeset[s_district_index].record.m_key;
-    District *district = s_district_tbl->GetPtr(d_id);
-    district->d_ytd += m_h_amount;
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
     
-    m_warehouse_name = warehouse->w_name;
-    m_district_name = district->d_name;
-    return true;
+    uint32_t keys[3];
+    bool commit = true;
+    if (m_by_name) {
+        Customer *customer = customer_by_name(m_last_name, m_c_w_id, m_c_d_id);
+        if (customer != NULL) {		// We found a valid customer            
+            m_c_id = customer->c_id;
+
+            // Update the warehouse
+            Warehouse *warehouse = s_warehouse_tbl->GetPtr(m_w_id);
+            warehouse->w_ytd += m_h_amount;
+
+            // Update the district
+            District *district = s_district_tbl->GetPtr(m_d_id);
+            district->d_ytd += m_h_amount;
+    
+            m_warehouse_name = warehouse->w_name;
+            m_district_name = district->d_name;
+        }
+        else {
+            return false;
+        }
+    }
+    keys[0] = m_c_w_id;
+    keys[1] = m_c_d_id;
+    keys[2] = m_c_id;
+    dep_info.record.m_table = CUSTOMER;
+    dep_info.record.m_key = TPCCKeyGen::create_customer_key(keys);
+    writeset.push_back(dep_info);
 }
 
 void
 PaymentTxn::LaterPhase() {
     assert(writeset[s_customer_index].record.m_table == CUSTOMER);
-    Customer *cust = s_customer_tbl->GetPtr(writeset[s_customer_index].record.m_key);
+    Customer *cust = 
+        s_customer_tbl->GetPtr(writeset[s_customer_index].record.m_key);
+    uint32_t customer_id = cust->c_id;
 
     static const char *credit = "BC";
     if (strcmp(credit, cust->c_credit) == 0) {	// Bad credit
         
         static const char *space = " ";
         char c_id_str[17];
-        sprintf(c_id_str, "%x", m_customer_id);
+        sprintf(c_id_str, "%x", m_c_id);
         char c_d_id_str[17]; 
-        sprintf(c_d_id_str, "%x", m_district_id);
+        sprintf(c_d_id_str, "%x", m_c_d_id);
         char c_w_id_str[17];
-        sprintf(c_w_id_str, "%x", m_warehouse_id);
+        sprintf(c_w_id_str, "%x", m_c_w_id);
         char d_id_str[17]; 
-        sprintf(d_id_str, "%lx", writeset[s_district_index].record.m_key);
+        sprintf(d_id_str, "%x", m_w_id);
         char w_id_str[17];
-        sprintf(w_id_str, "%lx", writeset[s_warehouse_index].record.m_key);
+        sprintf(w_id_str, "%x", m_d_id);
         char h_amount_str[17];
         sprintf(h_amount_str, "%lx", (uint64_t)m_h_amount);
         
@@ -790,12 +810,11 @@ PaymentTxn::LaterPhase() {
 
     // Insert an item into the History table
     History hist;
-    hist.h_c_id = m_customer_id;
-    hist.h_c_d_id = m_district_id;
-    hist.h_c_w_id = m_warehouse_id;
-    hist.h_d_id = 
-        TPCCKeyGen::get_district_key(writeset[s_district_index].record.m_key);
-    hist.h_w_id = writeset[s_warehouse_index].record.m_key;
+    hist.h_c_id = m_c_id;
+    hist.h_c_d_id = m_c_d_id;
+    hist.h_c_w_id = m_c_w_id;
+    hist.h_d_id = m_d_id;
+    hist.h_w_id = m_w_id;
     hist.h_date = m_time;
     hist.h_amount = m_h_amount;
     

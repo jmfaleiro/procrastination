@@ -134,9 +134,9 @@ public:
 
 // Each of the following classes defines a TPC-C table. 
 typedef struct {
-    int 		c_id;
-    int 		c_d_id;
-    int 		c_w_id;
+    uint32_t	c_id;
+    uint32_t	c_d_id;
+    uint32_t	c_w_id;
     int 		c_payment_cnt;
     int 		c_delivery_cnt;
     char 		*c_since;
@@ -354,18 +354,20 @@ public:
 
 class PaymentTxn : public Action {
 private:
-    static const int		s_warehouse_index = 0;
-    static const int		s_district_index = 1;
-    static const int 		s_customer_index = 2;
+    static const int 		s_customer_index = 0;
 
     float 					m_h_amount;
     uint32_t 				m_time;
     char 					*m_warehouse_name;
     char 					*m_district_name;
     
-    uint32_t 				m_warehouse_id;
-    uint32_t 				m_district_id;
-    uint32_t 				m_customer_id;
+    uint32_t 				m_w_id;
+    uint32_t 				m_d_id;
+    uint32_t 				m_c_id;
+    uint32_t 				m_c_w_id;
+    uint32_t 				m_c_d_id;
+    char					*m_last_name;
+    bool					m_by_name;
 
 public:
     PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
