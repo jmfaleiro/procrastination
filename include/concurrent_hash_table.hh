@@ -79,6 +79,17 @@ public:
         BucketItem<K, V> *bucket = GetBucket(key);
         return bucket->m_value;
     }
+
+    virtual V*
+    GetPtr(K key) {
+        BucketItem<K, V> *bucket = GetBucket(key);
+        if (bucket == NULL) {
+            return NULL;
+        }
+        else {
+            return &bucket->m_value;
+        }
+    }
     
     virtual TableIterator<K, V>
     GetIterator(K key) {

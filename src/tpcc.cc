@@ -20,16 +20,17 @@ HashTable<uint64_t, Warehouse> 						*s_warehouse_tbl;
 HashTable<uint64_t, District> 						*s_district_tbl;
 HashTable<uint64_t, Customer> 						*s_customer_tbl;
 HashTable<uint64_t, Item> 							*s_item_tbl;
-HashTable<uint64_t, Oorder>			 				*s_oorder_tbl;
 HashTable<uint64_t, Stock> 							*s_stock_tbl;
-HashTable<uint64_t, History> 						*s_history_tbl;
-HashTable<uint64_t, NewOrder> 						*s_new_order_tbl;
-HashTable<uint64_t, OrderLine> 						*s_order_line_tbl;
-HashTable<uint64_t, uint32_t>						*s_next_delivery_tbl;
+
+ConcurrentHashTable<uint64_t, Oorder>			 				*s_oorder_tbl;
+ConcurrentHashTable<uint64_t, History> 						*s_history_tbl;
+ConcurrentHashTable<uint64_t, NewOrder> 						*s_new_order_tbl;
+ConcurrentHashTable<uint64_t, OrderLine> 						*s_order_line_tbl;
 
 // Secondary indices
 StringTable<Customer*>								*s_last_name_index;
 HashTable<uint64_t, Oorder*>						*s_oorder_index;
+HashTable<uint64_t, uint32_t>						*s_next_delivery_tbl;
 
 // Experiment parameters
 uint32_t 											s_num_items;
@@ -416,11 +417,11 @@ TPCCInit::do_init() {
     s_item_tbl = new HashTable<uint64_t, Item>(1<<24, 20);
     s_next_delivery_tbl = new HashTable<uint64_t, uint32_t>(1<<10, 20);
 
-    s_new_order_tbl = new HashTable<uint64_t, NewOrder>(1<<24, 20);
-    s_oorder_tbl = new HashTable<uint64_t, Oorder>(1<<24, 20);
-    s_order_line_tbl = new HashTable<uint64_t, OrderLine>(1<<24, 20);
+    s_new_order_tbl = new ConcurrentHashTable<uint64_t, NewOrder>(1<<20, 20);
+    s_oorder_tbl = new ConcurrentHashTable<uint64_t, Oorder>(1<<20, 20);
+    s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<20, 20);
     s_last_name_index = new StringTable<Customer*>(1<<24, 20);
-    s_history_tbl = new HashTable<uint64_t, History>(1<<24, 20);
+    s_history_tbl = new ConcurrentHashTable<uint64_t, History>(1<<20, 20);
     s_oorder_index = new HashTable<uint64_t, Oorder*>(1<<24, 20);
 
     cout << "Num warehouses: " << m_num_warehouses << "\n";
