@@ -140,7 +140,6 @@ typedef struct {
     int 		c_payment_cnt;
     int 		c_delivery_cnt;
     char 		*c_since;
-    uint32_t 	c_latest_o_id;
     float 		c_discount;
     float 		c_credit_lim;
     float 		c_balance;
@@ -253,8 +252,8 @@ typedef struct {
     char 		w_city[21];
     char 		w_state[4];
     char 		w_zip[10];
-    District 	*w_district_table;
-    Stock 		*w_stock_table;
+    //    District 	*w_district_table;
+    //    Stock 		*w_stock_table;
 } Warehouse;
   
 typedef struct {
@@ -263,10 +262,14 @@ typedef struct {
 } OrderLineIndex;
 
 // Now phase tables
-extern Warehouse 									*s_warehouse_tbl;
-extern Item 										*s_item_tbl;
+extern HashTable<uint64_t, Warehouse> 				*s_warehouse_tbl;
+extern HashTable<uint64_t, District> 				*s_district_tbl;
+extern HashTable<uint64_t, Customer> 				*s_customer_tbl;
+extern HashTable<uint64_t, Item> 					*s_item_tbl;
+
 extern HashTable<uint64_t, Oorder>			 		*s_oorder__tbl;
 extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
+extern HashTable<uint64_t, Stock> 					*s_stock_tbl;
 extern StringTable<Customer*>						*s_last_name_index;
 
 // Later phase tables
@@ -293,15 +296,13 @@ private:
 
     // Each of the functions below initializes an apriori allocated single 
     // row.
-    void init_warehouse(Warehouse *wh, TPCCUtil &random);
-    void init_district(District *district, uint32_t warehouse_id, 
-                       TPCCUtil &random);
-    void init_customer(Customer *customer, uint32_t d_id, uint32_t w_id, 
-                       TPCCUtil &random);
-    void init_history(History *history, TPCCUtil &random);
-    void init_order(TPCCUtil &random);
-    void init_item(Item *item, TPCCUtil &random);
-    void init_stock(Stock *stock, uint32_t wh_id, TPCCUtil &random);
+    void init_warehouses( TPCCUtil &random);
+    void init_districts(TPCCUtil &random);
+    void init_customers(TPCCUtil &random);
+    void init_history(TPCCUtil &random);
+    void init_orders(TPCCUtil &random);
+    void init_items(TPCCUtil &random);
+    void init_stock(TPCCUtil &random);
     
     // Makes sure that everything is in order.
     void test_init();
@@ -331,9 +332,11 @@ private:
     // Fields 
     uint32_t m_all_local;
     int m_order_id;
-    int m_district_id;
-    int m_warehouse_id;
+    uint32_t m_customer_id;
+    uint32_t m_district_id;
+    uint32_t m_warehouse_id;
     float m_district_tax;
+    float m_warehouse_tax;
     uint32_t *m_order_quantities;
     uint64_t *m_supplierWarehouse_ids;
     int m_num_items;
@@ -356,8 +359,14 @@ private:
     static const int		s_district_index = 1;
     static const int 		s_customer_index = 2;
 
-    float m_h_amount;
-    uint32_t m_time;
+    float 					m_h_amount;
+    uint32_t 				m_time;
+    char 					*m_warehouse_name;
+    char 					*m_district_name;
+    
+    uint32_t 				m_warehouse_id;
+    uint32_t 				m_district_id;
+    uint32_t 				m_customer_id;
 
 public:
     PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,

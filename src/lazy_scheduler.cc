@@ -101,9 +101,7 @@ void* LazyScheduler::schedulerFunction(void* arg) {
         }
     }
     else {
-        //        uint64_t i = 0;
         while (true) {
-            //            cout << "Iteration " << i++ << "\n";
             Action *to_process = (Action*)incoming_txns->DequeueBlocking();
             if (to_process->NowPhase()) {
                 to_process->LaterPhase();

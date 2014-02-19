@@ -23,7 +23,6 @@ public:
         else if (pct <= 88) {
             return gen_payment();
         }
-
         else {
             int swtch_rand = m_util.gen_rand_range(1, 3);
             switch (swtch_rand) {
