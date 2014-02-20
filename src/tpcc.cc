@@ -495,16 +495,6 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     dep_info.record.m_key = customer_key;
     readset.push_back(dep_info);
   
-    // Insert the warehouse key in the read set. 
-    dep_info.record.m_table = WAREHOUSE;
-    dep_info.record.m_key = warehouse_key;
-    readset.push_back(dep_info);
-  
-    // Insert the district key in the write set.
-    dep_info.record.m_table = DISTRICT;
-    dep_info.record.m_key = district_key;
-    writeset.push_back(dep_info);
-
     // Create stock, and item keys for each item. 
     for (uint32_t i = 0; i < numItems; ++i) {
 
@@ -526,6 +516,17 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
         dep_info.record.m_table = STOCK;
         writeset.push_back(dep_info);
     }
+
+    dep_info.record.m_table = NEW_ORDER;
+    dep_info.record.m_key = 0;
+    writeset.push_back(dep_info);
+
+    for (uint32_t i = 0; i < numItems; ++i) {
+        dep_info.record.m_table = ORDER_LINE;
+        dep_info.record.m_key = 0;
+        writeset.push_back(dep_info);
+    }
+
     m_order_quantities = orderQuantities;
     m_supplierWarehouse_ids = supplierWarehouseIDs;
     m_num_items = numItems;
@@ -538,6 +539,7 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
 bool
 NewOrderTxn::NowPhase() {
     CompositeKey composite;
+    uint32_t keys[4];
 
     // A NewOrder txn aborts if any of the item keys are invalid. 
     int num_items = readset.size();
@@ -554,8 +556,9 @@ NewOrderTxn::NowPhase() {
   
     // We are guaranteed not to abort once we're here. Increment the highly 
     // contended next_order_id in the district table.
-    assert(writeset[s_district_index].record.m_table == DISTRICT);
-    uint64_t district_key = writeset[s_district_index].record.m_key;
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
     District *district = s_district_tbl->GetPtr(district_key);
   
     // Update the district record. 
@@ -564,8 +567,17 @@ NewOrderTxn::NowPhase() {
     district->d_next_o_id += 1;
     
     m_warehouse_tax = s_warehouse_tbl->GetPtr(m_warehouse_id)->w_tax;
-
     m_timestamp = time(NULL);
+    
+    keys[2] = m_order_id;
+    uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
+    writeset[m_num_items].record.m_key = new_order_key;
+    for (int i = 0; i < m_num_items; ++i) {
+        keys[3] = (uint32_t)i;
+        writeset[m_num_items+1+i].record.m_key = 
+            TPCCKeyGen::create_order_line_key(keys);
+    }
+
     return true;		// The txn can be considered committed. 
 }
 
@@ -582,7 +594,6 @@ NewOrderTxn::LaterPhase() {
     Customer *customer = s_customer_tbl->GetPtr(composite.m_key);
 
     float c_discount = customer->c_discount;
-    //    string c_credit = customer->c_credit;
 
     // Create a NewOrder record. 
     // XXX: This is a potentially serializing call to malloc. Make sure to link
@@ -605,8 +616,8 @@ NewOrderTxn::LaterPhase() {
     for (int i = 0; i < m_num_items; ++i) {
         composite = writeset[s_stock_index+i].record;
         assert(composite.m_table == STOCK);
-        uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
         uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
+        uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
         uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
 
         assert(readset[s_item_index+i].record.m_table == ITEM);        

@@ -321,26 +321,24 @@ class NewOrderTxn : public Action {
 private:
 
     // Read set indices
-    static const uint32_t s_customer_index = 0;
-    static const uint32_t s_warehouse_index = 1;
-    static const uint32_t s_item_index = 2;
+    static const uint32_t 	s_customer_index = 0;
+    static const uint32_t 	s_item_index = 1;
 
     // Write set indices
-    static const uint32_t s_district_index = 0;
-    static const uint32_t s_stock_index = 1;
+    static const uint32_t 	s_stock_index = 0;
 
     // Fields 
-    uint32_t m_all_local;
-    int m_order_id;
-    uint32_t m_customer_id;
-    uint32_t m_district_id;
-    uint32_t m_warehouse_id;
-    float m_district_tax;
-    float m_warehouse_tax;
-    uint32_t *m_order_quantities;
-    uint64_t *m_supplierWarehouse_ids;
-    int m_num_items;
-    long m_timestamp;
+    uint32_t 				m_all_local;
+    int 					m_order_id;
+    uint32_t 				m_customer_id;
+    uint32_t 				m_district_id;
+    uint32_t 				m_warehouse_id;
+    float 					m_district_tax;
+    float 					m_warehouse_tax;
+    uint32_t 				*m_order_quantities;
+    uint64_t 				*m_supplierWarehouse_ids;
+    int 					m_num_items;
+    long 					m_timestamp;
 
 public:
     NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
