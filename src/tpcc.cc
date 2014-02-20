@@ -527,6 +527,14 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
         writeset.push_back(dep_info);
     }
 
+    dep_info.record.m_table = OPEN_ORDER;
+    dep_info.record.m_key = 0;
+    writeset.push_back(dep_info);
+
+    dep_info.record.m_table = OPEN_ORDER_INDEX;
+    dep_info.record.m_key = customer_key;
+    writeset.push_back(dep_info);
+
     m_order_quantities = orderQuantities;
     m_supplierWarehouse_ids = supplierWarehouseIDs;
     m_num_items = numItems;
@@ -576,8 +584,8 @@ NewOrderTxn::NowPhase() {
         keys[3] = (uint32_t)i;
         writeset[m_num_items+1+i].record.m_key = 
             TPCCKeyGen::create_order_line_key(keys);
-    }
-
+    }    
+    writeset[2*m_num_items+1].record.m_key = new_order_key;
     return true;		// The txn can be considered committed. 
 }
 
@@ -585,8 +593,6 @@ void
 NewOrderTxn::LaterPhase() {
     float total_amount = 0;
     CompositeKey composite;
-    uint32_t keys[5];
-    ostringstream os; 
     
     // Read the customer record.
     composite = readset[s_customer_index].record;
@@ -603,15 +609,11 @@ NewOrderTxn::LaterPhase() {
     new_order_record.no_d_id = m_district_id;
     new_order_record.no_o_id = m_order_id;
 
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-    keys[2] = m_order_id;
-
     // Generate the NewOrder key and insert the record.
     // XXX: This insertion has to be concurrent. Therefore, use a hash-table to 
     // implement it. 
-    uint64_t no_id = TPCCKeyGen::create_new_order_key(keys);
-    s_new_order_tbl->Put(no_id, new_order_record);
+    assert(writeset[m_num_items].record.m_table == NEW_ORDER);
+    s_new_order_tbl->Put(writeset[m_num_items].record.m_key, new_order_record);
   
     for (int i = 0; i < m_num_items; ++i) {
         composite = writeset[s_stock_index+i].record;
@@ -695,15 +697,9 @@ NewOrderTxn::LaterPhase() {
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
         strcpy(new_order_line.ol_dist_info, ol_dist_info);
 
-        keys[0] = m_warehouse_id;
-        keys[1] = m_district_id;
-        keys[2] = m_order_id;
-        keys[3] = i;
-        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
-
         // XXX: Make sure that the put operation is implemented on top of a 
         // concurrent hash table. 
-        s_order_line_tbl->Put(order_line_key, new_order_line);
+        s_order_line_tbl->Put(writeset[m_num_items+1+i].record.m_key, new_order_line);
     }
     // Insert an entry into the open order table.    
     Oorder oorder;
@@ -715,12 +711,7 @@ NewOrderTxn::LaterPhase() {
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = m_timestamp;
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-    keys[2] = m_order_id;
-    uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
-    Oorder *new_oorder = s_oorder_tbl->Put(oorder_key, oorder);
-
+    Oorder *new_oorder = s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
     Oorder **old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
     *old_index = new_oorder;    
 }
