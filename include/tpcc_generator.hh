@@ -81,15 +81,6 @@ public:
                                                        item_ids, 
                                                        supplier_wh_ids, 
                                                        quantities);
-        assert(ret->writeset.size() == num_items+1);
-        assert(ret->readset.size() == num_items+2);
-        for (uint32_t i = 1; i < num_items+1; ++i) {
-            assert(ret->writeset[i].record.m_table == STOCK);
-        }
-        for (uint32_t i = 2; i < num_items; ++i) {
-            assert(ret->readset[i].record.m_table == ITEM);
-            assert(ret->readset[i].record.m_key < s_num_items);
-        }
         ret->materialize = true;
         return ret;
     }
