@@ -23,13 +23,13 @@ private:
     GetBucket(K key) {
         uint64_t index = this->m_hash_function(key) & this->m_mask;    
         BucketItem<K, V> **table = this->m_table;
-        uint64_t *lock_word = (uint64_t*)&table[CACHE_LINE*index+2];
+        uint64_t *lock_word = 
+            (uint64_t*)((char*)table+CACHE_LINE*index+
+                        sizeof(BucketItem<K, V>*));
         lock(lock_word);
-
-        BucketItem<K, V> *to_ret = table[CACHE_LINE*index];
-        
+        BucketItem<K, V> *to_ret = 
+            *(BucketItem<K, V>**)((char*)table+CACHE_LINE*index);        
         unlock(lock_word);
-        
         while (to_ret != NULL && to_ret->m_key != key) {
             to_ret = to_ret->m_next;
         }
@@ -41,35 +41,27 @@ public:
                         uint64_t (*hash)(K key) = NULL) 
         : HashTable<K, V>(size, 
                           chain_bound, 
-                          malloc(sizeof(BucketItem<K, V>*)*size*CACHE_LINE), 
+                          malloc(size*CACHE_LINE), 
                           hash) {
         memset(this->m_table, 0, 
-               sizeof(BucketItem<K, V>*)*this->m_size*CACHE_LINE);
+               this->m_size*CACHE_LINE);
         assert(this->m_hash_function != hash || 
                this->m_hash_function == this->default_hash_function);
     }
 
     virtual V*
     Put(K key, V value) {
-        uint64_t index = this->m_hash_function(key) & this->m_mask;
+        uint64_t index = this->m_hash_function(key) & this->m_mask;    
         BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, value);
         BucketItem<K, V> **table = this->m_table;
-
-        uint64_t *lock_word = (uint64_t*)&table[CACHE_LINE*index+2];
+        uint64_t *lock_word = 
+            (uint64_t*)((char*)table+CACHE_LINE*index+
+                        sizeof(BucketItem<K, V>*));
         lock(lock_word);
-    
-        // Insert the item into the chain. 
-        to_insert->m_next = table[CACHE_LINE*index];
-        table[CACHE_LINE*index] = to_insert;
-
-        // Ensure that the chain length is reasonable. 
-        /*
-          #ifndef NDEBUG
-          uint64_t *counter_ptr = (uint64_t*)&table[2*index + 1];
-          *counter_ptr += 1;
-          assert(*counter_ptr <= m_chain_bound);
-          #endif
-        */
+        BucketItem<K, V> **chain_head = 
+            (BucketItem<K, V>**)((char*)table+CACHE_LINE*index);        
+        to_insert->m_next = *chain_head;
+        *chain_head = to_insert;
         unlock(lock_word);
         return &to_insert->m_value;
     }
@@ -100,6 +92,7 @@ public:
 
     virtual V
     Delete(K key) {
+        assert(false);
         uint64_t index = this->m_hash_function(key) & this->m_mask;
         BucketItem<K, V> **table = this->m_table;
 

@@ -120,13 +120,11 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     else {
         while (true) {
             Action *to_process = (Action*)incoming_txns->DequeueBlocking();
-            to_process->NowPhase();
-            sched->addGraph(to_process);
-            /*
+            //            to_process->NowPhase();
+            //            sched->addGraph(to_process);
             if (to_process->NowPhase()) {
                 to_process->LaterPhase();
             }
-            */
             outgoing_txns->EnqueueBlocking((uint64_t)to_process);
         }
     }
