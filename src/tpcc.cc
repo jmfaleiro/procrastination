@@ -1143,6 +1143,11 @@ DeliveryTxn0::DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id,
     m_warehouse_id = w_id;
     m_district_id = d_id;
     m_carrier_id = carrier_id;    
+    m_level1_txn = level1_txn;
+    m_open_order_ids = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+    m_num_order_lines = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+    memset(m_num_order_lines, 0, sizeof(uint32_t)*s_districts_per_wh);
+    memset(m_open_order_ids, 0, sizeof(uint32_t)*s_districts_per_wh);
 }
 
 bool
@@ -1155,6 +1160,7 @@ DeliveryTxn0::NowPhase() {
         uint64_t district_key = TPCCKeyGen::create_district_key(keys);
         uint32_t *next_delivery = s_next_delivery_tbl->GetPtr(district_key);
         District *district = s_district_tbl->GetPtr(district_key);
+        assert(next_delivery != NULL && district != NULL);
         if (district->d_next_o_id > *next_delivery) {
             m_open_order_ids[i] = *next_delivery;
             *next_delivery += 1;
@@ -1236,14 +1242,17 @@ DeliveryTxn1::LaterPhase() {
         // Add all the order lines corresponding to this particular order to the 
         // readset
         dep_info.record.m_table = ORDER_LINE;
-        for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j, ++done) {
+        for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j) {
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
             dep_info.record.m_key = order_line_key;
             m_level2_txn->readset.push_back(dep_info);
         }
-        m_num_order_lines.push_back(done);
+        assert(open_order->o_ol_cnt != 0);
+        m_num_order_lines[i] = open_order->o_ol_cnt+done;
+        done += open_order->o_ol_cnt;
     }
+    return;
     m_level2_txn->NowPhase();
     m_level2_txn->LaterPhase();
 }
@@ -1265,12 +1274,20 @@ DeliveryTxn2::LaterPhase() {
     for (uint32_t i = 0; i < write_count; i += 2) {
         uint32_t amount = 0;
         int num_order_lines = m_num_order_lines[i];
-        for (int j = done; j < num_order_lines; ++j, ++done) {
+        if (readset.size() > (uint32_t)num_order_lines) {
+            std::cout << "blah!\n";
+        }
+        assert(readset.size() < (uint32_t)num_order_lines);
+        for (int j = done; j < num_order_lines; ++j, ++done) {            
+            if (readset[j].record.m_table != ORDER_LINE) {
+                std::cout << readset[j].record.m_table << "\n";
+            }
             assert(readset[j].record.m_table == ORDER_LINE);
             uint64_t order_line_key = readset[j].record.m_key;
             OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
             amount += orderline->ol_amount;
         }
+
         assert(writeset[i].record.m_table == CUSTOMER);
         uint64_t cust_key = writeset[i].record.m_key;
         Customer *cust = s_customer_tbl->GetPtr(cust_key);

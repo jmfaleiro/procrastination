@@ -144,6 +144,8 @@ public:
     gen_delivery() {
         uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses-1);
         uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh-1);
+        //        return new DeliveryTxn(warehouse_id, district_id, 10);
+
         DeliveryTxn2 *level2 = new DeliveryTxn2(warehouse_id, district_id, 10);
         DeliveryTxn1 *level1 = new DeliveryTxn1(warehouse_id, district_id, 10, 
                                                 level2);

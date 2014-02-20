@@ -465,9 +465,8 @@ protected:
     uint32_t 				m_warehouse_id;
     uint32_t 				m_district_id;
     uint32_t 				m_carrier_id;
-    std::vector<int>		m_num_order_lines;
-    uint32_t 				m_open_order_ids[20];
-
+    uint32_t				*m_num_order_lines;
+    uint32_t 				*m_open_order_ids;
     
 public:
     DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
