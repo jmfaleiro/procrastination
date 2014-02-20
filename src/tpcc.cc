@@ -716,8 +716,9 @@ NewOrderTxn::LaterPhase() {
     *old_index = new_oorder;    
 }
 
-PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t d_id,
-                       uint32_t c_d_id, uint32_t c_id, char *c_last, bool c_by_name) {
+PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, 
+                       uint32_t d_id, uint32_t c_d_id, uint32_t c_id, 
+                       char *c_last, bool c_by_name) {
     assert(w_id < s_num_warehouses);
     assert(c_w_id < s_num_warehouses);
     assert(d_id < s_districts_per_wh);
@@ -732,8 +733,21 @@ PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, uint32_t 
 
     m_last_name = c_last;
     m_by_name = c_by_name;
+    
+    // Add the customer to the writeset.
+    uint32_t keys[3];
+    keys[0] = m_c_w_id;
+    keys[1] = m_c_d_id;
+    keys[2] = m_c_id;
+    uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
 
-    uint32_t keys[10];
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = CUSTOMER;
+    dep_info.record.m_key = customer_key;
+    writeset.push_back(dep_info);
 
     m_time = (uint32_t)time(NULL);
     m_h_amount = h_amount;
@@ -768,12 +782,6 @@ PaymentTxn::NowPhase() {
             return false;
         }
     }
-    keys[0] = m_c_w_id;
-    keys[1] = m_c_d_id;
-    keys[2] = m_c_id;
-    dep_info.record.m_table = CUSTOMER;
-    dep_info.record.m_key = TPCCKeyGen::create_customer_key(keys);
-    writeset.push_back(dep_info);
 }
 
 void
