@@ -162,16 +162,13 @@ public:
 
     virtual V*
     GetPtr(K key) {
-        uint64_t index = m_hash_function(key) & m_mask;
-        BucketItem<K, V> *item = m_table[index];
-        while (item != NULL && item->m_key != key) {
-            item = item->m_next;
-        }
-        if (item == NULL) {
-            return NULL;
+        BucketItem<K, V> *bucket = NULL;
+        if ((bucket = GetBucket(key)) == NULL) {
+            bucket = PutInternal(key, V());
+            return &bucket->m_value;
         }
         else {
-            return &item->m_value;
+            return &bucket->m_value;
         }
     }
 

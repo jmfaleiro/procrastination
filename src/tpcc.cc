@@ -506,21 +506,26 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
         uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
 
         // Insert the item key into the read set. 
+        /*
         assert(item_key == invalid_item_key || item_key < s_num_items);
         dep_info.record.m_key = item_key;
         dep_info.record.m_table = ITEM;
         readset.push_back(dep_info);
+        */
 
         // Insert the stock key into the write set. 
+        /*
         dep_info.record.m_key = stock_key;
         dep_info.record.m_table = STOCK;
         writeset.push_back(dep_info);
+        */
     }
 
     dep_info.record.m_table = NEW_ORDER;
     dep_info.record.m_key = 0;
     writeset.push_back(dep_info);
-
+    
+    /*
     for (uint32_t i = 0; i < numItems; ++i) {
         dep_info.record.m_table = ORDER_LINE;
         dep_info.record.m_key = 0;
@@ -534,7 +539,7 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     dep_info.record.m_table = OPEN_ORDER_INDEX;
     dep_info.record.m_key = customer_key;
     writeset.push_back(dep_info);
-
+    */
     m_order_quantities = orderQuantities;
     m_supplierWarehouse_ids = supplierWarehouseIDs;
     m_num_items = numItems;
@@ -550,6 +555,7 @@ NewOrderTxn::NowPhase() {
     uint32_t keys[4];
 
     // A NewOrder txn aborts if any of the item keys are invalid. 
+    /*
     int num_items = readset.size();
     for (int i = s_item_index; i < num_items; ++i) {
 
@@ -561,7 +567,7 @@ NewOrderTxn::NowPhase() {
             return false;	// Abort the txn. 
         }
     }
-  
+    */
     // We are guaranteed not to abort once we're here. Increment the highly 
     // contended next_order_id in the district table.
     keys[0] = m_warehouse_id;
@@ -579,13 +585,16 @@ NewOrderTxn::NowPhase() {
     
     keys[2] = m_order_id;
     uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
-    writeset[m_num_items].record.m_key = new_order_key;
+    writeset[0].record.m_key = new_order_key;
+    //    writeset[m_num_items].record.m_key = new_order_key;
+    /*
     for (int i = 0; i < m_num_items; ++i) {
         keys[3] = (uint32_t)i;
         writeset[m_num_items+1+i].record.m_key = 
             TPCCKeyGen::create_order_line_key(keys);
     }    
     writeset[2*m_num_items+1].record.m_key = new_order_key;
+    */
     return true;		// The txn can be considered committed. 
 }
 

@@ -36,15 +36,14 @@ private:
     static const uint32_t s_customer_shift = 		24;
     static const uint32_t s_district_shift = 		16;
     static const uint32_t s_new_order_shift = 		24;
-    static const uint32_t s_order_shift = 		24;
+    static const uint32_t s_order_shift = 			24;
     static const uint32_t s_order_line_shift = 		56;
-    static const uint32_t s_stock_shift = 		16;
+    static const uint32_t s_stock_shift = 			16;
 
     static const uint64_t s_customer_mask = 		0x000000FFFF000000;
     static const uint64_t s_district_mask = 		0x0000000000FF0000;
     static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
-    static const uint64_t s_stock_mask = 			0xFFFFFFFFFFFF0000;
-
+    static const uint64_t s_stock_mask = 			0x0FFFFFFFFFFF0000;    
 
 public:
     static inline uint32_t

@@ -1,6 +1,6 @@
 #include "lazy_scheduler.h"
 #include "machine.h"
-
+#include <tpcc.hh>
 #include <assert.h>
 #include <deque>
 
@@ -77,11 +77,28 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     // Hash table that points to the most recent writers of records in a txn. 
     // XXX: Do we need inserts to count as writes? For now, I'm just assuming that
     // reads+writes count as dependencies, insertions do not count. 
-    sched->m_last_txns = NULL;
+    sched->m_last_txns = new HashTable<CompositeKey, Heuristic>(1<<30, 20);
     //new HashTable<CompositeKey, Heuristic>(m_table_size, 10);
 
     sched->m_num_txns = 0;
     pthread_t walker_thread;
+
+    uint32_t keys[3];
+    for (uint32_t w = 0; w < s_num_warehouses; ++w) {
+        keys[0] = w;
+        for (uint32_t d = 0; d < s_districts_per_wh; ++d) {
+            keys[1] = d;
+            for (uint32_t o = 0; o < (1<<20); ++o) {
+                keys[2] = o;
+                uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
+                CompositeKey blah;
+                blah.m_table = NEW_ORDER;
+                blah.m_key = new_order_key;
+                sched->m_last_txns->Put(blah, Heuristic());
+            }
+        }
+    }
+    
 
     // Indicate that the thread is running and ready to go to the co-ordinator. 
     xchgq(&(sched->m_start_flag), 1);
@@ -103,9 +120,13 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     else {
         while (true) {
             Action *to_process = (Action*)incoming_txns->DequeueBlocking();
+            to_process->NowPhase();
+            sched->addGraph(to_process);
+            /*
             if (to_process->NowPhase()) {
                 to_process->LaterPhase();
             }
+            */
             outgoing_txns->EnqueueBlocking((uint64_t)to_process);
         }
     }
@@ -125,76 +146,68 @@ bool LazyScheduler::isDone(int* count) {
 
 // Add the given action to the dependency graph. 
 void LazyScheduler::addGraph(Action* action) {
-    if (m_serial) {
-        action->state = SUBSTANTIATED;
-        //    action->sched_end_time = rdtsc();    
-        m_worker_input[0]->EnqueueBlocking((uint64_t)action);
-        return;
-    }    
-    else {
-        action->state = STICKY;
+    action->state = STICKY;
         
-        // Iterate through this action's read set and write set, find the 
-        // transactions it depends on and add it to the dependency graph. 
-        int num_reads = action->readset.size();
-        int num_writes = action->writeset.size();
-        int* count_ptrs[num_reads+num_writes];
+    // Iterate through this action's read set and write set, find the 
+    // transactions it depends on and add it to the dependency graph. 
+    int num_reads = action->readset.size();
+    int num_writes = action->writeset.size();
+    int* count_ptrs[num_reads+num_writes];
         
-        // Go through the read set. 
-        bool force_materialize = action->materialize;
-        for (int i = 0; i < num_reads; ++i) {
-            CompositeKey record = action->readset[i].record;
-            Heuristic *dep_info = m_last_txns->GetPtr(record);            
+    // Go through the read set. 
+    bool force_materialize = action->materialize;
+    for (int i = 0; i < num_reads; ++i) {
+        CompositeKey record = action->readset[i].record;
+        Heuristic *dep_info = m_last_txns->GetPtr(record);            
             
-            // Keep the information about the previous txn around.
-            action->readset[i].dependency = dep_info->last_txn;
-            action->readset[i].is_write = dep_info->is_write;
-            action->readset[i].index = dep_info->index;
-            count_ptrs[i] = &(dep_info->chain_length);
+        // Keep the information about the previous txn around.
+        action->readset[i].dependency = dep_info->last_txn;
+        action->readset[i].is_write = dep_info->is_write;
+        action->readset[i].index = dep_info->index;
+        count_ptrs[i] = &(dep_info->chain_length);
             
-            // Update the heuristic information. 
-            dep_info->last_txn = action;
-            dep_info->index = i;
-            dep_info->is_write = false;
+        // Update the heuristic information. 
+        dep_info->last_txn = action;
+        dep_info->index = i;
+        dep_info->is_write = false;
             
-            // Increment the length of the chain corresponding to this record, 
-            // check if it exceeds our threshold value. 
-            dep_info->chain_length += 1;
-            force_materialize |= (dep_info->chain_length >= m_max_chain);
-        }
+        // Increment the length of the chain corresponding to this record, 
+        // check if it exceeds our threshold value. 
+        dep_info->chain_length += 1;
+        force_materialize |= (dep_info->chain_length >= m_max_chain);
+    }
         
-        // Go through the write set. 
-        for (int i = 0; i < num_writes; ++i) {
-            CompositeKey record = action->writeset[i].record;
-            Heuristic *dep_info = m_last_txns->GetPtr(record);
+    // Go through the write set. 
+    for (int i = 0; i < num_writes; ++i) {
+        CompositeKey record = action->writeset[i].record;
+        Heuristic *dep_info = m_last_txns->GetPtr(record);
             
-            // Keep the information about the previous txn around. 
-            action->writeset[i].dependency = dep_info->last_txn;
-            action->writeset[i].is_write = dep_info->is_write;
-            action->writeset[i].index = dep_info->index;
-            count_ptrs[num_reads+i] = &(dep_info->chain_length);
+        // Keep the information about the previous txn around. 
+        action->writeset[i].dependency = dep_info->last_txn;
+        action->writeset[i].is_write = dep_info->is_write;
+        action->writeset[i].index = dep_info->index;
+        count_ptrs[num_reads+i] = &(dep_info->chain_length);
             
-            // Update the heuristic information. 
-            dep_info->last_txn = action;
-            dep_info->index = i;
-            dep_info->is_write = true;
+        // Update the heuristic information. 
+        dep_info->last_txn = action;
+        dep_info->index = i;
+        dep_info->is_write = true;
             
-            // Increment the length of the chain corresponding to this record, 
-            // check if it exceeds our threshold value. 
-            dep_info->chain_length += 1;
-            force_materialize |= (dep_info->chain_length >= m_max_chain);
-        }  
+        // Increment the length of the chain corresponding to this record, 
+        // check if it exceeds our threshold value. 
+        dep_info->chain_length += 1;
+        force_materialize |= (dep_info->chain_length >= m_max_chain);
+    }  
 
-        if (force_materialize) {
-            for (int i = 0; i < num_reads+num_writes; ++i) {
-                *(count_ptrs[i]) = 0;		  
-            }
-            m_last_used += 1;
-            
-            int index = m_last_used % m_num_workers;
-            m_worker_input[index]->EnqueueBlocking((uint64_t)action);
-            //	    action->sched_end_time = rdtsc();
+    if (force_materialize) {
+        for (int i = 0; i < num_reads+num_writes; ++i) {
+            *(count_ptrs[i]) = 0;		  
         }
+        m_last_used += 1;
+            
+        int index = m_last_used % m_num_workers;
+        //   m_worker_input[index]->EnqueueBlocking((uint64_t)action);
+        //   action->sched_end_time = rdtsc();
     }
 }
 
