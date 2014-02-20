@@ -755,13 +755,14 @@ PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount,
 
 bool
 PaymentTxn::NowPhase() {
+    /*
     struct DependencyInfo dep_info;
     dep_info.dependency = NULL;
     dep_info.is_write = false;
     dep_info.index = -1;
     
-    uint32_t keys[3];
     bool commit = true;
+    
     if (m_by_name) {
         Customer *customer = customer_by_name(m_last_name, m_c_w_id, m_c_d_id);
         if (customer != NULL) {		// We found a valid customer            
@@ -782,6 +783,19 @@ PaymentTxn::NowPhase() {
             return false;
         }
     }
+    */
+
+    // Update the warehouse
+    Warehouse *warehouse = s_warehouse_tbl->GetPtr(m_w_id);
+    warehouse->w_ytd += m_h_amount;
+
+    // Update the district
+    District *district = s_district_tbl->GetPtr(m_d_id);
+    district->d_ytd += m_h_amount;
+    
+    m_warehouse_name = warehouse->w_name;
+    m_district_name = district->d_name;
+    return true;
 }
 
 void
