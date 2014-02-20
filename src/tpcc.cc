@@ -825,6 +825,147 @@ PaymentTxn::LaterPhase() {
     s_history_tbl->Put(writeset[s_customer_index].record.m_key, hist);
 }
 
+StockLevelTxn0::StockLevelTxn0(uint32_t warehouse_id, uint32_t district_id, 
+                               int threshold, StockLevelTxn1 *level1_txn) {
+    assert(warehouse_id < s_num_warehouses);
+    assert(district_id < s_districts_per_wh);
+
+    m_threshold = threshold;
+    m_stock_count = 0;
+    m_warehouse_id = warehouse_id;
+    m_district_id = district_id;
+    m_level1_txn = level1_txn;
+}
+
+bool
+StockLevelTxn0::NowPhase() {
+    uint32_t keys[2];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+    m_next_order_id = s_district_tbl->GetPtr(district_key)->d_next_o_id;
+    assert(m_next_order_id > 20);
+    return true;
+}
+
+void
+StockLevelTxn0::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = OPEN_ORDER;
+
+    uint32_t keys[3];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    for (uint32_t i = 0; i < 20; ++i) {
+        keys[2] = m_next_order_id - 1 -i;
+        uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
+        dep_info.record.m_key = open_order_key;
+        m_level1_txn->readset.push_back(dep_info);
+    }
+    m_level1_txn->NowPhase();
+    m_level1_txn->LaterPhase();
+}
+
+StockLevelTxn1::StockLevelTxn1(uint32_t warehouse_id, uint32_t district_id, 
+                               int threshold, StockLevelTxn2 *level2_txn) : 
+    StockLevelTxn0(warehouse_id, district_id, threshold, this) {       
+    m_level2_txn = level2_txn;
+}
+
+bool
+StockLevelTxn1::NowPhase() {
+    return true;
+}
+
+void
+StockLevelTxn1::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = ORDER_LINE;
+
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    uint32_t num_reads = readset.size();
+    for (uint32_t i = 0; i < num_reads; ++i) {
+        Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
+        keys[2] = oorder->o_id;
+        for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
+            keys[3] = j;
+            uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+            dep_info.record.m_key = order_line_key;
+            m_level2_txn->readset.push_back(dep_info);
+        }
+    }
+    m_level2_txn->NowPhase();
+    m_level2_txn->LaterPhase();
+}
+
+StockLevelTxn2::StockLevelTxn2(uint32_t warehouse_id, uint32_t district_id, 
+                               int threshold, StockLevelTxn3 *level3_txn) : 
+    StockLevelTxn1(warehouse_id, district_id, threshold, this) {        
+    m_level3_txn = level3_txn;
+}
+
+
+bool
+StockLevelTxn2::NowPhase() {
+    return true;
+}
+
+void
+StockLevelTxn2::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = STOCK;
+
+    uint32_t keys[2];
+    keys[0] = m_warehouse_id;
+    
+    uint32_t num_ol = readset.size();
+    for (uint32_t i = 0; i < num_ol; ++i) {
+        OrderLine *order_line = 
+            s_order_line_tbl->GetPtr(readset[i].record.m_key);
+        keys[1] = order_line->ol_i_id;
+        uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
+        dep_info.record.m_key = stock_key;
+        m_level3_txn->readset.push_back(dep_info);
+    }
+    m_level3_txn->NowPhase();
+    m_level3_txn->LaterPhase();
+}
+
+StockLevelTxn3::StockLevelTxn3(uint32_t warehouse_id, uint32_t district_id, 
+                               int threshold) : 
+    StockLevelTxn2(warehouse_id, district_id, threshold, this) {        
+}
+
+bool
+StockLevelTxn3::NowPhase() {
+    return true;
+}
+
+void
+StockLevelTxn3::LaterPhase() {    
+    m_stock_count = 0;
+    uint32_t num_reads = readset.size();
+    for (uint32_t i = 0; i < num_reads; ++i) {
+        uint64_t stock_key = readset[i].record.m_key;
+        Stock *stock = s_stock_tbl->GetPtr(stock_key);
+        m_stock_count += 
+            ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
+    }
+}
+
 StockLevelTxn::StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, 
                              int threshold) {
     assert(warehouse_id < s_num_warehouses);
@@ -887,6 +1028,65 @@ StockLevelTxn::LaterPhase() {
     }
 }
 
+/*
+OrderStatusTxn0::OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
+                                 char *c_last, bool c_by_name) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
+    
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_customer_id = c_id;
+    m_c_by_name = c_by_name;
+    m_c_last = c_last;
+}
+
+bool
+OrderStatusTxn0::NowPhase() {
+    return true;
+}
+
+void
+OrderStatusTxn0::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = ORDER_LINE;
+
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
+    uint64_t index = readset[0].record.m_key;
+    Oorder *oorder = s_oorder_index->GetPtr(index);
+    keys[2] = oorder->o_id;
+    for (uint32_t i = 0; i < oorder->o_ol_cnt; ++i) {
+        keys[3] = i;
+        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+        dep_info.record.m_key = order_line_key;
+        m_level1_txn.readset.push_back(dep_info);
+    }
+}
+
+bool
+OrderStatusTxn1::NowPhase() {
+    return true;
+}
+
+void
+OrderStatusTxn1::LaterPhase() {
+    int num_items = readset.size();
+    for (int i = 0; i < num_items; ++i) {
+        uint64_t order_line_key = readset[i].record.m_key;
+        OrderLine *ol = s_order_line_tbl->GetPtr(order_line_key);
+        m_order_line_quantity += ol->ol_quantity;
+    }    
+}
+*/
+
 OrderStatusTxn::OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
                                char *c_last, bool c_by_name) {
     assert(w_id < s_num_warehouses);
@@ -899,6 +1099,7 @@ OrderStatusTxn::OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id,
     m_c_by_name = c_by_name;
     m_c_last = c_last;
 }
+
 
 bool
 OrderStatusTxn::NowPhase() {
@@ -933,7 +1134,135 @@ OrderStatusTxn::LaterPhase() {
         m_order_line_quantity += ol->ol_quantity;
     }
 }
+/*
+DeliveryTxn0::DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
 
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_carrier_id = carrier_id;    
+}
+
+bool
+DeliveryTxn0::NowPhase() {
+    uint32_t keys[4];
+    
+    keys[0] = m_warehouse_id;
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        keys[1] = i;
+        uint64_t district_key = TPCCKeyGen::create_district_key(keys);
+        uint32_t *next_delivery = s_next_delivery_tbl->GetPtr(district_key);
+        District *district = s_district_tbl->GetPtr(district_key);
+        if (district->d_next_o_id > *next_delivery) {
+            m_open_order_ids[i] = *next_delivery;
+            *next_delivery += 1;
+        }
+    }
+    return true;
+}
+
+void
+DeliveryTxn0::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = OPEN_ORDER;
+
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        keys[1] = i;
+        if (m_open_order_ids[i] > 0) {
+            keys[2] = open_order_ids[i];
+            uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
+            dep_info.record.m_key = open_order_key;
+            m_level1_txn.writeset.push_back(dep_info);
+        }
+    }
+}
+
+bool
+DeliveryTxn1::NowPhase() {
+    return true;
+}
+
+void
+DeliveryTxn1::LaterPhase() {
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = OPEN_ORDER;
+
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    uint32_t done = 0;
+    
+    uint32_t num_orders = writeset.size();
+    
+    for (uint32_t i = 0; i < num_orders; ++i) {
+        Oorder *open_order = s_open_order_tbl->GetPtr(writeset[i].record.m_key);
+        open_order->o_carrier_id = m_carrier_id;        
+        keys[1] = open_order->o_d_id;
+
+        // Add the customer who submitted this order to the writeset
+        keys[2] = open_order->o_c_id;
+        uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+        dep_info.record.m_table = CUSTOMER;
+        dep_info.record.m_key = customer_key;
+        m_level2_txn.writeset.push_back(dep_info);
+        
+        // Add the New Order record to the write set (this record is to be 
+        // deleted)
+        keys[2] = open_order->o_id;
+        uint64_t open_order_key = TPCCKeyGen::create_new_order_key(keys);
+        dep_info.record.m_table = NEW_ORDER;
+        dep_info.record.m_key = open_order_key;
+        m_level2_txn.writeset.push_back(dep_info);
+        
+        
+        // Add all the order lines corresponding to this particular order to the 
+        // readset
+        dep_info.record.m_table = ORDER_LINE;
+        for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j, ++done) {
+            keys[3] = j;
+            uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+            dep_info.record.m_key = order_line_key;
+            m_level2_txn.readset.push_back(dep_info);
+        }
+        m_num_order_lines.push_back(done);
+    }
+}
+
+bool
+DeliveryTxn2::NowPhase() {
+    return true;
+}
+
+void
+DeliveryTxn2::LaterPhase() {
+    int done = 0;
+    uint32_t write_count = writeset.size();
+    for (uint32_t i = 0; i < write_count; i += 2) {
+        uint32_t amount = 0;
+        int num_order_lines = m_num_order_lines[i];
+        for (int j = done; j < num_order_lines; ++j, ++done) {
+            assert(readset[j].record.m_table == ORDER_LINE);
+            uint64_t order_line_key = readset[j].record.m_key;
+            OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
+            amount += orderline->ol_amount;
+        }
+        assert(writeset[i].record.m_table == CUSTOMER);
+        uint64_t cust_key = writeset[i].record.m_key;
+        Customer *cust = s_customer_tbl->GetPtr(cust_key);
+        cust->c_balance += amount;
+        cust->c_delivery_cnt += 1;
+    }
+}
+*/
 
 DeliveryTxn::DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
     assert(w_id < s_num_warehouses);

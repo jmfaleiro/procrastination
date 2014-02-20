@@ -124,12 +124,20 @@ public:
                               false);
     }
 
-    StockLevelTxn*
+    StockLevelTxn0*
     gen_stock_level() {
         uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses-1);
         uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh-1);
         int threshold = 1000;
-        return new StockLevelTxn(warehouse_id, district_id, threshold);
+        StockLevelTxn3 *level3 = new StockLevelTxn3(warehouse_id, district_id, 
+                                                    threshold);
+        StockLevelTxn2 *level2 = new StockLevelTxn2(warehouse_id, district_id, 
+                                                    threshold, level3);
+        StockLevelTxn1 *level1 = new StockLevelTxn1(warehouse_id, district_id, 
+                                                    threshold, level2);
+        StockLevelTxn0 *level0 = new StockLevelTxn0(warehouse_id, district_id, 
+                                                    threshold, level1);
+        return level0;
     }
     
     DeliveryTxn*

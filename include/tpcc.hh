@@ -391,6 +391,55 @@ public:
     void LaterPhase();
 };
 
+class StockLevelTxn1;
+class StockLevelTxn0 : public Action {
+private:
+    StockLevelTxn1 *m_level1_txn;
+
+protected:
+    int 			m_threshold;
+    int 			m_stock_count;
+    uint32_t 		m_warehouse_id;
+    uint32_t 		m_district_id;
+    uint32_t 		m_next_order_id;    
+
+public:
+    StockLevelTxn0(uint32_t warehouse_id, uint32_t district_id, int threshold, 
+                   StockLevelTxn1 *level1_txn);
+    virtual bool NowPhase();
+    virtual void LaterPhase();
+};
+
+class StockLevelTxn2;
+class StockLevelTxn1 : public StockLevelTxn0 {
+private:
+    StockLevelTxn2 *m_level2_txn;
+
+public:
+    StockLevelTxn1(uint32_t warehouse_id, uint32_t district_id, int threshold, 
+                   StockLevelTxn2 *level2_txn);
+    virtual bool NowPhase();
+    virtual void LaterPhase();
+};
+
+class StockLevelTxn3;
+class StockLevelTxn2 : public StockLevelTxn1 {
+private:
+    StockLevelTxn3 *m_level3_txn;
+public:
+    StockLevelTxn2(uint32_t warehouse_id, uint32_t district_id, int threshold, 
+                   StockLevelTxn3 *level3_txn);
+    virtual bool NowPhase();
+    virtual void LaterPhase();
+};
+
+class StockLevelTxn3 : public StockLevelTxn2 {
+public:
+    StockLevelTxn3(uint32_t warehouse_id, uint32_t district_id, int threshold);
+    virtual bool NowPhase();
+    virtual void LaterPhase();
+};
+
 class OrderStatusTxn : public Action {
 private:
     uint32_t 		m_warehouse_id;
