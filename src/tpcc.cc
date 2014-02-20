@@ -1028,18 +1028,33 @@ StockLevelTxn::LaterPhase() {
     }
 }
 
-/*
 OrderStatusTxn0::OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
-                                 char *c_last, bool c_by_name) {
+                                 char *c_last, bool c_by_name, 
+                                 OrderStatusTxn1 *level1_txn) {
     assert(w_id < s_num_warehouses);
     assert(d_id < s_districts_per_wh);
     assert(c_id < s_customers_per_dist);
+
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = OPEN_ORDER_INDEX;    
     
     m_warehouse_id = w_id;
     m_district_id = d_id;
     m_customer_id = c_id;
     m_c_by_name = c_by_name;
     m_c_last = c_last;
+    m_level1_txn = level1_txn;
+    
+    uint32_t keys[3];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    keys[2] = m_customer_id;
+    uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+    dep_info.record.m_key = customer_key;
+    readset.push_back(dep_info);
 }
 
 bool
@@ -1061,15 +1076,23 @@ OrderStatusTxn0::LaterPhase() {
 
     assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
     uint64_t index = readset[0].record.m_key;
-    Oorder *oorder = s_oorder_index->GetPtr(index);
+    Oorder *oorder = s_oorder_index->Get(index);
     keys[2] = oorder->o_id;
     for (uint32_t i = 0; i < oorder->o_ol_cnt; ++i) {
         keys[3] = i;
         uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
         dep_info.record.m_key = order_line_key;
-        m_level1_txn.readset.push_back(dep_info);
+        m_level1_txn->readset.push_back(dep_info);
     }
+    m_level1_txn->NowPhase();
+    m_level1_txn->LaterPhase();
 }
+
+OrderStatusTxn1::OrderStatusTxn1(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
+                                 char *c_last, bool c_by_name)
+    : OrderStatusTxn0(w_id, d_id, c_id, c_last, c_by_name, this) {
+}
+
 
 bool
 OrderStatusTxn1::NowPhase() {
@@ -1085,7 +1108,6 @@ OrderStatusTxn1::LaterPhase() {
         m_order_line_quantity += ol->ol_quantity;
     }    
 }
-*/
 
 OrderStatusTxn::OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
                                char *c_last, bool c_by_name) {

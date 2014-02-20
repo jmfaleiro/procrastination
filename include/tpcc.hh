@@ -25,6 +25,7 @@ enum TPCCTable {
     ITEM,
     STOCK,    
     ORDER_LINE_INDEX,
+    OPEN_ORDER_INDEX,
 };
 
 
@@ -440,6 +441,33 @@ public:
     virtual void LaterPhase();
 };
 
+class OrderStatusTxn1;
+class OrderStatusTxn0 : public Action {
+private:
+    OrderStatusTxn1 	*m_level1_txn;
+protected:
+    uint32_t 			m_warehouse_id;
+    uint32_t 			m_district_id;
+    uint32_t 			m_customer_id;
+    bool 				m_c_by_name;
+    char 				*m_c_last;
+    uint64_t 			m_order_line_quantity;
+
+public:
+    OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
+                    bool c_by_name, OrderStatusTxn1 *level1_txn);
+    bool NowPhase();
+    void LaterPhase();
+};
+
+class OrderStatusTxn1 : public OrderStatusTxn0 {
+public:
+    OrderStatusTxn1(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
+                    bool c_by_name);
+    bool NowPhase();
+    void LaterPhase();
+};
+
 class OrderStatusTxn : public Action {
 private:
     uint32_t 		m_warehouse_id;
@@ -471,8 +499,8 @@ protected:
 public:
     DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
                 DeliveryTxn1 *level1_txn);
-    bool NowPhase();
-    void LaterPhase();
+    virtual bool NowPhase();
+    virtual void LaterPhase();
 };
 
 class DeliveryTxn2;
@@ -483,15 +511,15 @@ public:
     DeliveryTxn1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
                  DeliveryTxn2 *level2_txn);
 
-    bool NowPhase();
-    void LaterPhase();
+    virtual bool NowPhase();
+    virtual void LaterPhase();
 };
 
 class DeliveryTxn2 : public DeliveryTxn1 {
 public:
     DeliveryTxn2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
-    bool NowPhase();
-    void LaterPhase();
+    virtual bool NowPhase();
+    virtual void LaterPhase();
 };
 
 
