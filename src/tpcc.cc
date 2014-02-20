@@ -1241,18 +1241,18 @@ DeliveryTxn1::LaterPhase() {
         
         // Add all the order lines corresponding to this particular order to the 
         // readset
-        dep_info.record.m_table = ORDER_LINE;
         for (uint32_t j = 0; j < open_order->o_ol_cnt; ++j) {
+            keys[2] = open_order->o_id;
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+            dep_info.record.m_table = ORDER_LINE;
             dep_info.record.m_key = order_line_key;
             m_level2_txn->readset.push_back(dep_info);
         }
-        assert(open_order->o_ol_cnt != 0);
-        m_num_order_lines[i] = open_order->o_ol_cnt+done;
         done += open_order->o_ol_cnt;
+        m_num_order_lines[i] = done;
+
     }
-    return;
     m_level2_txn->NowPhase();
     m_level2_txn->LaterPhase();
 }
@@ -1269,27 +1269,18 @@ DeliveryTxn2::NowPhase() {
 
 void
 DeliveryTxn2::LaterPhase() {
-    int done = 0;
-    uint32_t write_count = writeset.size();
-    for (uint32_t i = 0; i < write_count; i += 2) {
-        uint32_t amount = 0;
-        int num_order_lines = m_num_order_lines[i];
-        if (readset.size() > (uint32_t)num_order_lines) {
-            std::cout << "blah!\n";
-        }
-        assert(readset.size() < (uint32_t)num_order_lines);
-        for (int j = done; j < num_order_lines; ++j, ++done) {            
-            if (readset[j].record.m_table != ORDER_LINE) {
-                std::cout << readset[j].record.m_table << "\n";
-            }
+    uint32_t done = 0;
+    uint32_t write_count = writeset.size()/2;
+    for (uint32_t i = 0; i < write_count; ++i) {
+        uint32_t amount = 1;
+        for (uint32_t j = done; j < m_num_order_lines[i]; ++j, ++done) {            
             assert(readset[j].record.m_table == ORDER_LINE);
             uint64_t order_line_key = readset[j].record.m_key;
             OrderLine *orderline = s_order_line_tbl->GetPtr(order_line_key);
             amount += orderline->ol_amount;
         }
-
-        assert(writeset[i].record.m_table == CUSTOMER);
-        uint64_t cust_key = writeset[i].record.m_key;
+        assert(writeset[2*i].record.m_table == CUSTOMER);
+        uint64_t cust_key = writeset[2*i].record.m_key;
         Customer *cust = s_customer_tbl->GetPtr(cust_key);
         cust->c_balance += amount;
         cust->c_delivery_cnt += 1;
