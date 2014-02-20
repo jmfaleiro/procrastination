@@ -1134,8 +1134,9 @@ OrderStatusTxn::LaterPhase() {
         m_order_line_quantity += ol->ol_quantity;
     }
 }
-/*
-DeliveryTxn0::DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
+
+DeliveryTxn0::DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                           DeliveryTxn1 *level1_txn) {
     assert(w_id < s_num_warehouses);
     assert(d_id < s_districts_per_wh);
 
@@ -1176,12 +1177,20 @@ DeliveryTxn0::LaterPhase() {
     for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
         keys[1] = i;
         if (m_open_order_ids[i] > 0) {
-            keys[2] = open_order_ids[i];
+            keys[2] = m_open_order_ids[i];
             uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
             dep_info.record.m_key = open_order_key;
-            m_level1_txn.writeset.push_back(dep_info);
+            m_level1_txn->writeset.push_back(dep_info);
         }
     }
+    m_level1_txn->NowPhase();
+    m_level1_txn->LaterPhase();
+}
+
+DeliveryTxn1::DeliveryTxn1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                           DeliveryTxn2 *level2_txn) 
+    : DeliveryTxn0(w_id, d_id, carrier_id, this) {
+    m_level2_txn = level2_txn;
 }
 
 bool
@@ -1204,7 +1213,7 @@ DeliveryTxn1::LaterPhase() {
     uint32_t num_orders = writeset.size();
     
     for (uint32_t i = 0; i < num_orders; ++i) {
-        Oorder *open_order = s_open_order_tbl->GetPtr(writeset[i].record.m_key);
+        Oorder *open_order = s_oorder_tbl->GetPtr(writeset[i].record.m_key);
         open_order->o_carrier_id = m_carrier_id;        
         keys[1] = open_order->o_d_id;
 
@@ -1213,7 +1222,7 @@ DeliveryTxn1::LaterPhase() {
         uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
         dep_info.record.m_table = CUSTOMER;
         dep_info.record.m_key = customer_key;
-        m_level2_txn.writeset.push_back(dep_info);
+        m_level2_txn->writeset.push_back(dep_info);
         
         // Add the New Order record to the write set (this record is to be 
         // deleted)
@@ -1221,7 +1230,7 @@ DeliveryTxn1::LaterPhase() {
         uint64_t open_order_key = TPCCKeyGen::create_new_order_key(keys);
         dep_info.record.m_table = NEW_ORDER;
         dep_info.record.m_key = open_order_key;
-        m_level2_txn.writeset.push_back(dep_info);
+        m_level2_txn->writeset.push_back(dep_info);
         
         
         // Add all the order lines corresponding to this particular order to the 
@@ -1231,11 +1240,18 @@ DeliveryTxn1::LaterPhase() {
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
             dep_info.record.m_key = order_line_key;
-            m_level2_txn.readset.push_back(dep_info);
+            m_level2_txn->readset.push_back(dep_info);
         }
         m_num_order_lines.push_back(done);
     }
+    m_level2_txn->NowPhase();
+    m_level2_txn->LaterPhase();
 }
+
+DeliveryTxn2::DeliveryTxn2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) 
+    : DeliveryTxn1(w_id, d_id, carrier_id, this) {
+}
+
 
 bool
 DeliveryTxn2::NowPhase() {
@@ -1262,7 +1278,6 @@ DeliveryTxn2::LaterPhase() {
         cust->c_delivery_cnt += 1;
     }
 }
-*/
 
 DeliveryTxn::DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id) {
     assert(w_id < s_num_warehouses);

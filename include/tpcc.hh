@@ -456,6 +456,46 @@ public:
     void LaterPhase();
 };
 
+class DeliveryTxn1;
+class DeliveryTxn0 : public Action {
+private:
+    DeliveryTxn1 			*m_level1_txn;
+
+protected:
+    uint32_t 				m_warehouse_id;
+    uint32_t 				m_district_id;
+    uint32_t 				m_carrier_id;
+    std::vector<int>		m_num_order_lines;
+    uint32_t 				m_open_order_ids[20];
+
+    
+public:
+    DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                DeliveryTxn1 *level1_txn);
+    bool NowPhase();
+    void LaterPhase();
+};
+
+class DeliveryTxn2;
+class DeliveryTxn1 : public DeliveryTxn0 {
+private:
+    DeliveryTxn2 			*m_level2_txn;
+public:
+    DeliveryTxn1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                 DeliveryTxn2 *level2_txn);
+
+    bool NowPhase();
+    void LaterPhase();
+};
+
+class DeliveryTxn2 : public DeliveryTxn1 {
+public:
+    DeliveryTxn2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
+    bool NowPhase();
+    void LaterPhase();
+};
+
+
 class DeliveryTxn : public Action {
 private:
     uint32_t 		m_warehouse_id;
