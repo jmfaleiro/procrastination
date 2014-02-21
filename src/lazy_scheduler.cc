@@ -97,29 +97,15 @@ void* LazyScheduler::schedulerFunction(void* arg) {
             continue;
         case CUSTOMER:
             sched->m_last_txns[CUSTOMER] = 
+                //                new HashTable<uint64_t, Heuristic>(1<<22, 20);
+            
                 new ThreeDimTable<Heuristic>(s_num_warehouses, 
                                              s_districts_per_wh, 
                                              s_customers_per_dist,
                                              TPCCKeyGen::get_warehouse_key,
                                              TPCCKeyGen::get_district_key,
                                              TPCCKeyGen::get_customer_key);
-            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
-                for (uint32_t d_id = 0; d_id < s_districts_per_wh; ++d_id) {
-                    for (uint32_t c_id = 0; c_id < s_customers_per_dist; 
-                         ++c_id) {
-                        keys[0] = w_id;
-                        keys[1] = d_id;
-                        keys[2] = c_id;
-                        uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
-                        Heuristic *test = 
-                            sched->m_last_txns[CUSTOMER]->GetPtr(customer_key);
-                        assert(test->last_txn == NULL);
-                        assert(test->index == -1);
-                        assert(test->is_write == false);
-                        assert(test->chain_length == 0);
-                    }
-                }
-            }
+            
             break;
         case NEW_ORDER:
             sched->m_last_txns[NEW_ORDER] = 
@@ -131,47 +117,24 @@ void* LazyScheduler::schedulerFunction(void* arg) {
             break;
         case STOCK:
             sched->m_last_txns[STOCK] = 
+                //    new HashTable<uint64_t, Heuristic>(1<<24, 20);
+
                 new TwoDimTable<Heuristic>(s_num_warehouses, s_num_items, 
                                            TPCCKeyGen::get_warehouse_key,
                                            TPCCKeyGen::get_stock_key);
-            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
-                for (uint32_t s_id = 0; s_id < s_num_items; ++s_id) {
-                    keys[0] = w_id;
-                    keys[1] = s_id;
-                    uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
-                    Heuristic *test = 
-                        sched->m_last_txns[STOCK]->GetPtr(stock_key);
-                    assert(test->last_txn == NULL);
-                    assert(test->index == -1);
-                    assert(test->is_write == false);
-                    assert(test->chain_length == 0);
-                }
-            }
+
             break;
         case OPEN_ORDER_INDEX:
             sched->m_last_txns[OPEN_ORDER_INDEX] = 
+                //                new HashTable<uint64_t, Heuristic>(1<<22, 20);
+            
                 new ThreeDimTable<Heuristic>(s_num_warehouses, 
                                              s_districts_per_wh, 
                                              s_customers_per_dist,
                                              TPCCKeyGen::get_warehouse_key,
                                              TPCCKeyGen::get_district_key,
                                              TPCCKeyGen::get_customer_key);
-            /*
-            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
-                for (uint32_t d_id = 0; d_id < s_districts_per_wh; ++d_id) {
-                    for (uint32_t c_id = 0; c_id < s_customers_per_dist;                          
-                         ++c_id) {
-                        keys[0] = w_id;
-                        keys[1] = d_id;
-                        keys[2] = c_id;
-                        uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
-                        Heuristic *test = 
-                            sched->m_last_txns[CUSTOMER]->GetPtr(customer_key);
-                        assert(*test == temp);
-                    }
-                }
-            }
-            */
+            
             break;
         defaut:
             std::cout << "Got more tables than expected!\n";

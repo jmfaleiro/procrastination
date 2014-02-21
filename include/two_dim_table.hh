@@ -1,6 +1,9 @@
 #ifndef TWO_DIM_TABLE_HH_
 #define TWO_DIM_TABLE_HH_
 
+#include <table.hh>
+#include <numa.h>
+
 template<class V>
 class TwoDimTable : public Table<uint64_t, V> {
 
@@ -15,9 +18,10 @@ public:
     TwoDimTable(uint32_t dim1, uint32_t dim2, 
                 uint32_t (*access1) (uint64_t composite1), 
                 uint32_t (*access2) (uint64_t composite2)) {
-        m_table = (V**)malloc(sizeof(V*)*dim1);
+        numa_set_strict(1);
+        m_table = (V**)numa_alloc_local(sizeof(V*)*dim1);
         for (uint32_t i = 0; i < dim1; ++i) {
-            m_table[i] = (V*)malloc(sizeof(V)*dim2);
+            m_table[i] = (V*)numa_alloc_local(sizeof(V)*dim2);
             for (uint32_t j = 0; j < dim2; ++j) {
                 m_table[i][j] = V();
             }
@@ -32,8 +36,6 @@ public:
     Put(uint64_t key, V value) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
-        assert(index1 < m_dim1);
-        assert(index2 < m_dim2);
         m_table[index1][index2] = value;
         return &m_table[index1][index2];
     }
@@ -42,8 +44,6 @@ public:
     Get(uint64_t key) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
-        assert(index1 < m_dim1);
-        assert(index2 < m_dim2);
         return m_table[index1][index2];
     }
 
@@ -51,11 +51,6 @@ public:
     GetPtr(uint64_t key) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
-        if (index1 >= m_dim1 || index2 >= m_dim2) {
-            std::cout << index1 << " " << m_dim1 << " " << index2 << " " <<  m_dim2 << "\n";
-        }
-        assert(index1 < m_dim1);
-        assert(index2 < m_dim2);
         return &m_table[index1][index2];
     }
   

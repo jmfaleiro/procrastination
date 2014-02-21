@@ -563,6 +563,9 @@
          if (m_item_ids[i] == invalid_item_key) {
              return false;
          }
+         uint64_t stock_key = writeset[s_stock_index+i].record.m_key;
+         assert(TPCCKeyGen::get_stock_key(stock_key) < s_num_items);
+         assert(m_item_ids[i] == TPCCKeyGen::get_stock_key(stock_key));
      }
 
      // We are guaranteed not to abort once we're here. Increment the highly 
@@ -582,8 +585,8 @@
 
      keys[2] = m_order_id;
      uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
-     writeset[1].record.m_key = new_order_key;
-     writeset[2].record.m_key = new_order_key;
+     writeset[m_num_items].record.m_key = new_order_key;
+     writeset[m_num_items+1].record.m_key = new_order_key;
      //     writeset[m_num_items].record.m_key = new_order_key;
      /*
      for (int i = 0; i < m_num_items; ++i) {

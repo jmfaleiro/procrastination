@@ -1,4 +1,4 @@
-CFLAGS=-O2 -Werror -Wextra -g -std=c++0x
+CFLAGS=-O2 -Werror -Wextra -g -std=c++0x 
 LIBS=-lnuma -lpthread -lprotobuf -lrt -lcityhash -ltcmalloc_minimal
 
 INCLUDE=include
