@@ -1,6 +1,7 @@
 #ifndef ACTION_H
 #define ACTION_H
 
+#include <cassert>
 #include <vector>
 #include <stdint.h>
 #include "machine.h"
@@ -30,15 +31,75 @@ class CompositeKey {
   bool operator!=(const CompositeKey &other) const {
     return !(*this == other);
   }
+  
+  bool operator<(const CompositeKey &other) const {
+      return (this->m_table < other.m_table) || (this->m_key < other.m_key);
+  }
+  
+  bool operator>(const CompositeKey &other) const {
+      return (this->m_table > other.m_table) || (this->m_key > other.m_key);
+  }
+  
+  bool operator<=(const CompositeKey &other) const {
+      return !(*this > other);
+  }
+  
+  bool operator>=(const CompositeKey &other) const {
+      return !(*this < other);
+  }
 };
 
 // The lazy scheduler has an entry of this type for every single record that is
 // read or written in the system.
 struct DependencyInfo {
-  CompositeKey record;
-  Action *dependency;
-  bool is_write;
-  int index;
+    CompositeKey record;
+    Action *dependency;
+    bool is_write;
+    int index;
+    
+    bool operator<(const struct DependencyInfo &other) const {
+        return (this->record < other.record);
+    }
+    
+    bool operator>(const struct DependencyInfo &other) const {
+        return (this->record > other.record);
+    }
+    
+    bool operator==(const struct DependencyInfo &other) const {
+        return (this->record == other.record);
+    }
+    
+    bool operator!=(const struct DependencyInfo &other) const {
+        return (this->record != other.record);
+    }
+
+    bool operator>=(const struct DependencyInfo &other) const {
+        return !(this->record < other.record);
+    }
+
+    bool operator<=(const struct DependencyInfo &other) const {
+        return !(this->record > other.record);
+    }
+};
+
+class EagerAction {
+ private:
+    volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_wakeup_flag;
+ public:
+    virtual void Execute() = 0;
+        
+    
+    void Spin(uint64_t *lock_word) {
+        xchgq(&m_wakeup_flag, 1);
+        unlock(lock_word);
+        while (m_wakeup_flag == 1)
+            ;
+    }
+    
+    void Wakeup(uint64_t *lock_word) {
+        assert(*lock_word == 1);
+        xchgq(&m_wakeup_flag, 0);
+    }
 };
 
 struct StateLock {

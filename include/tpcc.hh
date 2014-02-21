@@ -314,6 +314,34 @@ public:
     void do_init();
 };
 
+class NewOrderTxnEager : public EagerAction {
+
+    uint64_t 			m_warehouse_id;
+    uint64_t			m_district_id;
+    uint64_t 			m_customer_id;
+    uint64_t 			m_num_items;
+    uint64_t 			*m_item_ids;
+    uint32_t 			*m_order_quantities;
+    uint64_t 			*m_supplier_wh_ids;
+
+    CompositeKey		m_warehouse;
+    CompositeKey		m_district;
+    CompositeKey 		m_customer;
+    CompositeKey 		m_open_order;
+    CompositeKey		m_new_order;
+    
+    CompositeKey		*m_order_lines;
+    CompositeKey		*m_stocks;
+
+public:
+    NewOrderTxnEager(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
+                     uint64_t o_all_local, uint64_t num_items, 
+                     uint64_t *item_ids, uint64_t *supplier_wh_ids, 
+                     uint32_t *order_quantities);
+
+    virtual void
+    Execute();
+};
 
 class NewOrderTxn : public Action {
     
