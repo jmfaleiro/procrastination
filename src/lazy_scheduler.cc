@@ -3,6 +3,7 @@
 #include <tpcc.hh>
 #include <assert.h>
 #include <deque>
+#include <bulk_allocating_table.hh>
 
 using namespace std;
 
@@ -75,30 +76,12 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     pin_thread(sched->m_binding_info);    
 
     // Hash table that points to the most recent writers of records in a txn. 
-    // XXX: Do we need inserts to count as writes? For now, I'm just assuming that
-    // reads+writes count as dependencies, insertions do not count. 
-    sched->m_last_txns = new HashTable<CompositeKey, Heuristic>(1<<30, 20);
+    sched->m_last_txns = 
+        new BulkAllocatingTable<CompositeKey, Heuristic>(1<<30, 20, 1<<30);
     //new HashTable<CompositeKey, Heuristic>(m_table_size, 10);
 
     sched->m_num_txns = 0;
     pthread_t walker_thread;
-
-    uint32_t keys[3];
-    for (uint32_t w = 0; w < s_num_warehouses; ++w) {
-        keys[0] = w;
-        for (uint32_t d = 0; d < s_districts_per_wh; ++d) {
-            keys[1] = d;
-            for (uint32_t o = 0; o < (1<<20); ++o) {
-                keys[2] = o;
-                uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
-                CompositeKey blah;
-                blah.m_table = NEW_ORDER;
-                blah.m_key = new_order_key;
-                sched->m_last_txns->Put(blah, Heuristic());
-            }
-        }
-    }
-    
 
     // Indicate that the thread is running and ready to go to the co-ordinator. 
     xchgq(&(sched->m_start_flag), 1);

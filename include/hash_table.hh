@@ -18,8 +18,6 @@ string_hash_helper(char *str) {
     return CityHash64(str, len);
 }
 
-
-
 template <class K, class V>
 class BucketItem {
 public:
@@ -66,17 +64,6 @@ public:
 
 template <class K, class V>
 class HashTable : public Table<K, V> {
-private:
-
-    BucketItem<K, V>*
-    PutInternal(K key, V value) {
-        uint64_t index = m_hash_function(key) & m_mask;
-        BucketItem<K, V> *to_insert = new BucketItem<K, V> (key, value);
-        to_insert->m_next = m_table[index];
-        m_table[index] = to_insert;    
-        return to_insert;
-    }
-
 protected:
     uint32_t m_size;
     uint32_t m_mask;
@@ -90,6 +77,15 @@ protected:
     default_hash_function(K key) {
         char *start = (char*)&key;
         return CityHash64(start, sizeof(K));
+    }
+
+    virtual BucketItem<K, V>*
+    PutInternal(K key, V value) {
+        uint64_t index = m_hash_function(key) & m_mask;
+        BucketItem<K, V> *to_insert = new BucketItem<K, V> (key, value);
+        to_insert->m_next = m_table[index];
+        m_table[index] = to_insert;    
+        return to_insert;
     }
 
     HashTable(uint32_t size, uint32_t chain_bound, void *tbl,

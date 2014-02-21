@@ -11,7 +11,6 @@
 #include <vector>
 
 #include <table.hh>
-#include <hash_table.hh>
 #include <action.h>
 #include "concurrent_queue.h"
 #include "cpuinfo.h"
@@ -92,7 +91,7 @@ class LazyScheduler {
 
 
   // Last txns to touch a given record.
-  Table<CompositeKey, struct Heuristic>  *m_last_txns;
+  Table<CompositeKey, Heuristic>  *m_last_txns;
 
 
   // Queue of actions to process.
