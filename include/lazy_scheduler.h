@@ -88,12 +88,12 @@ class LazyScheduler {
     int m_last_used;
 
 	bool m_serial;
+    
+    // Last txns to touch a given record.
+    Table<uint64_t, Heuristic>  **m_last_txns;
 
-
-  // Last txns to touch a given record.
-  Table<CompositeKey, Heuristic>  *m_last_txns;
-
-
+    int m_num_tables;
+    
   // Queue of actions to process.
   SimpleQueue** m_worker_input;
 
@@ -141,6 +141,7 @@ public:
                 SimpleQueue** input,
                 SimpleQueue** output,
                 int binding,
+                int num_tables,
                 SimpleQueue* sched_input,
                 SimpleQueue* sched_output);
   

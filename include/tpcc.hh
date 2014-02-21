@@ -15,17 +15,16 @@
 #include <action.h>
 
 enum TPCCTable {
-    WAREHOUSE = 0,
-    DISTRICT,
-    CUSTOMER,
-    HISTORY,
-    NEW_ORDER,
-    OPEN_ORDER,
-    ORDER_LINE,
-    ITEM,
-    STOCK,    
-    ORDER_LINE_INDEX,
-    OPEN_ORDER_INDEX,
+    WAREHOUSE = 0,		// 0
+    DISTRICT,			// 1
+    CUSTOMER,			// 2
+    HISTORY,			// 3
+    NEW_ORDER,			// 4
+    OPEN_ORDER,			// 5
+    ORDER_LINE,			// 6
+    ITEM,				// 7
+    STOCK,    			// 8
+    OPEN_ORDER_INDEX,	// 9
 };
 
 
@@ -277,6 +276,7 @@ extern ConcurrentHashTable<uint64_t, NewOrder> 				*s_new_order_tbl;
 extern ConcurrentHashTable<uint64_t, OrderLine> 				*s_order_line_tbl;
 
 // Experiment parameters
+extern uint32_t										s_num_tables;
 extern uint32_t 									s_num_items;  
 extern uint32_t 									s_num_warehouses;
 extern uint32_t 									s_districts_per_wh;
@@ -336,6 +336,7 @@ private:
     float 					m_warehouse_tax;
     uint32_t 				*m_order_quantities;
     uint64_t 				*m_supplierWarehouse_ids;
+    uint64_t 				*m_item_ids;
     int 					m_num_items;
     long 					m_timestamp;
 

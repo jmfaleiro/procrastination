@@ -20,21 +20,7 @@ private:
     BucketItem<K, V>		*m_free_list;
     uint32_t				m_allocation_size;
 
-protected:    
-    virtual void
-    ExpandFreeList() {
-        BucketItem<K, V> *head = 
-            (BucketItem<K, V>*)malloc(sizeof(BucketItem<K, V>)*
-                                      m_allocation_size);
-        BucketItem<K, V> *temp = head;
-        for (uint32_t i = 0; i < m_allocation_size-1; ++i) {
-            temp->m_next = &head[i+1];
-            temp = temp->m_next;
-        }
-        temp->m_next = NULL;
-        m_free_list = head;
-    }
-
+protected:
     virtual BucketItem<K, V>*
     PutInternal(K key, V value) {
         uint64_t index = (this->m_hash_function(key)) & (this->m_mask);
@@ -43,8 +29,11 @@ protected:
         }
         BucketItem<K, V> *to_insert = m_free_list;
         m_free_list = m_free_list->m_next;
+
         to_insert->m_next = this->m_table[index];
-        this->m_table[index] = to_insert;    
+        to_insert->m_key = key;
+        to_insert->m_value = value;
+        this->m_table[index] = to_insert;        
         return to_insert;
     }
 
@@ -54,7 +43,7 @@ public:
                         uint64_t (*hash)(K key) = NULL)
         : HashTable<K, V> (size, 
                            chain_bound, 
-                           malloc(size),
+                           malloc(sizeof(BucketItem<K, V>*)*size),
                            hash) {
         memset(this->m_table, 0, size);
         assert(this->m_hash_function != hash || 
@@ -63,6 +52,21 @@ public:
         m_free_list = NULL;
         m_allocation_size = allocation_size;
         ExpandFreeList();
+    }
+
+    virtual void
+    ExpandFreeList() {
+        std::cout << "warning: Performing bulk allocation!!!\n";
+        BucketItem<K, V> *head = 
+            (BucketItem<K, V>*)malloc(sizeof(BucketItem<K, V>)*
+                                      m_allocation_size);
+        BucketItem<K, V> *temp = head;
+        for (uint32_t i = 0; i < m_allocation_size-1; ++i) {
+            temp->m_next = &head[i+1];
+            temp = temp->m_next;
+        }
+        temp->m_next = m_free_list;
+        m_free_list = head;
     }
 };
 

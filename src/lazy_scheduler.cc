@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <deque>
 #include <bulk_allocating_table.hh>
+#include <two_dim_table.hh>
+#include <three_dim_table.hh>
 
 using namespace std;
 
@@ -16,10 +18,12 @@ LazyScheduler::LazyScheduler(bool serial,
                              SimpleQueue** worker_inputs,
                              SimpleQueue** worker_outputs,
                              int binding_info,
+                             int num_tables,
                              SimpleQueue* sched_input,
                              SimpleQueue* sched_output) {
     m_throughput = throughput;
 	
+    m_num_tables = num_tables;
     m_serial = serial;
     m_worker_input = worker_inputs;
     m_num_workers = num_workers;
@@ -75,13 +79,110 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     LazyScheduler* sched = (LazyScheduler*)arg;
     pin_thread(sched->m_binding_info);    
 
-    // Hash table that points to the most recent writers of records in a txn. 
+    // Hash table that points to the most recent writers of records in a txn.
+    uint32_t keys[5];
     sched->m_last_txns = 
-        new BulkAllocatingTable<CompositeKey, Heuristic>(1<<30, 20, 1<<30);
-    //new HashTable<CompositeKey, Heuristic>(m_table_size, 10);
+        (Table<uint64_t, Heuristic>**)malloc(sizeof(Table<uint64_t, Heuristic>*)*
+                                             sched->m_num_tables);
+    memset(sched->m_last_txns, 0, sizeof(Table<uint64_t, Heuristic>*)*sched->m_num_tables);
+    Heuristic temp;
+
+    for (int i = 0; i < sched->m_num_tables; ++i) {
+        switch (i) {
+        case WAREHOUSE:
+        case DISTRICT:
+        case HISTORY:
+        case ITEM:
+        case ORDER_LINE:
+            continue;
+        case CUSTOMER:
+            sched->m_last_txns[CUSTOMER] = 
+                new ThreeDimTable<Heuristic>(s_num_warehouses, 
+                                             s_districts_per_wh, 
+                                             s_customers_per_dist,
+                                             TPCCKeyGen::get_warehouse_key,
+                                             TPCCKeyGen::get_district_key,
+                                             TPCCKeyGen::get_customer_key);
+            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
+                for (uint32_t d_id = 0; d_id < s_districts_per_wh; ++d_id) {
+                    for (uint32_t c_id = 0; c_id < s_customers_per_dist; 
+                         ++c_id) {
+                        keys[0] = w_id;
+                        keys[1] = d_id;
+                        keys[2] = c_id;
+                        uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+                        Heuristic *test = 
+                            sched->m_last_txns[CUSTOMER]->GetPtr(customer_key);
+                        assert(test->last_txn == NULL);
+                        assert(test->index == -1);
+                        assert(test->is_write == false);
+                        assert(test->chain_length == 0);
+                    }
+                }
+            }
+            break;
+        case NEW_ORDER:
+            sched->m_last_txns[NEW_ORDER] = 
+                new BulkAllocatingTable<uint64_t, Heuristic>(1<<24, 20, 1<<24);
+            break;
+        case OPEN_ORDER:
+             sched->m_last_txns[OPEN_ORDER] = 
+                new BulkAllocatingTable<uint64_t, Heuristic>(1<<24, 20, 1<<24);
+            break;
+        case STOCK:
+            sched->m_last_txns[STOCK] = 
+                new TwoDimTable<Heuristic>(s_num_warehouses, s_num_items, 
+                                           TPCCKeyGen::get_warehouse_key,
+                                           TPCCKeyGen::get_stock_key);
+            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
+                for (uint32_t s_id = 0; s_id < s_num_items; ++s_id) {
+                    keys[0] = w_id;
+                    keys[1] = s_id;
+                    uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
+                    Heuristic *test = 
+                        sched->m_last_txns[STOCK]->GetPtr(stock_key);
+                    assert(test->last_txn == NULL);
+                    assert(test->index == -1);
+                    assert(test->is_write == false);
+                    assert(test->chain_length == 0);
+                }
+            }
+            break;
+        case OPEN_ORDER_INDEX:
+            sched->m_last_txns[OPEN_ORDER_INDEX] = 
+                new ThreeDimTable<Heuristic>(s_num_warehouses, 
+                                             s_districts_per_wh, 
+                                             s_customers_per_dist,
+                                             TPCCKeyGen::get_warehouse_key,
+                                             TPCCKeyGen::get_district_key,
+                                             TPCCKeyGen::get_customer_key);
+            /*
+            for (uint32_t w_id = 0; w_id < s_num_warehouses; ++w_id) {
+                for (uint32_t d_id = 0; d_id < s_districts_per_wh; ++d_id) {
+                    for (uint32_t c_id = 0; c_id < s_customers_per_dist;                          
+                         ++c_id) {
+                        keys[0] = w_id;
+                        keys[1] = d_id;
+                        keys[2] = c_id;
+                        uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);
+                        Heuristic *test = 
+                            sched->m_last_txns[CUSTOMER]->GetPtr(customer_key);
+                        assert(*test == temp);
+                    }
+                }
+            }
+            */
+            break;
+        defaut:
+            std::cout << "Got more tables than expected!\n";
+            exit(-1);
+        }
+    }
 
     sched->m_num_txns = 0;
     pthread_t walker_thread;
+    
+    std::cout << "Begin experiment!\n";
 
     // Indicate that the thread is running and ready to go to the co-ordinator. 
     xchgq(&(sched->m_start_flag), 1);
@@ -103,11 +204,14 @@ void* LazyScheduler::schedulerFunction(void* arg) {
     else {
         while (true) {
             Action *to_process = (Action*)incoming_txns->DequeueBlocking();
-            //            to_process->NowPhase();
-            //            sched->addGraph(to_process);
+            if (to_process->NowPhase()) {
+                sched->addGraph(to_process);
+            }
+            /*
             if (to_process->NowPhase()) {
                 to_process->LaterPhase();
             }
+            */
             outgoing_txns->EnqueueBlocking((uint64_t)to_process);
         }
     }
@@ -139,7 +243,7 @@ void LazyScheduler::addGraph(Action* action) {
     bool force_materialize = action->materialize;
     for (int i = 0; i < num_reads; ++i) {
         CompositeKey record = action->readset[i].record;
-        Heuristic *dep_info = m_last_txns->GetPtr(record);            
+        Heuristic *dep_info = m_last_txns[record.m_table]->GetPtr(record.m_key);            
             
         // Keep the information about the previous txn around.
         action->readset[i].dependency = dep_info->last_txn;
@@ -161,7 +265,7 @@ void LazyScheduler::addGraph(Action* action) {
     // Go through the write set. 
     for (int i = 0; i < num_writes; ++i) {
         CompositeKey record = action->writeset[i].record;
-        Heuristic *dep_info = m_last_txns->GetPtr(record);
+        Heuristic *dep_info = m_last_txns[record.m_table]->GetPtr(record.m_key);
             
         // Keep the information about the previous txn around. 
         action->writeset[i].dependency = dep_info->last_txn;

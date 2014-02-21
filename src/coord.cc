@@ -385,6 +385,7 @@ initialize(ExperimentInfo* info,
                                        worker_inputs,
                                        NULL,
                                        0,
+                                       s_num_tables,
                                        scheduler_input,
                                        scheduler_output);
     }
@@ -397,6 +398,7 @@ initialize(ExperimentInfo* info,
                                        worker_flag,
                                        worker_inputs,
                                        NULL,
+                                       0,
                                        0,
                                        scheduler_input,
                                        NULL);
