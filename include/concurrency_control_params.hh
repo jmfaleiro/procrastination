@@ -62,30 +62,30 @@ namespace cc_params {
         uint32_t 		(*m_access3) (uint64_t composite);    
     };
 
-    union TableParams {
+    typedef union {
         struct HashTableInit 					m_hash_params;
         struct ConcurrentHashTableInit			m_conc_params;
         struct BulkAllocatingTableInit			m_bulk_params;
         struct OneDimTableInit					m_one_params;
         struct TwoDimTableInit					m_two_params;
         struct ThreeDimTableInit				m_three_params;
-    };
+    } TableParams;
 
-    struct TableInit {
+    typedef struct {
         TableType	   	    m_table_type;
         TableParams			m_params;
-    };
+    } TableInit;
 
     template<class V>
     static Table<uint64_t, V>**
-    do_tbl_init(struct TableInit *table_params, int num_params) {
+    do_tbl_init(TableInit *tbl_init, int num_params) {
         Table<uint64_t, V> **ret = 
             (Table<uint64_t, V>**)malloc(sizeof(Table<uint64_t, V>*)*
                                          num_params);
         memset(ret, 0, sizeof(Table<uint64_t, V>*)*num_params);
         for (int i = 0; i < num_params; ++i) {
-            TableType table_type = table_params[i].m_table_type;
-            TableParams table_params; = table_params[i].m_params;
+            TableType table_type = tbl_init[i].m_table_type;
+            TableParams table_params = tbl_init[i].m_params;
             switch (table_type) {
             case HASH_TABLE:
                 ret[i] = 

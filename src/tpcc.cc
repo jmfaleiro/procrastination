@@ -512,13 +512,14 @@ NewOrderTxnEager::NewOrderTxnEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
 // 2-phase locking implementation of NewOrder
 void
 NewOrderTxnEager::Execute() {
+    /*
     uint32_t timestamp = time(NULL);
 
     uint32_t keys[4] = {0, 0, 0, 0};
     keys[0] = m_warehouse_id;
     keys[1] = m_district_id;
 
-    s_lock_manager->LockRead(m_warehouse, this);
+    s_lock_manager->Lock(m_warehouse, this);
     s_lock_manager->LockWrite(m_district, this);
     
     // Get the order id for this particular transaction
@@ -656,6 +657,7 @@ NewOrderTxnEager::Execute() {
     for (uint32_t j = 0; j < m_num_items; ++j) {
         s_lock_manager->Unlock(m_stocks[j], this);
     }
+    */
 }
 
 NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 

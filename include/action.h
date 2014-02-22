@@ -56,6 +56,9 @@ struct DependencyInfo {
     Action *dependency;
     bool is_write;
     int index;
+
+    struct DependencyInfo *next;
+    struct DependencyInfo **prev;
     
     bool operator<(const struct DependencyInfo &other) const {
         return (this->record < other.record);
@@ -118,6 +121,9 @@ class Action {
   int num_writes;
   bool materialize;
   int is_blind;
+
+  volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
+
   volatile uint64_t start_time;
   volatile uint64_t end_time;
   volatile uint64_t system_start_time;

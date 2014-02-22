@@ -36,14 +36,14 @@ xchgq(volatile uint64_t *addr, uint64_t new_val)
 
 // Spin lock implementation. XXX: Is test-n-test-n-set better?
 static inline void
-lock(uint64_t *word) {
+lock(volatile uint64_t *word) {
   while (xchgq(word, 1) == 1) {
     do_pause();
   }
 }
 
 static inline void
-unlock(uint64_t *word) {
+unlock(volatile uint64_t *word) {
   xchgq(word, 0);
 }
 
@@ -51,12 +51,25 @@ static inline uint64_t
 fetch_and_increment(volatile uint64_t *variable)
 {
     uint64_t counter_value = 1;
-    asm volatile ("lock; xaddq %%rax, %1;"
+    asm volatile ("lock; addq %%rax, %1;"
                   : "=a" (counter_value), "+m" (*variable)
                   : "a" (counter_value)
                   : "memory");
     return counter_value + 1;
 }
+
+static inline uint64_t
+fetch_and_decrement(volatile uint64_t *variable) 
+{
+    uint64_t counter_value = 1;
+    asm volatile ("lock; subq %%rax, %1;"
+                  : "=a" (counter_value), "+m" (*variable)
+                  : "a" (counter_value)
+                  : "memory");
+    return counter_value + 1;
+}
+
+    
 
 // An indivisible unit of work. 
 static inline void

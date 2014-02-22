@@ -5,43 +5,50 @@
 #include <tpcc.hh>
 #include <action.h>
 #include <deque>
+#include <concurrency_control_params.hh>
 
 using namespace std;
 
-struct LockRequest {
-    LockRequest(bool w, EagerAction* t) : txn(t), is_write(w) {}
-    EagerAction* txn;  // Pointer to txn requesting the lock.
-    bool is_write;  // Specifies whether this is a read or write lock request.
-};
-
-struct KeysList {
-    KeysList(CompositeKey m, deque<LockRequest>* t) : key(m), locksrequest(t) {}
-    CompositeKey key;
-    deque<LockRequest>* locksrequest;
-};
-
-class LockManager {
+struct TxnQueue {
+    struct DependencyInfo												*head;
+    struct DependencyInfo												**tail;
+    volatile uint64_t __attribute((aligned(CACHE_LINE))) 	lock_word;
     
-private:
-    static uint64_t 
-    hash(CompositeKey key) {
-        char *start = (char*)&key;
-        return CityHash64(start, sizeof(CompositeKey));
+    TxnQueue() {
+        head = NULL;
+        tail = NULL;
+        lock_word = 0;
     }
+};
 
-    uint64_t 				m_size;
-    deque<KeysList> 		**m_lock_table;
+class LockManager {    
+private:
+    Table<uint64_t, TxnQueue>		**m_tables;    
+
+    bool
+    CheckWrite(struct TxnQueue *queue, struct DependencyInfo *dep);
+
+    bool
+    CheckRead(struct TxnQueue *queue, struct DependencyInfo *dep);
+
+    void
+    AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep);
+
+    void
+    RemoveWrite(struct TxnQueue *queue, struct DependencyInfo *dep);
+
+    void
+    RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep);
 
 public:
-    LockManager(uint64_t table_size);
+    LockManager(cc_params::TableInit *params, int num_params);
     
     // Acquire and release the mutex protecting a particular hash chain
-    virtual void Acquire(uint64_t index);
-    virtual void Release(uint64_t index);
+    virtual void
+    Unlock(Action *txn);
 
-    virtual void LockWrite(CompositeKey key, EagerAction* txn);
-    virtual void LockRead(CompositeKey key, EagerAction *txn);
-    virtual void Unlock(CompositeKey key, EagerAction *txn);
+    virtual bool
+    Lock(Action *txn);
 };
 
 #endif // LOCK_MANAGER_HH_
