@@ -385,6 +385,31 @@ public:
 };
 
 
+class PaymentTxnEager : public Action {
+private:
+    static const int 		s_warehouse_index = 0;
+    static const int 		s_district_index = 1;
+    static const int 		s_customer_index = 2;
+
+    float 					m_h_amount;
+    uint32_t 				m_time;
+    uint32_t 				m_w_id;
+    uint32_t 				m_d_id;
+    uint32_t 				m_c_id;
+    uint32_t 				m_c_w_id;
+    uint32_t 				m_c_d_id;
+    char					*m_c_last;
+    bool					m_c_by_name;
+
+public:
+    PaymentTxnEager(uint32_t w_id, uint32_t c_w_id, float h_amount, 
+                    uint32_t d_id, uint32_t c_d_id, uint32_t c_id, char *c_last,
+                    bool c_by_name);
+    
+    bool NowPhase();
+    void LaterPhase();    
+};
+
 class PaymentTxn : public Action {
 private:
     static const int 		s_customer_index = 0;

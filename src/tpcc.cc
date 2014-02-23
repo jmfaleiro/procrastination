@@ -691,6 +691,7 @@ NewOrderTxnEager::LaterPhase() {
     *old_index = new_oorder;    
 }
 
+
 NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
                          uint64_t o_all_local, uint64_t numItems, 
                          uint64_t *itemIds, 
@@ -946,6 +947,125 @@ NewOrderTxn::LaterPhase() {
     Oorder *new_oorder = s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
     Oorder **old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
     *old_index = new_oorder;    
+}
+
+PaymentTxnEager::PaymentTxnEager(uint32_t w_id, uint32_t c_w_id, float h_amount,
+                                 uint32_t d_id, uint32_t c_d_id, uint32_t c_id, 
+                                 char *c_last, bool c_by_name) {
+    assert(w_id < s_num_warehouses);
+    assert(c_w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
+    
+    m_w_id = w_id;
+    m_c_w_id = c_w_id;
+    m_h_amount = h_amount;
+    m_d_id = d_id;
+    m_c_d_id = c_d_id;
+    m_c_id = c_id;
+    m_c_last = c_last;
+    m_c_by_name = c_by_name;
+
+    struct DependencyInfo info;
+    uint32_t keys[4];
+    
+    // Add the warehouse to the writeset
+    info.record.m_table = WAREHOUSE;
+    info.record.m_key = w_id;
+    writeset.push_back(info);    
+    
+    // Add the district to the writeset
+    keys[0] = w_id;
+    keys[1] = d_id;
+    info.record.m_key = TPCCKeyGen::create_district_key(keys);
+    info.record.m_table = DISTRICT;
+    writeset.push_back(info);
+
+    // Add the customer to the writeset
+    keys[0] = c_w_id;
+    keys[1] = c_d_id;
+    keys[2] = c_id;
+    info.record.m_key = TPCCKeyGen::create_customer_key(keys);
+    info.record.m_table = CUSTOMER;
+    writeset.push_back(info);
+    
+    // Sort the elements in the writeset, make sure that the readset is empty
+    std::sort(writeset.begin(), writeset.end());
+    assert(readset.size() == 0);
+
+    // Make sure that all the keys are placed in their expected locations
+    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
+    assert(writeset[s_district_index].record.m_table == DISTRICT);
+    assert(writeset[s_customer_index].record.m_table == CUSTOMER);
+}
+
+bool
+PaymentTxnEager::NowPhase() {
+    return true;
+}
+
+void
+PaymentTxnEager::LaterPhase() {
+
+    // Update the warehouse
+    Warehouse *warehouse = s_warehouse_tbl->GetPtr(m_w_id);
+    warehouse->w_ytd += m_h_amount;
+
+    // Update the district
+    District *district = s_district_tbl->GetPtr(m_d_id);
+    district->d_ytd += m_h_amount;
+
+    char *warehouse_name = warehouse->w_name;
+    char *district_name = district->d_name;
+
+    // Update the customer
+    Customer *cust = 
+        s_customer_tbl->GetPtr(writeset[s_customer_index].record.m_key);
+    uint32_t customer_id = cust->c_id;
+
+    static const char *credit = "BC";
+    if (strcmp(credit, cust->c_credit) == 0) {	// Bad credit
+        
+        static const char *space = " ";
+        char c_id_str[17];
+        sprintf(c_id_str, "%x", m_c_id);
+        char c_d_id_str[17]; 
+        sprintf(c_d_id_str, "%x", m_c_d_id);
+        char c_w_id_str[17];
+        sprintf(c_w_id_str, "%x", m_c_w_id);
+        char d_id_str[17]; 
+        sprintf(d_id_str, "%x", m_w_id);
+        char w_id_str[17];
+        sprintf(w_id_str, "%x", m_d_id);
+        char h_amount_str[17];
+        sprintf(h_amount_str, "%lx", (uint64_t)m_h_amount);
+        
+        static const char *holder[11] = {c_id_str, space, c_d_id_str, space, 
+                                         c_w_id_str, space, d_id_str, space, 
+                                         w_id_str, space, h_amount_str};
+        TPCCUtil::append_strings(cust->c_data, holder, 501, 11);
+    }
+    else {
+        cust->c_balance -= m_h_amount;
+        cust->c_ytd_payment += m_h_amount;
+        cust->c_payment_cnt += 1;
+    }
+
+    // Insert an item into the History table
+    History hist;
+    hist.h_c_id = m_c_id;
+    hist.h_c_d_id = m_c_d_id;
+    hist.h_c_w_id = m_c_w_id;
+    hist.h_d_id = m_d_id;
+    hist.h_w_id = m_w_id;
+    hist.h_date = m_time;
+    hist.h_amount = m_h_amount;
+    
+    static const char *empty = "    ";
+    const char *holder[3] = {warehouse_name, empty, district_name};
+    TPCCUtil::append_strings(hist.h_data, holder, 26, 3);
+    s_history_tbl->Put(writeset[s_customer_index].record.m_key, hist);    
 }
 
 PaymentTxn::PaymentTxn(uint32_t w_id, uint32_t c_w_id, float h_amount, 
