@@ -67,9 +67,7 @@ fetch_and_decrement(volatile uint64_t *variable)
                   : "a" (counter_value)
                   : "memory");
     return counter_value + 1;
-}
-
-    
+}    
 
 // An indivisible unit of work. 
 static inline void
