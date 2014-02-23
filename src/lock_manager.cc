@@ -44,32 +44,61 @@ LockManager::AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep) {
 }
 
 void
-LockManager::RemoveWrite(struct TxnQueue *queue, struct DependencyInfo *dep) {
-       
-    // This txn was a write, it better be at the front of the queue
-    assert(queue->head == dep);
-    assert(dep->prev == NULL);
-    queue->head = dep->next;
-        
-    // If the queue is empty, make sure the tail reflects it
-    if (dep->next == NULL) {
-        assert(queue->tail == dep);
-        queue->tail = NULL;
+LockManager::RemoveTxn(struct TxnQueue *queue, 
+                       struct DependencyInfo *dep,
+                       struct DependencyInfo **prev_txn,
+                       struct DependencyInfo **next_txn) {
+    
+    struct DependencyInfo *prev = dep->prev;
+    struct DependencyInfo *next = dep->next;
+
+    // If we're at either end of the queue, make appropriate adjustments
+    if (prev == NULL) {
+        queue->head = next;
     }
     else {
-        dep->next->prev = NULL;
-        if (dep->next->is_write) {
-            fetch_and_decrement(&dep->next->dependency->num_dependencies);
+        assert(prev->next == dep);
+        prev->next = next;
+    }
+
+    if (next == NULL) {
+        queue->tail = prev;
+    }
+    else {
+        assert(next->prev == dep);
+        next->prev = prev;
+    }
+    *prev_txn = prev;
+    *next_txn = next;
+}
+
+void
+LockManager::AdjustWrite(struct DependencyInfo *dep) {
+    assert(dep->is_write);
+    struct DependencyInfo *next = dep->next;
+    if (next != NULL) {
+        if (next->is_write) {
+            fetch_and_decrement(&next->dependency->num_dependencies);
         }
         else {
-            for (struct DependencyInfo *iter = dep->next; 
+            for (struct DependencyInfo *iter = next;
                  iter != NULL && !iter->is_write; iter = iter->next) {
                 fetch_and_decrement(&iter->dependency->num_dependencies);
             }
         }
-    } 
+    }
 }
 
+void
+LockManager::AdjustRead(struct DependencyInfo *dep) {
+    assert(!dep->is_write);
+    struct DependencyInfo *next = dep->next;
+    if (next != NULL && dep->prev == NULL && next->is_write) {
+        fetch_and_decrement(&next->dependency->num_dependencies);
+    }
+}
+
+/*
 void
 LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 
@@ -102,18 +131,24 @@ LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
         fetch_and_decrement(&next->dependency->num_dependencies);
     }
 }
-
+*/
 
 void
 LockManager::Unlock(Action *txn) {
+    struct DependencyInfo *prev;
+    struct DependencyInfo *next;
+
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         Table<uint64_t, TxnQueue> *tbl = 
             m_tables[txn->writeset[i].record.m_table];
         TxnQueue *value = tbl->GetPtr(txn->writeset[i].record.m_key);
         assert(value != NULL);
-        
+        struct DependencyInfo *dep = &txn->writeset[i];
+
         lock(&value->lock_word);
-        RemoveWrite(value, &txn->writeset[i]);
+        RemoveTxn(value, dep, &prev, &next);
+        assert(prev == NULL);	// A write better be at the front of the queue
+        AdjustWrite(dep);
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
@@ -121,9 +156,11 @@ LockManager::Unlock(Action *txn) {
             m_tables[txn->readset[i].record.m_table];
         TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
         assert(value != NULL);
-        
+        struct DependencyInfo *dep = &txn->readset[i];
+
         lock(&value->lock_word);
-        RemoveRead(value, &txn->readset[i]);
+        RemoveTxn(value, dep, &prev, &next);
+        AdjustRead(dep);
         unlock(&value->lock_word);
     }
 }
@@ -133,6 +170,9 @@ LockManager::Lock(Action *txn) {
       for (size_t i = 0; i < txn->writeset.size(); ++i) {
           txn->writeset[i].dependency = txn;
           txn->writeset[i].is_write = true;
+          txn->writeset[i].next = NULL;
+          txn->writeset[i].prev = NULL;
+          
 
           Table<uint64_t, TxnQueue> *tbl = 
               m_tables[txn->writeset[i].record.m_table];

@@ -35,10 +35,16 @@ private:
     AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep);
 
     void
-    RemoveWrite(struct TxnQueue *queue, struct DependencyInfo *dep);
+    RemoveTxn(struct TxnQueue *queue, 
+              struct DependencyInfo *dep, 
+              struct DependencyInfo **prev,
+              struct DependencyInfo **next);
 
     void
-    RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep);
+    AdjustRead(struct DependencyInfo *dep);
+
+    void
+    AdjustWrite(struct DependencyInfo *dep);
 
 public:
     LockManager(cc_params::TableInit *params, int num_params);
