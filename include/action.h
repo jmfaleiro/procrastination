@@ -58,7 +58,7 @@ struct DependencyInfo {
     int index;
 
     struct DependencyInfo *next;
-    struct DependencyInfo **prev;
+    struct DependencyInfo *prev;
     
     bool operator<(const struct DependencyInfo &other) const {
         return (this->record < other.record);

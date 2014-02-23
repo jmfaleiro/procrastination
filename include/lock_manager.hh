@@ -11,8 +11,8 @@ using namespace std;
 
 struct TxnQueue {
     struct DependencyInfo												*head;
-    struct DependencyInfo												**tail;
-    volatile uint64_t __attribute((aligned(CACHE_LINE))) 	lock_word;
+    struct DependencyInfo												*tail;
+    volatile uint64_t __attribute((aligned(CACHE_LINE))) 				lock_word;
     
     TxnQueue() {
         head = NULL;

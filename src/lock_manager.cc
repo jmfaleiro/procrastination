@@ -7,11 +7,12 @@ using namespace cc_params;
 
 LockManager::LockManager(TableInit *params, int num_params) {
     m_tables = do_tbl_init<TxnQueue>(params, num_params);
+    assert(m_tables != NULL);
 }
 
 bool
 LockManager::CheckWrite(struct TxnQueue *queue, struct DependencyInfo *dep) {
-    return queue->head->dependency == dep->dependency;
+    return queue->head == dep;
 }
 
 bool
@@ -29,14 +30,14 @@ LockManager::AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep) {
     if (queue->tail != NULL) {
         assert(queue->head != NULL);
         dep->prev = queue->tail;
-        *(queue->tail) = dep;
-        queue->tail = &dep->next;
+        queue->tail->next = dep;
+        queue->tail = dep;
         dep->next = NULL;
     }
     else {
         assert(queue->head == NULL);
         queue->head = dep;
-        queue->tail = &dep->next;
+        queue->tail = dep;
         dep->prev = NULL;
         dep->next = NULL;
     }
@@ -52,8 +53,8 @@ LockManager::RemoveWrite(struct TxnQueue *queue, struct DependencyInfo *dep) {
         
     // If the queue is empty, make sure the tail reflects it
     if (dep->next == NULL) {
-        assert(*(queue->tail) == dep);
-        queue->tail == NULL;
+        assert(queue->tail == dep);
+        queue->tail = NULL;
     }
     else {
         dep->next->prev = NULL;
@@ -74,25 +75,25 @@ LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 
     // Splice this element out of the queue
     struct DependencyInfo *next = dep->next;
-    struct DependencyInfo **prev = dep->prev;
+    struct DependencyInfo *prev = dep->prev;
 
     // Try to update the previous txn
     if (prev != NULL) {
-        assert((*prev)->next == dep);
-        (*prev)->next = next;
+        assert(prev->next == dep);
+        prev->next = next;
     }
     else {
         assert(queue->head == dep);
-        queue->head = dep->next;            
+        queue->head = next;
     }
 
     // Try to update the next txn
     if (next != NULL) {
-        assert(*(next->prev) == dep);
+        assert(next->prev == dep);
         next->prev = prev;
     }
     else {
-        assert(*(queue->tail) == dep);
+        assert(queue->tail == dep);
         queue->tail = prev;
     }
         
@@ -112,11 +113,18 @@ LockManager::Unlock(Action *txn) {
         assert(value != NULL);
         
         lock(&value->lock_word);
-        
+        RemoveWrite(value, &txn->writeset[i]);
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
-
+        Table<uint64_t, TxnQueue> *tbl = 
+            m_tables[txn->readset[i].record.m_table];
+        TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
+        assert(value != NULL);
+        
+        lock(&value->lock_word);
+        RemoveRead(value, &txn->readset[i]);
+        unlock(&value->lock_word);
     }
 }
 
@@ -150,7 +158,7 @@ LockManager::Lock(Action *txn) {
 
           // We *must* find the key-value pair
           Table<uint64_t, TxnQueue> *tbl = 
-              m_tables[txn->writeset[i].record.m_table];
+              m_tables[txn->readset[i].record.m_table];
           TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
           assert(value != NULL);
           
