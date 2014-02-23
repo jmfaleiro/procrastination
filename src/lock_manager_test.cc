@@ -94,7 +94,25 @@ LockManagerTest::TestConflictSerial() {
 
     mgr->Unlock(action3);
     assert(action1->num_dependencies == 2);
-
+    
     mgr->Unlock(action2);
     assert(action1->num_dependencies == 0);
+    
+    info.record.m_table = 2;
+    info.record.m_key = 0;
+    action3->writeset.push_back(info);
+
+    mgr->Lock(action1);
+    assert(action1->num_dependencies == 0);
+
+    mgr->Lock(action3);
+    assert(action3->num_dependencies == 2);
+
+    mgr->Lock(action2);
+    assert(action2->num_dependencies == 3);
+    
+    mgr->Kill(action3);
+    assert(action2->num_dependencies == 2);
+    mgr->Unlock(action1);
+    assert(action2->num_dependencies == 0);
 }

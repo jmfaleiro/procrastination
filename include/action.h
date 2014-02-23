@@ -55,6 +55,7 @@ struct DependencyInfo {
     CompositeKey record;
     Action *dependency;
     bool is_write;
+    bool is_held;
     int index;
 
     struct DependencyInfo *next;

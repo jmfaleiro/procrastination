@@ -78,11 +78,13 @@ LockManager::AdjustWrite(struct DependencyInfo *dep) {
     struct DependencyInfo *next = dep->next;
     if (next != NULL) {
         if (next->is_write) {
+            next->is_held = true;
             fetch_and_decrement(&next->dependency->num_dependencies);
         }
         else {
             for (struct DependencyInfo *iter = next;
                  iter != NULL && !iter->is_write; iter = iter->next) {
+                iter->is_held = true;
                 fetch_and_decrement(&iter->dependency->num_dependencies);
             }
         }
@@ -94,6 +96,7 @@ LockManager::AdjustRead(struct DependencyInfo *dep) {
     assert(!dep->is_write);
     struct DependencyInfo *next = dep->next;
     if (next != NULL && dep->prev == NULL && next->is_write) {
+        next->is_held = true;
         fetch_and_decrement(&next->dependency->num_dependencies);
     }
 }
@@ -146,7 +149,12 @@ LockManager::Kill(Action *txn) {
         
         lock(&value->lock_word);
         RemoveTxn(value, cur, &prev, &next);
-        assert(prev != NULL);        
+        if (cur->is_held) {
+            AdjustWrite(cur);
+        }
+        else {
+            assert(prev != NULL);        
+        }
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
@@ -157,7 +165,12 @@ LockManager::Kill(Action *txn) {
         
         lock(&value->lock_word);
         RemoveTxn(value, cur, &prev, &next);
-        assert(prev != NULL);
+        if (cur->is_held) {
+            AdjustRead(cur);
+        }
+        else {
+            assert(prev != NULL);        
+        }
         unlock(&value->lock_word);
     }
 }
@@ -166,7 +179,7 @@ void
 LockManager::Unlock(Action *txn) {
     struct DependencyInfo *prev;
     struct DependencyInfo *next;
-
+    
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         Table<uint64_t, TxnQueue> *tbl = 
             m_tables[txn->writeset[i].record.m_table];
@@ -175,6 +188,7 @@ LockManager::Unlock(Action *txn) {
         struct DependencyInfo *dep = &txn->writeset[i];
 
         lock(&value->lock_word);
+        assert(dep->is_held);
         RemoveTxn(value, dep, &prev, &next);
         assert(prev == NULL);	// A write better be at the front of the queue
         AdjustWrite(dep);
@@ -188,6 +202,7 @@ LockManager::Unlock(Action *txn) {
         struct DependencyInfo *dep = &txn->readset[i];
 
         lock(&value->lock_word);
+        assert(dep->is_held);
         RemoveTxn(value, dep, &prev, &next);
         AdjustRead(dep);
         unlock(&value->lock_word);
@@ -196,50 +211,51 @@ LockManager::Unlock(Action *txn) {
 
 bool
 LockManager::Lock(Action *txn) {
-      for (size_t i = 0; i < txn->writeset.size(); ++i) {
-          txn->writeset[i].dependency = txn;
-          txn->writeset[i].is_write = true;
-          txn->writeset[i].next = NULL;
-          txn->writeset[i].prev = NULL;
-          
+    txn->num_dependencies = 0;
+    for (size_t i = 0; i < txn->writeset.size(); ++i) {
+        txn->writeset[i].dependency = txn;
+        txn->writeset[i].is_write = true;
+        txn->writeset[i].next = NULL;
+        txn->writeset[i].prev = NULL;
+        txn->writeset[i].is_held = false;
 
-          Table<uint64_t, TxnQueue> *tbl = 
-              m_tables[txn->writeset[i].record.m_table];
-          TxnQueue *value = 
-              tbl->GetPtr(txn->writeset[i].record.m_key);
-          assert(value != NULL);
+        Table<uint64_t, TxnQueue> *tbl = 
+            m_tables[txn->writeset[i].record.m_table];
+        TxnQueue *value = 
+            tbl->GetPtr(txn->writeset[i].record.m_key);
+        assert(value != NULL);
 
-          // Atomically add the transaction to the lock queue and check whether 
-          // it managed to successfully acquire the lock
-          lock(&value->lock_word);
-          AddTxn(value, &txn->writeset[i]);          
-          if (!CheckWrite(value, &txn->writeset[i])) {
-              fetch_and_increment(&txn->num_dependencies);
-          }
-
-          // Unlatch the value
-          unlock(&value->lock_word);
-      }
+        // Atomically add the transaction to the lock queue and check whether 
+        // it managed to successfully acquire the lock
+        lock(&value->lock_word);
+        AddTxn(value, &txn->writeset[i]);          
+        if ((txn->writeset[i].is_held = CheckWrite(value, &txn->writeset[i])) == false) {
+            fetch_and_increment(&txn->num_dependencies);
+        }
+        // Unlatch the value
+        unlock(&value->lock_word);
+    }
       
-      for (size_t i = 0; i < txn->readset.size(); ++i) {
-          txn->readset[i].dependency = txn;
-          txn->readset[i].is_write = false;
+    for (size_t i = 0; i < txn->readset.size(); ++i) {
+        txn->readset[i].dependency = txn;
+        txn->readset[i].is_write = false;
+        txn->readset[i].is_held = false;
 
-          // We *must* find the key-value pair
-          Table<uint64_t, TxnQueue> *tbl = 
-              m_tables[txn->readset[i].record.m_table];
-          TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
-          assert(value != NULL);
+        // We *must* find the key-value pair
+        Table<uint64_t, TxnQueue> *tbl = 
+            m_tables[txn->readset[i].record.m_table];
+        TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
+        assert(value != NULL);
           
-          // Atomically add the transaction to the lock queue and check whether 
-          // it managed to successfully acquire the lock
-          lock(&value->lock_word);
-          AddTxn(value, &txn->readset[i]);
-          if (!CheckRead(value, &txn->readset[i])) {
-              fetch_and_increment(&txn->num_dependencies);
-          }
-          unlock(&value->lock_word);
-      }
+        // Atomically add the transaction to the lock queue and check whether 
+        // it managed to successfully acquire the lock
+        lock(&value->lock_word);
+        AddTxn(value, &txn->readset[i]);
+        if ((txn->readset[i].is_held = CheckRead(value, &txn->readset[i])) == false) {
+            fetch_and_increment(&txn->num_dependencies);
+        }
+        unlock(&value->lock_word);
+    }
       
-      return (txn->num_dependencies == 0);
+    return (txn->num_dependencies == 0);
 }
