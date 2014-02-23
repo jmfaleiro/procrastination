@@ -474,9 +474,6 @@ int
 main(int argc, char** argv) {
     ExperimentInfo* info = new ExperimentInfo(argc, argv);
     
-    LockManagerTest test;
-    test.DoTest();
-    exit(0);
     run_experiment(info);
     return 0;
 }

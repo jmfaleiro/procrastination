@@ -16,6 +16,7 @@ public:
 
     Action*
     genNext() {
+        return gen_new_order();
         int pct = m_util.gen_rand_range(1, 100);
         if (pct <= 45) {
             return gen_new_order();
@@ -37,7 +38,7 @@ public:
         assert(false);
     }
     
-    NewOrderTxn*
+    NewOrderTxnEager*
     gen_new_order() {
         uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
         uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
@@ -76,11 +77,15 @@ public:
             assert(item_ids[i] < s_num_items || 
                    item_ids[i] == NewOrderTxn::invalid_item_key);
         }
-        NewOrderTxn *ret = new NewOrderTxn(w_id, d_id, c_id, 
-                                                       all_local, num_items, 
-                                                       item_ids, 
-                                                       supplier_wh_ids, 
-                                                       quantities);
+        NewOrderTxnEager *ret = new NewOrderTxnEager(w_id, d_id, c_id, 
+                                                all_local, num_items, 
+                                                item_ids, 
+                                                supplier_wh_ids, 
+                                                quantities);
+        assert(ret->readset[NewOrderTxnEager::s_warehouse_index].record.m_table == WAREHOUSE);
+        assert(ret->readset[NewOrderTxnEager::s_customer_index].record.m_table == CUSTOMER);        
+        assert(ret->writeset[NewOrderTxnEager::s_district_index].record.m_table == DISTRICT);
+
         ret->materialize = true;
         return ret;
     }

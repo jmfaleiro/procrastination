@@ -33,11 +33,13 @@ class CompositeKey {
   }
   
   bool operator<(const CompositeKey &other) const {
-      return (this->m_table < other.m_table) || (this->m_key < other.m_key);
+      return ((this->m_table < other.m_table) || 
+              ((this->m_table == other.m_table) && (this->m_key < other.m_key)));
   }
   
   bool operator>(const CompositeKey &other) const {
-      return (this->m_table > other.m_table) || (this->m_key > other.m_key);
+      return ((this->m_table > other.m_table) ||
+              ((this->m_table == other.m_table) && (this->m_key > other.m_key)));
   }
   
   bool operator<=(const CompositeKey &other) const {

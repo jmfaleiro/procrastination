@@ -16,15 +16,15 @@
 
 enum TPCCTable {
     WAREHOUSE = 0,		// 0
-    DISTRICT,			// 1
-    CUSTOMER,			// 2
-    HISTORY,			// 3
-    NEW_ORDER,			// 4
-    OPEN_ORDER,			// 5
-    ORDER_LINE,			// 6
-    ITEM,				// 7
-    STOCK,    			// 8
-    OPEN_ORDER_INDEX,	// 9
+    DISTRICT = 1,			// 1
+    CUSTOMER = 2,			// 2
+    HISTORY = 3,			// 3
+    NEW_ORDER = 4,			// 4
+    OPEN_ORDER = 5,			// 5
+    ORDER_LINE = 6,			// 6
+    ITEM = 7,				// 7
+    STOCK = 8,    			// 8
+    OPEN_ORDER_INDEX = 9,	// 9
 };
 
 
@@ -318,13 +318,6 @@ class NewOrderTxnEager : public Action {
 private:
     static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
 
-    // Read set indices
-    static const uint32_t 			s_customer_index 	= 1;
-    static const uint32_t 			s_warehouse_index   = 0;
-    
-    // Write set indices
-    static const uint32_t 			s_district_index    = 0;
-    static const uint32_t 			s_stock_index		= 1;
 
 
     uint64_t 			m_warehouse_id;
@@ -346,6 +339,14 @@ public:
     
     virtual void
     LaterPhase();
+
+    // Read set indices
+    static const uint32_t 			s_customer_index 	= 1;
+    static const uint32_t 			s_warehouse_index   = 0;
+    
+    // Write set indices
+    static const uint32_t 			s_district_index    = 0;
+    static const uint32_t 			s_stock_index		= 1;
 };
 
 class NewOrderTxn : public Action {
