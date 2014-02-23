@@ -10,20 +10,14 @@ class LockManagerTest {
 private:
     LockManager *mgr;
 
-public:
-    LockManagerTest();
-        
     void
     TestConflictSerial();
-    
-    void
-    TestReleaseSerial();
 
-    void
-    TestConflictParallel();
+public:
+    LockManagerTest();
     
     void
-    TestReleaseParallel();
+    DoTest();
 };
 
 #endif 		 // LOCK_MANAGER_TEST_HH_

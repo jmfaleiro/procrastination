@@ -41,6 +41,11 @@ LockManagerTest::LockManagerTest() {
 }
 
 void
+LockManagerTest::DoTest() {
+    TestConflictSerial();
+}
+
+void
 LockManagerTest::TestConflictSerial() {
     struct DependencyInfo info;
     Action *action1 = new Action();
@@ -72,19 +77,4 @@ LockManagerTest::TestConflictSerial() {
     
     mgr->Unlock(action1);
     assert(action2->num_dependencies == 0);
-}
-
-void
-LockManagerTest::TestReleaseSerial() {
-
-}
-
-void
-LockManagerTest::TestConflictParallel() {
-
-}
-
-void
-LockManagerTest::TestReleaseParallel() {
-
 }
