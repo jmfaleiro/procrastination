@@ -11,8 +11,8 @@ using namespace std;
 
 struct TxnQueue {
     struct DependencyInfo												*head;
-    struct DependencyInfo												**tail;
-    volatile uint64_t __attribute((aligned(CACHE_LINE))) 	lock_word;
+    struct DependencyInfo												*tail;
+    volatile uint64_t __attribute((aligned(CACHE_LINE))) 				lock_word;
     
     TxnQueue() {
         head = NULL;
@@ -35,10 +35,16 @@ private:
     AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep);
 
     void
-    RemoveWrite(struct TxnQueue *queue, struct DependencyInfo *dep);
+    RemoveTxn(struct TxnQueue *queue, 
+              struct DependencyInfo *dep, 
+              struct DependencyInfo **prev,
+              struct DependencyInfo **next);
 
     void
-    RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep);
+    AdjustRead(struct DependencyInfo *dep);
+
+    void
+    AdjustWrite(struct DependencyInfo *dep);
 
 public:
     LockManager(cc_params::TableInit *params, int num_params);
@@ -49,6 +55,9 @@ public:
 
     virtual bool
     Lock(Action *txn);
+    
+    virtual void
+    Kill(Action *txn);
 };
 
 #endif // LOCK_MANAGER_HH_
