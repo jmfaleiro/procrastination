@@ -12,7 +12,9 @@ LockManager::LockManager(TableInit *params, int num_params) {
 
 bool
 LockManager::CheckWrite(struct TxnQueue *queue, struct DependencyInfo *dep) {
-    return queue->head == dep;
+    bool ret = (queue->head == dep);
+    assert(!ret || (dep->prev == NULL));
+    return ret;
 }
 
 bool
@@ -27,6 +29,9 @@ LockManager::CheckRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 
 void
 LockManager::AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep) {
+    dep->next = NULL;
+    dep->prev = NULL;
+
     if (queue->tail != NULL) {
         assert(queue->head != NULL);
         dep->prev = queue->tail;
@@ -54,6 +59,7 @@ LockManager::RemoveTxn(struct TxnQueue *queue,
 
     // If we're at either end of the queue, make appropriate adjustments
     if (prev == NULL) {
+        assert(queue->head == dep);
         queue->head = next;
     }
     else {
@@ -62,6 +68,7 @@ LockManager::RemoveTxn(struct TxnQueue *queue,
     }
 
     if (next == NULL) {
+        assert(queue->tail == dep);
         queue->tail = prev;
     }
     else {
@@ -148,13 +155,20 @@ LockManager::Kill(Action *txn) {
         assert(value != NULL);
         
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         RemoveTxn(value, cur, &prev, &next);
+
         if (cur->is_held) {
             AdjustWrite(cur);
         }
         else {
             assert(prev != NULL);        
         }
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
@@ -164,6 +178,9 @@ LockManager::Kill(Action *txn) {
         assert(value != NULL);
         
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         RemoveTxn(value, cur, &prev, &next);
         if (cur->is_held) {
             AdjustRead(cur);
@@ -171,6 +188,9 @@ LockManager::Kill(Action *txn) {
         else {
             assert(prev != NULL);        
         }
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         unlock(&value->lock_word);
     }
 }
@@ -185,13 +205,20 @@ LockManager::Unlock(Action *txn) {
             m_tables[txn->writeset[i].record.m_table];
         TxnQueue *value = tbl->GetPtr(txn->writeset[i].record.m_key);
         assert(value != NULL);
+
         struct DependencyInfo *dep = &txn->writeset[i];
 
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         assert(dep->is_held);
         RemoveTxn(value, dep, &prev, &next);
         assert(prev == NULL);	// A write better be at the front of the queue
         AdjustWrite(dep);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
@@ -199,12 +226,18 @@ LockManager::Unlock(Action *txn) {
             m_tables[txn->readset[i].record.m_table];
         TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
         assert(value != NULL);
-        struct DependencyInfo *dep = &txn->readset[i];
 
+        struct DependencyInfo *dep = &txn->readset[i];
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         assert(dep->is_held);
         RemoveTxn(value, dep, &prev, &next);
         AdjustRead(dep);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         unlock(&value->lock_word);
     }
 }
@@ -228,10 +261,19 @@ LockManager::Lock(Action *txn) {
         // Atomically add the transaction to the lock queue and check whether 
         // it managed to successfully acquire the lock
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         AddTxn(value, &txn->writeset[i]);          
         if ((txn->writeset[i].is_held = CheckWrite(value, &txn->writeset[i])) == false) {
             fetch_and_increment(&txn->num_dependencies);
         }
+        else {
+            assert(txn->writeset[i].prev == NULL);
+        }
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         // Unlatch the value
         unlock(&value->lock_word);
     }
@@ -250,10 +292,16 @@ LockManager::Lock(Action *txn) {
         // Atomically add the transaction to the lock queue and check whether 
         // it managed to successfully acquire the lock
         lock(&value->lock_word);
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         AddTxn(value, &txn->readset[i]);
         if ((txn->readset[i].is_held = CheckRead(value, &txn->readset[i])) == false) {
             fetch_and_increment(&txn->num_dependencies);
-        }
+        }        
+        assert((value->head == NULL && value->tail == NULL) ||
+               (value->head != NULL && value->tail != NULL));
+
         unlock(&value->lock_word);
     }
       

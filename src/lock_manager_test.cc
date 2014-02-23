@@ -50,6 +50,7 @@ LockManagerTest::TestConflictSerial() {
     info.record.m_key = 0;
     action1->writeset.push_back(info);
     
+    // Lock Action1
     bool decision = mgr->Lock(action1);
     assert(decision == true);
     
@@ -71,6 +72,7 @@ LockManagerTest::TestConflictSerial() {
     info.record.m_key = 0;
     action2->writeset.push_back(info);
     
+    // Locks: Action1 --> Action2
     decision = mgr->Lock(action2);
     assert(decision == false);
     assert(action2->num_dependencies == 2);
@@ -80,39 +82,59 @@ LockManagerTest::TestConflictSerial() {
     info.record.m_key = 0;
     action3->readset.push_back(info);
     
+    // Locks: Action1 --> Action2 --> Action3
     decision = mgr->Lock(action3);
     assert(decision == false);
     assert(action3->num_dependencies == 1);
 
+    // Locks: Action2 --> Action3
     mgr->Unlock(action1);
     assert(action2->num_dependencies == 0);
     assert(action3->num_dependencies == 0);
     
+    // Locks: Action2 --> Action3 --> Action1
     decision = mgr->Lock(action1);
     assert(decision == false);
     assert(action1->num_dependencies == 2);
 
+    // Locks: Action2 --> Action1
+    assert(action3->num_dependencies == 0);
     mgr->Unlock(action3);
     assert(action1->num_dependencies == 2);
     
+    // Locks: Action1
     mgr->Unlock(action2);
     assert(action1->num_dependencies == 0);
     
+    // Locks: 
+    mgr->Unlock(action1);    
+
     info.record.m_table = 2;
     info.record.m_key = 0;
     action3->writeset.push_back(info);
 
-    mgr->Lock(action1);
+    // Locks: Action1
+    decision = mgr->Lock(action1);
+    assert(decision);
     assert(action1->num_dependencies == 0);
 
-    mgr->Lock(action3);
-    assert(action3->num_dependencies == 2);
+    // Locks: Action1 --> Action3
+    decision = mgr->Lock(action3);
+    assert(!decision);
+    assert(action3->num_dependencies == 1);
 
-    mgr->Lock(action2);
+    // Locks: Action1 --> Action3 --> Action2
+    decision = mgr->Lock(action2);
+    assert(!decision);
     assert(action2->num_dependencies == 3);
     
+    // Locks: Action1 --> Action2
     mgr->Kill(action3);
     assert(action2->num_dependencies == 2);
+    
+    // Locks: Action2
     mgr->Unlock(action1);
     assert(action2->num_dependencies == 0);
+    
+    mgr->Unlock(action2);
 }
