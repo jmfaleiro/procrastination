@@ -134,6 +134,35 @@ LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 */
 
 void
+LockManager::Kill(Action *txn) {
+    struct DependencyInfo *prev;
+    struct DependencyInfo *next;
+    
+    for (size_t i = 0; i < txn->writeset.size(); ++i) {
+        struct DependencyInfo *cur = &txn->writeset[i];
+        Table<uint64_t, TxnQueue> *tbl = m_tables[cur->record.m_table];
+        TxnQueue *value = tbl->GetPtr(cur->record.m_key);
+        assert(value != NULL);
+        
+        lock(&value->lock_word);
+        RemoveTxn(value, cur, &prev, &next);
+        assert(prev != NULL);        
+        unlock(&value->lock_word);
+    }
+    for (size_t i = 0; i < txn->readset.size(); ++i) {
+        struct DependencyInfo *cur = &txn->readset[i];
+        Table<uint64_t, TxnQueue> *tbl = m_tables[cur->record.m_table];
+        TxnQueue *value = tbl->GetPtr(cur->record.m_key);
+        assert(value != NULL);
+        
+        lock(&value->lock_word);
+        RemoveTxn(value, cur, &prev, &next);
+        assert(prev != NULL);
+        unlock(&value->lock_word);
+    }
+}
+
+void
 LockManager::Unlock(Action *txn) {
     struct DependencyInfo *prev;
     struct DependencyInfo *next;

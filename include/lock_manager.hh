@@ -55,6 +55,9 @@ public:
 
     virtual bool
     Lock(Action *txn);
+    
+    virtual void
+    Kill(Action *txn);
 };
 
 #endif // LOCK_MANAGER_HH_
