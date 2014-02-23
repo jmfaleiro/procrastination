@@ -13,6 +13,7 @@
 #include <string.h>
 #include <iomanip>
 #include <stdlib.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -480,6 +481,7 @@ NewOrderTxnEager::NewOrderTxnEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
                                    uint64_t *supplier_wh_ids, 
                                    uint32_t *order_quantities) {
     uint32_t keys[4];
+    struct DependencyInfo info;    
 
     m_warehouse_id = w_id;
     m_district_id = d_id;
@@ -488,99 +490,119 @@ NewOrderTxnEager::NewOrderTxnEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     m_item_ids = item_ids;
     m_order_quantities = order_quantities;
     m_supplier_wh_ids = supplier_wh_ids;
+    m_all_local = o_all_local;
     
     // Create the warehouse key
-    m_warehouse.m_table = WAREHOUSE;
-    m_warehouse.m_key = w_id;
+    info.record.m_table = WAREHOUSE;
+    info.record.m_key = w_id;
+    readset.push_back(info);
     
     // Create the district key
     keys[0] = w_id;
     keys[1] = d_id;
-    m_district.m_table = DISTRICT;
-    m_district.m_key = TPCCKeyGen::create_district_key(keys);
-    
+    info.record.m_table = DISTRICT;
+    info.record.m_key = TPCCKeyGen::create_district_key(keys);
+    writeset.push_back(info);
+
     // Create the customer key
     keys[2] = c_id;
-    m_customer.m_table = CUSTOMER;
-    m_customer.m_key = TPCCKeyGen::create_customer_key(keys);
+    info.record.m_table = CUSTOMER;
+    info.record.m_key = TPCCKeyGen::create_customer_key(keys);
+    readset.push_back(info);
+
+    // Create a key for customer key indexed open order
+    info.record.m_table = OPEN_ORDER_INDEX;
+    writeset.push_back(info);
     
-    m_open_order.m_table = OPEN_ORDER;
-    m_new_order.m_table = NEW_ORDER;
-    m_order_lines = (CompositeKey*)malloc(sizeof(CompositeKey)*m_num_items);
+    // Create the stock keys
+    info.record.m_table = STOCK;
+    for (size_t i = 0; i < num_items; ++i) {
+        keys[1] = item_ids[i];
+        info.record.m_key = TPCCKeyGen::create_stock_key(keys);
+        writeset.push_back(info);
+    }
+
+    // Make sure that all txns request locks in the same sorted order to avoid 
+    // deadlocks
+    std::sort(readset.begin(), readset.end());
+    std::sort(writeset.begin(), writeset.end());
 }
 
-// 2-phase locking implementation of NewOrder
+bool
+NewOrderTxnEager::NowPhase() {
+    return true;
+}
+
 void
-NewOrderTxnEager::Execute() {
-    /*
-    uint32_t timestamp = time(NULL);
-
-    uint32_t keys[4] = {0, 0, 0, 0};
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-
-    s_lock_manager->Lock(m_warehouse, this);
-    s_lock_manager->LockWrite(m_district, this);
+NewOrderTxnEager::LaterPhase() {
+    uint32_t keys[4];
     
-    // Get the order id for this particular transaction
-    District *dist = s_district_tbl->GetPtr(m_district.m_key);
-    uint32_t order_id = dist->d_next_o_id;
-    
-    // Create the new order and open order keys
-    keys[3] = order_id;
-    m_new_order.m_key = TPCCKeyGen::create_new_order_key(keys);    
-    m_open_order.m_key = m_new_order.m_key;
+    // A NewOrder txn aborts if any of the item keys are invalid. 
+    for (uint32_t i = 0; i < m_num_items; ++i) {
 
-    // Initialize the new order struct to insert
-    NewOrder new_order;
-    new_order.no_w_id = m_warehouse_id;
-    new_order.no_d_id = m_district_id;
-    new_order.no_o_id = order_id;
-    
-    // Initialize the open order struct to insert
-    Oorder open_order;
-    open_order.o_id = order_id;
-    open_order.o_w_id = m_warehouse_id;
-    open_order.o_d_id = m_district_id;
-    open_order.o_c_id = m_customer_id;
-    open_order.o_ol_cnt = m_num_items;
-    open_order.o_entry_d = timestamp;
-
-    for (uint32_t j = 0; j < m_num_items; ++j) {
-        keys[4] = j;
-        m_order_lines[j].m_key = TPCCKeyGen::create_order_line_key(keys);
-    }
-
-    s_lock_manager->LockRead(m_customer, this);
-    s_lock_manager->LockWrite(m_new_order, this);
-    s_lock_manager->LockWrite(m_open_order, this);
-
-    for (uint32_t j = 0; j < m_num_items; ++j) {
-        s_lock_manager->LockWrite(m_stocks[j], this);
+        // Make sure that all the items requested exist. 
+        if (m_item_ids[i] == invalid_item_key) {
+            return;
+        }
     }
     
-    // Release the most contended locks ASAP (warehouse, district and, 
-    // potentially, customer)
-    s_lock_manager->Unlock(m_warehouse, this);
-    s_lock_manager->Unlock(m_district, this);
-    s_lock_manager->Unlock(m_customer, this);
+    // Update the district record
+    assert(writeset[s_district_index].record.m_table == DISTRICT);
+    uint64_t d_key = writeset[s_district_index].record.m_key;
+    District *district = s_district_tbl->GetPtr(d_key);
+    uint32_t order_id = district->d_next_o_id;
+    float district_tax = district->d_tax;
+    district->d_next_o_id += 1;
     
-    // Insert the new order and open order records. At this point, it's safe to 
-    // realease the new order lock. Not yet safe to release open order because
-    // we're going to overload it as a placeholder for order lines
-    s_new_order_tbl->Put(m_new_order.m_key, new_order);
-    s_oorder_tbl->Put(m_open_order.m_key, open_order);
-    s_lock_manager->Unlock(m_new_order, this);
+    float warehouse_tax = s_warehouse_tbl->GetPtr(m_warehouse_id)->w_tax;
+    
+    // XXX: Hope this does not serialize in the OS!
+    // m_timestamp = time(NULL);
+    uint32_t timestamp = 0;
     
     float total_amount = 0;
-    // Insert the order lines and update the stock
-    for (uint32_t i = 0; i < m_num_items; ++i) {
-        uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(m_stocks[i].m_key);
+    CompositeKey composite;
+    
+    // Read the customer record.
+    assert(readset[s_customer_index].record.m_table == CUSTOMER);
+    Customer *customer = 
+        s_customer_tbl->GetPtr(readset[s_customer_index].record.m_key);
+    float c_discount = customer->c_discount;
+    
+    
+    //
+    // BEGIN: INSERT NEWORDER RECORD
+    //
+    // Create the NewOrder record
+    NewOrder new_order_record;
+    new_order_record.no_w_id = m_warehouse_id;
+    new_order_record.no_d_id = m_district_id;
+    new_order_record.no_o_id = order_id;
+    
+    // Create the NewOrder key
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    keys[2] = order_id;
+    uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
+
+    // Insert the NewOrder record
+    s_new_order_tbl->Put(new_order_key, new_order_record);
+    
+    //
+    // END: INSERT NEWORDER RECORD
+    //
+  
+    for (size_t i = 0; i < m_num_items; ++i) {
+        composite = writeset[s_stock_index+i].record;
+        assert(composite.m_table == STOCK);
+        uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
+        uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
+        uint64_t ol_i_id = m_item_ids[i];        
         int ol_quantity = m_order_quantities[i];
     
         // Get the item and the stock records. 
-        Item *item = s_item_tbl->GetPtr(m_stocks[i].m_key);
-        Stock *stock = s_stock_tbl->GetPtr(m_stocks[i].m_key);
+        Item *item = s_item_tbl->GetPtr(ol_i_id);
+        Stock *stock = s_stock_tbl->GetPtr(composite.m_key);
     
         // Update the inventory for the item in question. 
         if (stock->s_order_cnt - ol_quantity >= 10) {
@@ -649,15 +671,24 @@ NewOrderTxnEager::Execute() {
 
         // XXX: Make sure that the put operation is implemented on top of a 
         // concurrent hash table. 
-        s_order_line_tbl->Put(m_order_lines[i].m_key, new_order_line);
-    }    
-
-    // Release the rest of the locks
-    s_lock_manager->Unlock(m_open_order, this);
-    for (uint32_t j = 0; j < m_num_items; ++j) {
-        s_lock_manager->Unlock(m_stocks[j], this);
+        s_order_line_tbl->Put(writeset[m_num_items+1+i].record.m_key, 
+                              new_order_line);
     }
-    */
+    // Insert an entry into the open order table.    
+    Oorder oorder;
+    oorder.o_id = order_id;
+    oorder.o_w_id = m_warehouse_id;
+    oorder.o_d_id = m_district_id;
+    oorder.o_c_id = m_customer_id;
+    oorder.o_carrier_id = 0;
+    oorder.o_ol_cnt = m_num_items;
+    oorder.o_all_local = m_all_local;
+    oorder.o_entry_d = timestamp;
+    Oorder *new_oorder = 
+        s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
+    Oorder **old_index = 
+        s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
+    *old_index = new_oorder;    
 }
 
 NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id, 
