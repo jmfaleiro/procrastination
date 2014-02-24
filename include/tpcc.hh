@@ -15,7 +15,7 @@
 #include <action.h>
 
 enum TPCCTable {
-    WAREHOUSE = 0,		// 0
+    WAREHOUSE = 0,			// 0
     DISTRICT = 1,			// 1
     CUSTOMER = 2,			// 2
     HISTORY = 3,			// 3
@@ -25,6 +25,7 @@ enum TPCCTable {
     ITEM = 7,				// 7
     STOCK = 8,    			// 8
     OPEN_ORDER_INDEX = 9,	// 9
+    NEXT_DELIVERY = 10,		// 10
 };
 
 

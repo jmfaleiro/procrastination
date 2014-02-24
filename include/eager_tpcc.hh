@@ -160,4 +160,69 @@ public:
 };
 
 
+class DeliveryEager1;
+class DeliveryEager0 : public EagerAction {
+
+private:
+    DeliveryEager1 		*m_level1_txn;
+
+protected:
+    uint32_t 			m_warehouse_id;
+    uint32_t 			m_district_id;
+    uint32_t 			m_carrier_id;
+    uint32_t 			*m_open_order_ids;
+    uint32_t 			*m_num_order_lines;
+    uint32_t 			*m_amounts;
+    uint64_t 			*m_customer_keys;
+
+    
+public: 
+    DeliveryEager0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                   DeliveryEager1 *level1_txn);
+    
+    virtual bool
+    IsLinked(EagerAction **ret);
+    
+    virtual void
+    Execute();
+    
+    virtual void
+    PostExec();    
+};
+
+class DeliveryEager2;
+class DeliveryEager1 : public DeliveryEager0 {
+private:
+    DeliveryEager2			*m_level2_txn;
+
+public:
+    DeliveryEager1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
+                   DeliveryEager2 *level2_txn);
+    
+    virtual bool
+    IsLinked(EagerAction **ret);
+    
+    virtual void
+    Execute();
+    
+    virtual void
+    PostExec();    
+};
+
+class DeliveryEager2 : public DeliveryEager1 {
+public:
+    DeliveryEager2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
+                   
+    
+    virtual bool
+    IsLinked(EagerAction **ret);
+    
+    virtual void
+    Execute();
+    
+    virtual void
+    PostExec();    
+};
+
+
 #endif	//  EAGER_TPCC_HH_

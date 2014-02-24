@@ -212,7 +212,6 @@ public:
     virtual void LaterPhase();
 };
 
-
 class DeliveryTxn : public Action {
 private:
     uint32_t 		m_warehouse_id;

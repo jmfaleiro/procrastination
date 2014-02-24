@@ -558,3 +558,158 @@ OrderStatusEager1::PostExec() {
 
 }
 
+DeliveryEager0::DeliveryEager0(uint32_t w_id, uint32_t d_id, 
+                               uint32_t carrier_id, 
+                               DeliveryEager1 *level1_txn) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_carrier_id = carrier_id;    
+    m_level1_txn = level1_txn;
+
+    m_amounts = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+    m_open_order_ids = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+    m_num_order_lines = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+
+    memset(m_num_order_lines, 0, sizeof(uint32_t)*s_districts_per_wh);
+    memset(m_open_order_ids, 0, sizeof(uint32_t)*s_districts_per_wh);
+    memset(m_amounts, 0, sizeof(uint32_t)*s_districts_per_wh);
+
+    struct EagerRecordInfo info;
+    uint32_t keys[2];
+    keys[0] = m_warehouse_id;
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        keys[1] = i;
+        info.record.m_table = DISTRICT;
+        info.record.m_key = TPCCKeyGen::create_district_key(keys);
+        readset.push_back(info);
+        
+        info.record.m_table = NEXT_DELIVERY;
+        writeset.push_back(info);
+    }
+    
+    assert(readset.size() == writeset.size());    
+}
+
+bool
+DeliveryEager0::IsLinked(EagerAction **ret) {
+    *ret = m_level1_txn;
+    return true;
+}
+
+void
+DeliveryEager0::Execute() {
+    uint32_t num_reads = readset.size();
+    for (uint32_t i = 0; i < num_reads; ++i) {
+        assert(readset[i].record.m_table == DISTRICT);
+        assert(writeset[i].record.m_table == NEXT_DELIVERY);
+
+        District *district = s_district_tbl->GetPtr(readset[i].record.m_key);
+        uint32_t *order_id = 
+            s_next_delivery_tbl->GetPtr(writeset[i].record.m_key);        
+        if (district->d_next_o_id > *order_id) {
+            m_open_order_ids[i] = *order_id;
+            *order_id += 1;
+        }
+    }
+}
+
+void
+DeliveryEager0::PostExec() {
+    uint32_t keys[3];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    struct EagerRecordInfo info;
+    info.record.m_table = OPEN_ORDER;
+
+    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+        if (m_open_order_ids[i] > 0) {
+            keys[2] = i;            
+            info.record.m_key = TPCCKeyGen::create_order_key(keys);
+            m_level1_txn->writeset.push_back(info);
+            m_level1_txn->m_amounts[i] = 0;
+        }
+    }
+}
+
+DeliveryEager1::DeliveryEager1(uint32_t w_id, uint32_t d_id, 
+                               uint32_t carrier_id, 
+                               DeliveryEager2 *level1_txn) 
+    : DeliveryEager0(w_id, d_id, carrier_id, this) {
+}
+
+void
+DeliveryEager1::Execute() {
+    uint32_t keys[4];
+
+    uint32_t writeset_size = writeset.size();
+    for (uint32_t i = 0; i < writeset_size; ++i) {
+        assert(writeset[i].record.m_table == OPEN_ORDER);
+        Oorder *oorder = s_oorder_tbl->GetPtr(writeset[i].record.m_key);
+        uint32_t num_items = oorder->o_ol_cnt;
+        uint32_t amount = 0;
+        
+        keys[0] = oorder->o_w_id;
+        keys[1] = oorder->o_d_id;
+        keys[2] = oorder->o_c_id;        
+        m_customer_keys[i] = TPCCKeyGen::create_customer_key(keys);
+
+        keys[2] = oorder->o_id;
+        m_amounts[i] = 0;
+        for (uint32_t j = 0; j < num_items; ++j) {
+            keys[3] = j;
+            uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+            OrderLine *order_line = s_order_line_tbl->GetPtr(order_line_key);
+            m_amounts[i] += order_line->ol_amount;
+        }
+    }
+}
+
+void
+DeliveryEager1::PostExec() {
+    struct EagerRecordInfo info;
+    info.record.m_table = CUSTOMER;
+
+    for (uint32_t i = 0; i < writeset.size(); ++i) {
+        info.record.m_key = m_customer_keys[i];
+        m_level2_txn->writeset.push_back(info);
+        m_level2_txn->m_amounts[i] = m_amounts[i];
+    }
+}
+
+bool
+DeliveryEager1::IsLinked(EagerAction **ret) {
+    *ret = m_level2_txn;
+    return true;
+}
+
+
+DeliveryEager2::DeliveryEager2(uint32_t w_id, uint32_t d_id, 
+                               uint32_t carrier_id) 
+    : DeliveryEager1(w_id, d_id, carrier_id, this) {
+
+}
+
+bool
+DeliveryEager2::IsLinked(EagerAction **ret) {
+    ret = NULL;
+    return false;
+}
+
+
+void
+DeliveryEager2::Execute() {
+    uint32_t num_customers = writeset.size();
+    for (uint32_t i = 0; i < num_customers; ++i) {
+        Customer *customer = s_customer_tbl->GetPtr(writeset[i].record.m_key);
+        customer->c_balance += m_amounts[i];
+        customer->c_delivery_cnt += 1;
+    }
+}
+
+void
+DeliveryEager2::PostExec() { }
+
