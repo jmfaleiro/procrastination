@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <sched.h>
 
+#include <eager_tpcc_generator.hh>
 #include <lock_manager_test.hh>
 
 #include <iostream> 

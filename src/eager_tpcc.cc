@@ -699,7 +699,6 @@ DeliveryEager2::IsLinked(EagerAction **ret) {
     return false;
 }
 
-
 void
 DeliveryEager2::Execute() {
     uint32_t num_customers = writeset.size();
