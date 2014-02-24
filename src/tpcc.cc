@@ -1537,6 +1537,87 @@ StockLevelTxn::LaterPhase() {
     }
 }
 
+OrderStatusEager0::OrderStatusEager0(uint32_t w_id, uint32_t d_id, 
+                                     uint32_t c_id, char *c_last, 
+                                     bool c_by_name, 
+                                     OrderStatusEager1 *level1_txn) {
+    assert(w_id < s_num_warehouses);
+    assert(d_id < s_districts_per_wh);
+    assert(c_id < s_customers_per_dist);
+    
+    m_warehouse_id = w_id;
+    m_district_id = d_id;
+    m_customer_id = c_id;
+    m_c_by_name = c_by_name;
+    m_c_last = c_last;
+    m_level1_txn = level1_txn;
+
+    struct EagerRecordInfo info;
+    info.record.m_table = OPEN_ORDER_INDEX;
+    uint32_t keys[3];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    keys[2] = m_customer_id;
+    info.record.m_key = TPCCKeyGen::create_customer_key(keys);
+    readset.push_back(info);
+}
+
+bool
+OrderStatusEager0::IsLinked(EagerAction **ret) {
+    *ret = m_level1_txn;
+    return true;
+}
+
+void
+OrderStatusEager0::Execute() {
+    assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
+    //    m_open_order_key = s_oorder_index->Get(readset[0].record.m_key);
+    m_open_order_key = 0;
+}
+
+void
+OrderStatusEager0::PostExec() {
+    struct EagerRecordInfo info;
+    info.record.m_table = OPEN_ORDER;
+    info.record.m_key = m_open_order_key;
+}
+
+
+OrderStatusEager1::OrderStatusEager1(uint32_t w_id, uint32_t d_id, 
+                                     uint32_t c_id, char *c_last, 
+                                     bool c_by_name)
+    : OrderStatusEager0(w_id, d_id, c_id, c_last, c_by_name, this) {
+
+}
+
+bool
+OrderStatusEager1::IsLinked(EagerAction **ret) {
+    *ret = NULL;
+    return false;
+}
+
+void
+OrderStatusEager1::Execute() {
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    
+    Oorder *oorder = s_oorder_tbl->GetPtr(readset[0].record.m_key);
+    keys[2] = oorder->o_id;
+    for (uint32_t i = 0; i < oorder->o_ol_cnt; ++i) {
+        keys[3] = i;        
+        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+        OrderLine *ol = s_order_line_tbl->GetPtr(order_line_key);
+        m_order_line_quantity += ol->ol_quantity;
+    }
+}
+
+void
+OrderStatusEager1::PostExec() {
+
+}
+
+
 OrderStatusTxn0::OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
                                  char *c_last, bool c_by_name, 
                                  OrderStatusTxn1 *level1_txn) {

@@ -543,6 +543,51 @@ public:
     virtual void LaterPhase();
 };
 
+class OrderStatusEager1;
+class OrderStatusEager0 : public EagerAction {
+private:
+    OrderStatusEager1			*m_level1_txn;
+protected:
+    uint32_t 					m_warehouse_id;
+    uint32_t 					m_district_id;
+    uint32_t 					m_customer_id;
+    bool 						m_c_by_name;
+    char						*m_c_last;
+    uint64_t 					m_open_order_key;
+
+public:
+    OrderStatusEager0(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last,
+                      bool c_by_name, OrderStatusEager1 *level1_txn);
+
+    virtual bool
+    IsLinked(EagerAction **ret);
+    
+    virtual void
+    Execute();
+    
+    virtual void
+    PostExec();
+};
+
+class OrderStatusEager1 : public OrderStatusEager0 {
+public:
+    uint32_t 		m_order_line_quantity;
+
+    OrderStatusEager1(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last,
+                      bool c_by_name);
+
+    virtual bool
+    IsLinked(EagerAction **ret);
+    
+    virtual void
+    Execute();
+    
+    virtual void
+    PostExec();    
+
+
+};
+
 class OrderStatusTxn1;
 class OrderStatusTxn0 : public Action {
 private:
