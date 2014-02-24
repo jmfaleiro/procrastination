@@ -51,6 +51,40 @@ class CompositeKey {
   }
 };
 
+class EagerAction;
+struct EagerRecordInfo {
+    CompositeKey 					record;
+    EagerAction						*dependency;
+    bool 							is_write;
+    bool 							is_held;
+    struct EagerRecordInfo 			*next;
+    struct EagerRecordInfo			*prev;
+    
+    bool operator<(const struct EagerRecordInfo &other) const {
+        return (this->record < other.record);
+    }
+    
+    bool operator>(const struct EagerRecordInfo &other) const {
+        return (this->record > other.record);
+    }
+    
+    bool operator==(const struct EagerRecordInfo &other) const {
+        return (this->record == other.record);
+    }
+    
+    bool operator!=(const struct EagerRecordInfo &other) const {
+        return (this->record != other.record);
+    }
+
+    bool operator>=(const struct EagerRecordInfo &other) const {
+        return !(this->record < other.record);
+    }
+
+    bool operator<=(const struct EagerRecordInfo &other) const {
+        return !(this->record > other.record);
+    }    
+};
+
 // The lazy scheduler has an entry of this type for every single record that is
 // read or written in the system.
 struct DependencyInfo {
@@ -62,7 +96,7 @@ struct DependencyInfo {
 
     struct DependencyInfo *next;
     struct DependencyInfo *prev;
-    
+
     bool operator<(const struct DependencyInfo &other) const {
         return (this->record < other.record);
     }
@@ -85,27 +119,18 @@ struct DependencyInfo {
 
     bool operator<=(const struct DependencyInfo &other) const {
         return !(this->record > other.record);
-    }
+    }        
 };
 
 class EagerAction {
- private:
-    volatile uint64_t __attribute__((aligned(CACHE_LINE))) m_wakeup_flag;
  public:
-    virtual void Execute() = 0;
-        
+    volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
+    std::vector<struct EagerRecordInfo> writeset;
+    std::vector<struct EagerRecordInfo> readset;
     
-    void Spin(uint64_t *lock_word) {
-        xchgq(&m_wakeup_flag, 1);
-        unlock(lock_word);
-        while (m_wakeup_flag == 1)
-            ;
-    }
-    
-    void Wakeup(uint64_t *lock_word) {
-        assert(*lock_word == 1);
-        xchgq(&m_wakeup_flag, 0);
-    }
+    virtual bool IsLinked(EagerAction **ret) { *ret = NULL; return false; };
+    virtual void Execute() { };
+    virtual void PostExec() { };
 };
 
 struct StateLock {
@@ -125,7 +150,6 @@ class Action {
   bool materialize;
   int is_blind;
 
-  volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
 
   volatile uint64_t start_time;
   volatile uint64_t end_time;
@@ -157,7 +181,7 @@ class Action {
     return action->values[4];
   }
   
-  virtual bool NowPhase() { }
+  virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
 };
 

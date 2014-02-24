@@ -11,15 +11,15 @@ LockManager::LockManager(TableInit *params, int num_params) {
 }
 
 bool
-LockManager::CheckWrite(struct TxnQueue *queue, struct DependencyInfo *dep) {
+LockManager::CheckWrite(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
     bool ret = (queue->head == dep);
     assert(!ret || (dep->prev == NULL));
     return ret;
 }
 
 bool
-LockManager::CheckRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
-    for (struct DependencyInfo *iter = queue->head; 
+LockManager::CheckRead(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
+    for (struct EagerRecordInfo *iter = queue->head; 
          iter != dep; iter = iter->next) {
         if (iter->is_write) {
             return false;
@@ -28,7 +28,7 @@ LockManager::CheckRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 }
 
 void
-LockManager::AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep) {
+LockManager::AddTxn(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
     dep->next = NULL;
     dep->prev = NULL;
 
@@ -50,12 +50,12 @@ LockManager::AddTxn(struct TxnQueue *queue, struct DependencyInfo *dep) {
 
 void
 LockManager::RemoveTxn(struct TxnQueue *queue, 
-                       struct DependencyInfo *dep,
-                       struct DependencyInfo **prev_txn,
-                       struct DependencyInfo **next_txn) {
+                       struct EagerRecordInfo *dep,
+                       struct EagerRecordInfo **prev_txn,
+                       struct EagerRecordInfo **next_txn) {
     
-    struct DependencyInfo *prev = dep->prev;
-    struct DependencyInfo *next = dep->next;
+    struct EagerRecordInfo *prev = dep->prev;
+    struct EagerRecordInfo *next = dep->next;
 
     // If we're at either end of the queue, make appropriate adjustments
     if (prev == NULL) {
@@ -80,16 +80,16 @@ LockManager::RemoveTxn(struct TxnQueue *queue,
 }
 
 void
-LockManager::AdjustWrite(struct DependencyInfo *dep) {
+LockManager::AdjustWrite(struct EagerRecordInfo *dep) {
     assert(dep->is_write);
-    struct DependencyInfo *next = dep->next;
+    struct EagerRecordInfo *next = dep->next;
     if (next != NULL) {
         if (next->is_write) {
             next->is_held = true;
             fetch_and_decrement(&next->dependency->num_dependencies);
         }
         else {
-            for (struct DependencyInfo *iter = next;
+            for (struct EagerRecordInfo *iter = next;
                  iter != NULL && !iter->is_write; iter = iter->next) {
                 iter->is_held = true;
                 fetch_and_decrement(&iter->dependency->num_dependencies);
@@ -99,9 +99,9 @@ LockManager::AdjustWrite(struct DependencyInfo *dep) {
 }
 
 void
-LockManager::AdjustRead(struct DependencyInfo *dep) {
+LockManager::AdjustRead(struct EagerRecordInfo *dep) {
     assert(!dep->is_write);
-    struct DependencyInfo *next = dep->next;
+    struct EagerRecordInfo *next = dep->next;
     if (next != NULL && dep->prev == NULL && next->is_write) {
         next->is_held = true;
         fetch_and_decrement(&next->dependency->num_dependencies);
@@ -110,11 +110,11 @@ LockManager::AdjustRead(struct DependencyInfo *dep) {
 
 /*
 void
-LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
+LockManager::RemoveRead(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
 
     // Splice this element out of the queue
-    struct DependencyInfo *next = dep->next;
-    struct DependencyInfo *prev = dep->prev;
+    struct EagerRecordInfo *next = dep->next;
+    struct EagerRecordInfo *prev = dep->prev;
 
     // Try to update the previous txn
     if (prev != NULL) {
@@ -144,12 +144,12 @@ LockManager::RemoveRead(struct TxnQueue *queue, struct DependencyInfo *dep) {
 */
 
 void
-LockManager::Kill(Action *txn) {
-    struct DependencyInfo *prev;
-    struct DependencyInfo *next;
+LockManager::Kill(EagerAction *txn) {
+    struct EagerRecordInfo *prev;
+    struct EagerRecordInfo *next;
     
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
-        struct DependencyInfo *cur = &txn->writeset[i];
+        struct EagerRecordInfo *cur = &txn->writeset[i];
         Table<uint64_t, TxnQueue> *tbl = m_tables[cur->record.m_table];
         TxnQueue *value = tbl->GetPtr(cur->record.m_key);
         assert(value != NULL);
@@ -172,7 +172,7 @@ LockManager::Kill(Action *txn) {
         unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
-        struct DependencyInfo *cur = &txn->readset[i];
+        struct EagerRecordInfo *cur = &txn->readset[i];
         Table<uint64_t, TxnQueue> *tbl = m_tables[cur->record.m_table];
         TxnQueue *value = tbl->GetPtr(cur->record.m_key);
         assert(value != NULL);
@@ -196,9 +196,9 @@ LockManager::Kill(Action *txn) {
 }
 
 void
-LockManager::Unlock(Action *txn) {
-    struct DependencyInfo *prev;
-    struct DependencyInfo *next;
+LockManager::Unlock(EagerAction *txn) {
+    struct EagerRecordInfo *prev;
+    struct EagerRecordInfo *next;
     
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         Table<uint64_t, TxnQueue> *tbl = 
@@ -206,7 +206,7 @@ LockManager::Unlock(Action *txn) {
         TxnQueue *value = tbl->GetPtr(txn->writeset[i].record.m_key);
         assert(value != NULL);
 
-        struct DependencyInfo *dep = &txn->writeset[i];
+        struct EagerRecordInfo *dep = &txn->writeset[i];
 
         lock(&value->lock_word);
         assert((value->head == NULL && value->tail == NULL) ||
@@ -227,7 +227,7 @@ LockManager::Unlock(Action *txn) {
         TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
         assert(value != NULL);
 
-        struct DependencyInfo *dep = &txn->readset[i];
+        struct EagerRecordInfo *dep = &txn->readset[i];
         lock(&value->lock_word);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
@@ -243,7 +243,7 @@ LockManager::Unlock(Action *txn) {
 }
 
 bool
-LockManager::Lock(Action *txn) {
+LockManager::Lock(EagerAction *txn) {
     txn->num_dependencies = 0;
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         txn->writeset[i].dependency = txn;

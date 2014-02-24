@@ -1201,6 +1201,138 @@ PaymentTxn::LaterPhase() {
     s_history_tbl->Put(writeset[s_customer_index].record.m_key, hist);
 }
 
+StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id, 
+                                   int threshold, 
+                                   StockLevelEager1 *level1_txn) {
+    assert(warehouse_id < s_num_warehouses);
+    assert(district_id < s_districts_per_wh);
+    
+    m_threshold = threshold;
+    m_level1_txn = level1_txn;
+    m_next_order_id = 0;
+    m_num_stocks = 0;
+    
+    uint32_t keys[2];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    struct EagerRecordInfo info;
+    info.record.m_table = DISTRICT;
+    info.record.m_key = TPCCKeyGen::create_district_key(keys);
+    readset.push_back(info);        
+}
+
+bool
+StockLevelEager0::IsLinked(EagerAction **ret) {
+    *ret = m_level1_txn;
+    return true;
+}
+
+void
+StockLevelEager0::Execute() {
+    assert(readset[0].record.m_table == DISTRICT);
+    District *dist = s_district_tbl->GetPtr(readset[0].record.m_key);    
+    m_next_order_id = dist->d_next_o_id;
+}
+
+void
+StockLevelEager0::PostExec() {
+    assert(m_next_order_id != 0);
+    struct EagerRecordInfo dep_info;
+
+    uint32_t keys[3];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    dep_info.record.m_table = OPEN_ORDER;
+    for (uint32_t i = 0; i < 20; ++i) {
+        keys[2] = m_next_order_id - 1 -i;
+        uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
+        dep_info.record.m_key = open_order_key;
+        m_level1_txn->readset.push_back(dep_info);
+    }
+}
+
+StockLevelEager1::StockLevelEager1(uint32_t warehouse_id, uint32_t district_id, 
+                                   int threshold, 
+                                   StockLevelEager2 *level1_txn) 
+    : StockLevelEager0(warehouse_id, district_id, threshold, this) {
+    
+}
+
+bool
+StockLevelEager1::IsLinked(EagerAction **ret) {
+    *ret = m_level2_txn;
+    return true;
+}
+
+// Get the primary keys of the stock
+void
+StockLevelEager1::Execute() {
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+
+    for (size_t i = 0; i < readset.size(); ++i) {
+        Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
+        keys[2] = oorder->o_id;
+        for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
+            keys[3] = j;
+            uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+            OrderLine *order_line = s_order_line_tbl->GetPtr(order_line_key);
+            m_stock_ids.push_back(order_line->ol_i_id);
+        }
+    }
+}
+
+
+// Insert each of the stocks into the readset
+void
+StockLevelEager1::PostExec() {
+    
+    // Stuff to create the keys
+    struct EagerRecordInfo info;
+    info.record.m_table = STOCK;    
+    uint32_t keys[2];
+    keys[0] = m_warehouse_id;
+
+    // Create the keys and insert them into the readset
+    uint32_t num_stocks = m_stock_ids.size();
+    for (uint32_t i = 0; i < num_stocks; ++i) {
+        keys[1] = m_stock_ids[i];
+        info.record.m_key = TPCCKeyGen::create_stock_key(keys);
+        readset.push_back(info);
+    }
+}
+
+
+StockLevelEager2::StockLevelEager2(uint32_t warehouse_id, uint32_t district_id, 
+                                   int threshold) 
+    : StockLevelEager1(warehouse_id, district_id, threshold, this) {
+    m_num_stocks = 0;
+}
+
+bool
+StockLevelEager2::IsLinked(EagerAction **ret) {
+    *ret = NULL;
+    return false;
+}
+
+void
+StockLevelEager2::Execute() {
+    m_num_stocks = 0;
+    uint32_t num_stocks = readset.size();
+    for (uint32_t i = 0; i < num_stocks; ++i) {
+        assert(readset[i].record.m_table == STOCK);
+        Stock *stock = s_stock_tbl->GetPtr(readset[i].record.m_key);
+        m_num_stocks += ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
+    }
+}
+
+void
+StockLevelEager2::PostExec() {
+
+}
+
 StockLevelTxn0::StockLevelTxn0(uint32_t warehouse_id, uint32_t district_id, 
                                int threshold, StockLevelTxn1 *level1_txn) {
     assert(warehouse_id < s_num_warehouses);
@@ -1211,6 +1343,7 @@ StockLevelTxn0::StockLevelTxn0(uint32_t warehouse_id, uint32_t district_id,
     m_warehouse_id = warehouse_id;
     m_district_id = district_id;
     m_level1_txn = level1_txn;
+    
 }
 
 bool

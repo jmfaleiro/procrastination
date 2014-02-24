@@ -39,8 +39,8 @@ LockManagerTest::DoTest() {
 
 void
 LockManagerTest::TestConflictSerial() {
-    struct DependencyInfo info;
-    Action *action1 = new Action();
+    struct EagerRecordInfo info;
+    EagerAction *action1 = new EagerAction();
 
     info.record.m_table = 0;
     info.record.m_key = 0;
@@ -54,7 +54,7 @@ LockManagerTest::TestConflictSerial() {
     bool decision = mgr->Lock(action1);
     assert(decision == true);
     
-    Action *action2 = new Action();
+    EagerAction *action2 = new EagerAction();
     
     info.record.m_table = 0;
     info.record.m_key = 0;
@@ -77,7 +77,7 @@ LockManagerTest::TestConflictSerial() {
     assert(decision == false);
     assert(action2->num_dependencies == 2);
     
-    Action *action3 = new Action();
+    EagerAction *action3 = new EagerAction();
     info.record.m_table = 0;
     info.record.m_key = 0;
     action3->readset.push_back(info);

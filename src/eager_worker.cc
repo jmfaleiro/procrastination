@@ -35,10 +35,17 @@ EagerWorker::BootstrapWorker(void *arg) {
 void
 EagerWorker::WorkerFunction() {
     while (true) {
-        Action *txn = (Action*)m_txn_input_queue->DequeueBlocking();
-        m_lock_mgr->Lock(txn);
-        txn->LaterPhase();
+        /*
+        EagerAction *txn = (EagerAction*)m_txn_input_queue->DequeueBlocking();
+        if (m_lock_mgr->Lock(txn)) {
+            txn->Execute();
+        }
+        else {
+            
+        }
         m_lock_mgr->Unlock(txn);
+        txn->PostExec();
         m_output_queue->EnqueueBlocking((uint64_t)txn);
+        */
     }
 }

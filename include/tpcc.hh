@@ -435,6 +435,51 @@ public:
     void LaterPhase();
 };
 
+class StockLevelEager1;
+class StockLevelEager0 : public EagerAction {
+private:
+    StockLevelEager1 		*m_level1_txn;
+
+protected:
+    int 					m_threshold;
+    uint32_t 				m_warehouse_id;
+    uint32_t 				m_district_id;
+    uint32_t 				m_next_order_id;
+    uint32_t 				m_num_stocks;
+
+public:
+    StockLevelEager0(uint32_t warehouse_id, uint32_t district_id, int threshold, 
+                     StockLevelEager1 *level1_txn);
+    
+    virtual bool IsLinked(EagerAction **ret);
+    virtual void Execute();
+    virtual void PostExec();
+};
+
+class StockLevelEager2;
+class StockLevelEager1 : public StockLevelEager0 {
+private:
+    StockLevelEager2 			*m_level2_txn;
+    std::vector<uint32_t>		m_stock_ids;
+
+public:
+    StockLevelEager1(uint32_t warehouse_id, uint32_t district_id, int threshold,
+                     StockLevelEager2 *level2_txn);
+    virtual bool IsLinked(EagerAction **ret);
+    virtual void Execute();
+    virtual void PostExec();
+};
+
+class StockLevelEager2 : public StockLevelEager1 {
+public:
+    StockLevelEager2(uint32_t warehouse_id, uint32_t district_id, 
+                     int threshold);
+    virtual bool IsLinked(EagerAction **ret);
+    virtual void Execute();
+    virtual void PostExec();
+};
+
+
 class StockLevelTxn : public Action {
 private:
     static const int s_district_index = 0;

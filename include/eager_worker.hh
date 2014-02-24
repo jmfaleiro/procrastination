@@ -17,6 +17,8 @@ private:
     int 				m_cpu_number;			// CPU to which to bind
     volatile uint64_t	m_start_signal;			// Flag indicating we've begun
     pthread_t 			m_worker_thread;		// Worker thread
+    //    EagerAction 		*m_pending_txns;		// 
+
 
     // The worker threads starts executing in this function
     static void*
