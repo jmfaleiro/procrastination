@@ -17,8 +17,8 @@ private:
     int 				m_cpu_number;			// CPU to which to bind
     volatile uint64_t	m_start_signal;			// Flag indicating we've begun
     pthread_t 			m_worker_thread;		// Worker thread
-    //    EagerAction 		*m_pending_txns;		// 
-
+    EagerAction 		*m_queue_head;			// Head of queue of waiting txns
+    EagerAction			*m_queue_tail;			// Tail of queue of waiting txns
 
     // The worker threads starts executing in this function
     static void*
@@ -27,6 +27,21 @@ private:
     // Worker thread function
     virtual void
     WorkerFunction();
+
+    void
+    Enqueue(EagerAction *txn);
+
+    void
+    RemoveQueue(EagerAction *txn);
+
+    bool
+    CheckReady(EagerAction **to_proc);
+
+    void
+    TryExec(EagerAction *txn);
+
+    void
+    DoExec(EagerAction *txn);
 
 public:
     EagerWorker(LockManager *mgr, SimpleQueue *input_queue, 
