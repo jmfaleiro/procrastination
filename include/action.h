@@ -58,7 +58,7 @@ struct EagerRecordInfo {
     EagerAction						*dependency;
     bool 							is_write;
     bool 							is_held;
-    pthread_mutex_t					*latch;
+    volatile uint64_t				*latch;
     struct EagerRecordInfo 			*next;
     struct EagerRecordInfo			*prev;
     
