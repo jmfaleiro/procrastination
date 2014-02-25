@@ -1,6 +1,9 @@
 // Author: Jose Faleiro (faleiro.jose.manuel@gmail.com)
 // 
 
+#ifndef EXPERIMENT_INFO_H_
+#define EXPERIMENT_INFO_H_
+
 #include <getopt.h>
 #include <stdlib.h>
 #include <set>
@@ -55,6 +58,8 @@ class ExperimentInfo {
         districts = -1;
         customers = -1;
         items = -1;
+        
+        given_split = false;
 
         serial = true;
         substantiate_period = 1;
@@ -264,3 +269,5 @@ class ExperimentInfo {
     uint32_t delivery;
     uint32_t order_status;
 };
+
+#endif

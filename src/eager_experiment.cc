@@ -144,7 +144,9 @@ void
 EagerExperiment::Run() {
     switch (m_info->experiment) {
     case TPCC:
+        std::cout << "Running TPCC!\n";
         RunTPCC();
+        break;
     }
 }
 

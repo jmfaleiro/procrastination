@@ -23,6 +23,8 @@
 #include <eager_tpcc_generator.hh>
 #include <lock_manager_test.hh>
 
+#include <eager_experiment.hh>
+
 #include <iostream> 
 #include <fstream>
 #include <time.h>
@@ -476,7 +478,11 @@ run_experiment(ExperimentInfo* info) {
 int
 main(int argc, char** argv) {
     ExperimentInfo* info = new ExperimentInfo(argc, argv);
-    
+    if (info->serial) {
+        EagerExperiment *expt = new EagerExperiment(info);
+        expt->Run();
+    }
+
     run_experiment(info);
     return 0;
 }
