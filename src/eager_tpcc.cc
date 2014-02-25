@@ -348,7 +348,7 @@ PaymentEager::Execute() {
 
 StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id, 
                                    int threshold, 
-                                   StockLevelEager1 *level1_txn) {
+                                   StockLevelEager1 *level1_txn, bool do_init) {
     assert(warehouse_id < s_num_warehouses);
     assert(district_id < s_districts_per_wh);
     
@@ -357,13 +357,15 @@ StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id,
     m_next_order_id = 0;
     m_num_stocks = 0;
     
-    uint32_t keys[2];
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-    struct EagerRecordInfo info;
-    info.record.m_table = DISTRICT;
-    info.record.m_key = TPCCKeyGen::create_district_key(keys);
-    readset.push_back(info);        
+    if (do_init) {
+        uint32_t keys[2];
+        keys[0] = m_warehouse_id;
+        keys[1] = m_district_id;
+        struct EagerRecordInfo info;
+        info.record.m_table = DISTRICT;
+        info.record.m_key = TPCCKeyGen::create_district_key(keys);
+        readset.push_back(info);        
+    }
 }
 
 bool
@@ -399,9 +401,9 @@ StockLevelEager0::PostExec() {
 
 StockLevelEager1::StockLevelEager1(uint32_t warehouse_id, uint32_t district_id, 
                                    int threshold, 
-                                   StockLevelEager2 *level1_txn) 
-    : StockLevelEager0(warehouse_id, district_id, threshold, this) {
-    
+                                   StockLevelEager2 *level2_txn) 
+    : StockLevelEager0(warehouse_id, district_id, threshold, this, false) {
+    m_level2_txn = level2_txn;
 }
 
 bool
@@ -418,6 +420,7 @@ StockLevelEager1::Execute() {
     keys[1] = m_district_id;
 
     for (size_t i = 0; i < readset.size(); ++i) {
+        assert(readset[i].record.m_table == OPEN_ORDER);
         Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
         keys[2] = oorder->o_id;
         for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
@@ -445,7 +448,7 @@ StockLevelEager1::PostExec() {
     for (uint32_t i = 0; i < num_stocks; ++i) {
         keys[1] = m_stock_ids[i];
         info.record.m_key = TPCCKeyGen::create_stock_key(keys);
-        readset.push_back(info);
+        m_level2_txn->readset.push_back(info);
     }
 }
 

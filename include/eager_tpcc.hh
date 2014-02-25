@@ -89,7 +89,7 @@ protected:
 
 public:
     StockLevelEager0(uint32_t warehouse_id, uint32_t district_id, int threshold, 
-                     StockLevelEager1 *level1_txn);
+                     StockLevelEager1 *level1_txn, bool do_init);
     
     virtual bool IsLinked(EagerAction **ret);
     virtual void Execute();

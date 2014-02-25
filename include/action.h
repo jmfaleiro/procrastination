@@ -122,19 +122,6 @@ struct DependencyInfo {
     }        
 };
 
-class EagerAction {
- public:
-    volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
-    std::vector<struct EagerRecordInfo> writeset;
-    std::vector<struct EagerRecordInfo> readset;
-
-    virtual bool IsLinked(EagerAction **ret) { *ret = NULL; return false; };
-    virtual void Execute() { };
-    virtual void PostExec() { };
-
-    EagerAction 	*next;
-    EagerAction 	*prev;
-};
 
 struct StateLock {
   uint64_t values[8];
@@ -187,5 +174,20 @@ class Action {
   virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
 };
+
+class EagerAction {
+ public:
+    volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
+    std::vector<struct EagerRecordInfo> writeset;
+    std::vector<struct EagerRecordInfo> readset;
+
+    virtual bool IsLinked(EagerAction **ret) { *ret = NULL; return false; };
+    virtual void Execute() { };
+    virtual void PostExec() { };
+
+    EagerAction 	*next;
+    EagerAction 	*prev;
+};
+
 
 #endif // ACTION_H

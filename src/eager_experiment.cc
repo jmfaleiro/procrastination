@@ -1,5 +1,19 @@
 #include <eager_experiment.hh>
 
+timespec
+EagerExperiment::diff_time(timespec end, timespec start) {
+    timespec temp;
+    if ((end.tv_nsec - start.tv_nsec) < 0) {
+        temp.tv_sec = end.tv_sec - start.tv_sec - 1;
+        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    }
+    else {
+        temp.tv_sec = end.tv_sec-start.tv_sec;
+        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+}
+
 EagerExperiment::EagerExperiment(ExperimentInfo *info) {
     m_info = info;
 }
@@ -68,10 +82,10 @@ EagerExperiment::InitQueues(int num_queues, uint32_t size) {
 }
 
 void
-EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, 
+EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers,
                             EagerGenerator *gen) {
     for (int i = 0; i < num_inputs; ++i) {
-        input_queues[i%num_inputs]->EnqueueBlocking((uint64_t)gen->genNext());
+        input_queues[i%num_workers]->EnqueueBlocking((uint64_t)gen->genNext());
     }
 }
 
@@ -103,6 +117,9 @@ EagerExperiment::DoThroughputExperiment(EagerWorker **workers,
         workers[i]->Run();
     }
     
+    timespec start_time, end_time;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_time);
+
     // Spin until the workers have finished processing their inputs
     uint32_t num_done = 0;
     while (num_done < num_waits) {
@@ -113,6 +130,10 @@ EagerExperiment::DoThroughputExperiment(EagerWorker **workers,
             }
         }
     }
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
+    
+    timespec diff = diff_time(end_time, start_time);
+    std::cout << diff.tv_sec << "." << diff.tv_nsec << "\n";
 }
 
 
@@ -132,19 +153,26 @@ EagerExperiment::RunTPCC() {
                                            m_info->order_status);
     }
     else {
-        txn_generator = EagerTPCCGenerator();
+        txn_generator = EagerTPCCGenerator(0, 0, 1, 0, 0);
     }
-    InitInputs(input_queues, m_info->num_workers, &txn_generator);    
+    InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
                                         output_queues);
+
+    
+    DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
+                           (uint32_t)m_info->num_txns);
+
     
 }
 
 void
 EagerExperiment::Run() {
     switch (m_info->experiment) {
-    case TPCC:
-        std::cout << "Running TPCC!\n";
+    case TPCC:        
+        TPCCInit tpcc_initializer(m_info->warehouses, m_info->districts, 
+                                  m_info->customers, m_info->items);
+        tpcc_initializer.do_init();
         RunTPCC();
         break;
     }

@@ -164,7 +164,12 @@ public:
                                                         threshold, level2);
         StockLevelEager0 *level0 = new StockLevelEager0(warehouse_id, 
                                                         district_id, 
-                                                        threshold, level1);
+                                                        threshold, level1, true);
+        EagerAction *temp;
+        assert(level0->IsLinked(&temp));
+        assert(temp == level1);
+        assert(level1->IsLinked(&temp));
+        assert(temp == level2);
         return level0;
     }
     

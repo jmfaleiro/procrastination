@@ -9,12 +9,15 @@
 #include <cpuinfo.h>
 #include <tpcc_table_spec.hh>
 #include <concurrent_queue.h>
-
+#include <time.h>
 
 class EagerExperiment {
 private:
     ExperimentInfo 		*m_info;
     LockManager			*m_lock_mgr;
+
+    static timespec
+    diff_time(timespec end, timespec start);
 
     void
     InitializeTPCCLockManager();
@@ -23,7 +26,8 @@ private:
     InitQueues(int num_queues, uint32_t size);
 
     void
-    InitInputs(SimpleQueue **input_queues, int num_inputs, EagerGenerator *gen);
+    InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers, 
+               EagerGenerator *gen);
 
     EagerWorker**
     InitWorkers(int num_workers, SimpleQueue **input_queues, 
