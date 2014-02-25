@@ -144,8 +144,8 @@ class ExperimentInfo {
             if (i != 10 && i != 8 && i != 0 && i != 10 && i != 11 && i != 12 &&
                 i != 13 && i != 14) {
                 if (args_received.find(i) == args_received.end()) {
-                    cout << "Missing argument: ";
-                    cout << long_options[i].name << "\n";
+                    std::cout << "Missing argument: ";
+                    std::cout << long_options[i].name << "\n";
                     argError(long_options, NUM_OPTS);
                 }
             }
@@ -236,10 +236,10 @@ class ExperimentInfo {
     int substantiate_threshold;
     
     // File in which to dump substantiation throughput. 
-    string subst_file;
+    std::string subst_file;
     
     // File in which to dump stickification throughput. 
-    string stick_file;
+    std::string stick_file;
 
     // Number of times to repeat our experiment. 
     int num_runs;
@@ -255,4 +255,12 @@ class ExperimentInfo {
     int districts;
     int customers;
     int items;
+
+    bool given_split;
+
+    uint32_t new_order;
+    uint32_t district;
+    uint32_t stock_level;
+    uint32_t delivery;
+    uint32_t order_status;
 };

@@ -3,6 +3,8 @@
 
 #include <tpcc.hh>
 
+using namespace tpcc;
+
 class NewOrderTxn : public Action {
     
 private:

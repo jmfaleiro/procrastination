@@ -4,9 +4,11 @@
 #include <tpcc.hh>
 #include <action.h>
 
+using namespace tpcc;
+
 class NewOrderEager : public EagerAction {
 private:
-    static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
+
 
     uint64_t 			m_warehouse_id;
     uint64_t			m_district_id;
@@ -38,6 +40,8 @@ public:
     // Write set indices
     static const uint32_t 			s_district_index    = 0;
     static const uint32_t 			s_stock_index		= 1;
+
+    static const uint64_t invalid_item_key = 0xFFFFFFFFFFFFFFFF;
 };
 
 class PaymentEager : public EagerAction {
@@ -212,7 +216,6 @@ public:
 class DeliveryEager2 : public DeliveryEager1 {
 public:
     DeliveryEager2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
-                   
     
     virtual bool
     IsLinked(EagerAction **ret);

@@ -7,6 +7,8 @@
 #include <eager_tpcc.hh>
 #include <iostream>
 
+using namespace tpcc;
+
 class TPCCGenerator : public WorkloadGenerator {
 private:
     TPCCUtil m_util;

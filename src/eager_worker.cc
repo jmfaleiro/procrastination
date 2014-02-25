@@ -30,7 +30,17 @@ EagerWorker::Run() {
 void*
 EagerWorker::BootstrapWorker(void *arg) {
     EagerWorker *worker = (EagerWorker*)arg;
-    fetch_and_increment(&worker->m_start_signal);
+
+	// Pin the thread to a cpu
+    if (pin_thread(worker->m_cpu_number) == -1) {
+        std::cout << "EagerWorker couldn't bind to a cpu!!!\n";
+        exit(-1);
+    }
+
+    // Signal that we've initialized
+    fetch_and_increment(&worker->m_start_signal);	
+
+	// Start processing input
     worker->WorkerFunction();
 }
 

@@ -108,7 +108,7 @@ class SimpleQueue {
             return true;
         }
     }
-};
+} __attribute__((aligned(CACHE_LINE)));
 
 class ConcurrentQueue {
 

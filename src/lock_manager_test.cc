@@ -2,6 +2,7 @@
 #include <tpcc.hh>
 
 using namespace cc_params;
+using namespace tpcc;
 
 LockManagerTest::LockManagerTest() {
     

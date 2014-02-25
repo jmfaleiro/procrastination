@@ -14,400 +14,403 @@
 #include <keys.h>
 #include <action.h>
 
-enum TPCCTable {
-    WAREHOUSE = 0,			// 0
-    DISTRICT = 1,			// 1
-    CUSTOMER = 2,			// 2
-    HISTORY = 3,			// 3
-    NEW_ORDER = 4,			// 4
-    OPEN_ORDER = 5,			// 5
-    ORDER_LINE = 6,			// 6
-    ITEM = 7,				// 7
-    STOCK = 8,    			// 8
-    OPEN_ORDER_INDEX = 9,	// 9
-    NEXT_DELIVERY = 10,		// 10
-};
+namespace tpcc {
+
+    enum TPCCTable {
+        WAREHOUSE = 0,			// 0
+        DISTRICT = 1,			// 1
+        CUSTOMER = 2,			// 2
+        HISTORY = 3,			// 3
+        NEW_ORDER = 4,			// 4
+        OPEN_ORDER = 5,			// 5
+        ORDER_LINE = 6,			// 6
+        ITEM = 7,				// 7
+        STOCK = 8,    			// 8
+        OPEN_ORDER_INDEX = 9,	// 9
+        NEXT_DELIVERY = 10,		// 10
+    };
 
 
 
 
-class TPCCKeyGen {
-private:
-    static const uint32_t s_customer_shift = 		24;
-    static const uint32_t s_district_shift = 		16;
-    static const uint32_t s_new_order_shift = 		24;
-    static const uint32_t s_order_shift = 			24;
-    static const uint32_t s_order_line_shift = 		56;
-    static const uint32_t s_stock_shift = 			16;
+    class TPCCKeyGen {
+    private:
+        static const uint32_t s_customer_shift = 		24;
+        static const uint32_t s_district_shift = 		16;
+        static const uint32_t s_new_order_shift = 		24;
+        static const uint32_t s_order_shift = 			24;
+        static const uint32_t s_order_line_shift = 		56;
+        static const uint32_t s_stock_shift = 			16;
 
-    static const uint64_t s_customer_mask = 		0x000000FFFF000000;
-    static const uint64_t s_district_mask = 		0x0000000000FF0000;
-    static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
-    static const uint64_t s_stock_mask = 			0x0FFFFFFFFFFF0000;    
+        static const uint64_t s_customer_mask = 		0x000000FFFF000000;
+        static const uint64_t s_district_mask = 		0x0000000000FF0000;
+        static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
+        static const uint64_t s_stock_mask = 			0x0FFFFFFFFFFF0000;    
 
-public:
-    static inline uint32_t
-    get_stock_key(uint64_t composite_key) {
-        return (uint32_t)((composite_key & s_stock_mask) >> s_stock_shift);
-    }
+    public:
+        static inline uint32_t
+        get_stock_key(uint64_t composite_key) {
+            return (uint32_t)((composite_key & s_stock_mask) >> s_stock_shift);
+        }
 
-    static inline uint32_t
-    get_customer_key(uint64_t composite_key) {
-        return (uint32_t)((composite_key & s_customer_mask) >> s_customer_shift);
-    }
+        static inline uint32_t
+        get_customer_key(uint64_t composite_key) {
+            return (uint32_t)((composite_key & s_customer_mask) >> s_customer_shift);
+        }
 
-    static inline uint32_t
-    get_warehouse_key(uint64_t composite_key) {
-        return (uint32_t)(composite_key & s_warehouse_mask);
-    }
+        static inline uint32_t
+        get_warehouse_key(uint64_t composite_key) {
+            return (uint32_t)(composite_key & s_warehouse_mask);
+        }
 
-    static inline uint32_t
-    get_district_key(uint64_t composite_key) {
-        return (uint32_t)((composite_key & s_district_mask) >> s_district_shift);
-    }
+        static inline uint32_t
+        get_district_key(uint64_t composite_key) {
+            return (uint32_t)((composite_key & s_district_mask) >> s_district_shift);
+        }
 
-    // Expects: 	warehouse_id 	==> 	keys[0] 
-    // 				district_id  	==> 	keys[1]
-    //				customer_id  	==> 	keys[2]
-    static inline uint64_t
-    create_customer_key(uint32_t *keys) {
-        return (
-                ((uint64_t)keys[0])				|
-                (((uint64_t)keys[1]) << s_district_shift)		|
-                (((uint64_t)keys[2]) << s_customer_shift)		
-                );
-    }
+        // Expects: 	warehouse_id 	==> 	keys[0] 
+        // 				district_id  	==> 	keys[1]
+        //				customer_id  	==> 	keys[2]
+        static inline uint64_t
+        create_customer_key(uint32_t *keys) {
+            return (
+                    ((uint64_t)keys[0])				|
+                    (((uint64_t)keys[1]) << s_district_shift)		|
+                    (((uint64_t)keys[2]) << s_customer_shift)		
+                    );
+        }
 
-    // Expects: 	warehouse_id 	==> 	keys[0]
-    //			district_id 	==> 	keys[1]
-    static inline uint64_t
-    create_district_key(uint32_t *keys) {
-        return (
-                ((uint64_t)keys[0])				|
-                ((uint64_t)keys[1] << s_district_shift)
-                );
-    }
+        // Expects: 	warehouse_id 	==> 	keys[0]
+        //			district_id 	==> 	keys[1]
+        static inline uint64_t
+        create_district_key(uint32_t *keys) {
+            return (
+                    ((uint64_t)keys[0])				|
+                    ((uint64_t)keys[1] << s_district_shift)
+                    );
+        }
 
-    // Expects: 	warehouse_id 	==> 	keys[0]
-    // 			district_id 	==> 	keys[1]
-    //			new_order_id	==> 	keys[2]
-    static inline uint64_t
-    create_new_order_key(uint32_t *keys) {
-        return (
-                ((uint64_t)keys[0])    				|
-                ((uint64_t)keys[1] << s_district_shift)		|
-                ((uint64_t)keys[2] << s_new_order_shift)
-                );
-    }	
+        // Expects: 	warehouse_id 	==> 	keys[0]
+        // 			district_id 	==> 	keys[1]
+        //			new_order_id	==> 	keys[2]
+        static inline uint64_t
+        create_new_order_key(uint32_t *keys) {
+            return (
+                    ((uint64_t)keys[0])    				|
+                    ((uint64_t)keys[1] << s_district_shift)		|
+                    ((uint64_t)keys[2] << s_new_order_shift)
+                    );
+        }	
 
-    // Expects: 	warehouse_id 	==> 	keys[0]
-    // 			district_id 	==> 	keys[1]
-    //			order_id	==> 	keys[2]
-    static inline uint64_t
-    create_order_key(uint32_t *keys) {
-        return (
-                ((uint64_t)keys[0])				|
-                (((uint64_t)keys[1]) << s_district_shift)		|
-                (((uint64_t)keys[2]) << s_order_shift)
-                );
-    }
+        // Expects: 	warehouse_id 	==> 	keys[0]
+        // 			district_id 	==> 	keys[1]
+        //			order_id	==> 	keys[2]
+        static inline uint64_t
+        create_order_key(uint32_t *keys) {
+            return (
+                    ((uint64_t)keys[0])				|
+                    (((uint64_t)keys[1]) << s_district_shift)		|
+                    (((uint64_t)keys[2]) << s_order_shift)
+                    );
+        }
 
-    static inline uint64_t
-    create_order_line_key(uint32_t *keys) {            
-        return (
-                ((uint64_t)keys[0]) 				| 
-                (((uint64_t)keys[1]) << s_district_shift) 	| 
-                (((uint64_t)keys[2]) << s_order_shift)		|
-                (((uint64_t)keys[3]) << s_order_line_shift)
-                );
-    }
+        static inline uint64_t
+        create_order_line_key(uint32_t *keys) {            
+            return (
+                    ((uint64_t)keys[0]) 				| 
+                    (((uint64_t)keys[1]) << s_district_shift) 	| 
+                    (((uint64_t)keys[2]) << s_order_shift)		|
+                    (((uint64_t)keys[3]) << s_order_line_shift)
+                    );
+        }
 
-    static inline uint64_t
-    create_stock_key(uint32_t *keys) {
-        return (
-                ((uint64_t)keys[0])				|
-                (((uint64_t)keys[1]) << s_stock_shift)		
-                );
-    }
+        static inline uint64_t
+        create_stock_key(uint32_t *keys) {
+            return (
+                    ((uint64_t)keys[0])				|
+                    (((uint64_t)keys[1]) << s_stock_shift)		
+                    );
+        }
 
-};
+    };
 
-// Each of the following classes defines a TPC-C table. 
-typedef struct {
-    uint32_t	c_id;
-    uint32_t	c_d_id;
-    uint32_t	c_w_id;
-    int 		c_payment_cnt;
-    int 		c_delivery_cnt;
-    char 		*c_since;
-    float 		c_discount;
-    float 		c_credit_lim;
-    float 		c_balance;
-    float 		c_ytd_payment;
-    char 		c_credit[3];
-    char 		c_last[16];
-    char 		c_first[17];
-    char 		c_street_1[21];
-    char 		c_street_2[21];
-    char 		c_city[21];
-    char 		c_state[3];
-    char 		c_zip[11];
-    char 		c_phone[17];
-    char 		c_middle[3];
-    char 		c_data[501];
-} Customer;
+    // Each of the following classes defines a TPC-C table. 
+    typedef struct {
+        uint32_t	c_id;
+        uint32_t	c_d_id;
+        uint32_t	c_w_id;
+        int 		c_payment_cnt;
+        int 		c_delivery_cnt;
+        char 		*c_since;
+        float 		c_discount;
+        float 		c_credit_lim;
+        float 		c_balance;
+        float 		c_ytd_payment;
+        char 		c_credit[3];
+        char 		c_last[16];
+        char 		c_first[17];
+        char 		c_street_1[21];
+        char 		c_street_2[21];
+        char 		c_city[21];
+        char 		c_state[3];
+        char 		c_zip[11];
+        char 		c_phone[17];
+        char 		c_middle[3];
+        char 		c_data[501];
+    } Customer;
 
-typedef struct {
-    int 		d_id;
-    int 		d_w_id;
-    uint32_t	d_next_o_id;
-    float 		d_ytd;
-    float 		d_tax;
-    char 		d_name[11];
-    char 		d_street_1[21];
-    char 		d_street_2[21];
-    char 		d_city[21];
-    char 		d_state[4];
-    char 		d_zip[10];
-} District __attribute((aligned(CACHE_LINE)));
+    typedef struct {
+        int 		d_id;
+        int 		d_w_id;
+        uint32_t	d_next_o_id;
+        float 		d_ytd;
+        float 		d_tax;
+        char 		d_name[11];
+        char 		d_street_1[21];
+        char 		d_street_2[21];
+        char 		d_city[21];
+        char 		d_state[4];
+        char 		d_zip[10];
+    } District __attribute((aligned(CACHE_LINE)));
 
-typedef struct {
-    uint32_t	h_c_id;
-    uint32_t	h_c_d_id;
-    uint32_t	h_c_w_id;
-    uint32_t	h_d_id;
-    uint32_t	h_w_id;
-    uint32_t 	h_date;
-    float 		h_amount;
-    char		h_data[26];
-} History;
+    typedef struct {
+        uint32_t	h_c_id;
+        uint32_t	h_c_d_id;
+        uint32_t	h_c_w_id;
+        uint32_t	h_d_id;
+        uint32_t	h_w_id;
+        uint32_t 	h_date;
+        float 		h_amount;
+        char		h_data[26];
+    } History;
 
-typedef struct {
-    int 		i_id; // PRIMARY KEY
-    int 		i_im_id;
-    float 		i_price;
-    char 		i_name[25];
-    char 		i_data[51];
-} Item;
+    typedef struct {
+        int 		i_id; // PRIMARY KEY
+        int 		i_im_id;
+        float 		i_price;
+        char 		i_name[25];
+        char 		i_data[51];
+    } Item;
 
-typedef struct {
-    int 		no_w_id;
-    int 		no_d_id;
-    int 		no_o_id;
-} NewOrder;
+    typedef struct {
+        int 		no_w_id;
+        int 		no_d_id;
+        int 		no_o_id;
+    } NewOrder;
 
-typedef struct {
-    uint32_t 	o_id;
-    uint32_t 	o_w_id;
-    uint32_t 	o_d_id;
-    uint32_t 	o_c_id;
-    uint32_t 	o_carrier_id;
-    uint32_t 	o_ol_cnt;
-    uint32_t 	o_all_local;
-    long 		o_entry_d;
-} Oorder;
+    typedef struct {
+        uint32_t 	o_id;
+        uint32_t 	o_w_id;
+        uint32_t 	o_d_id;
+        uint32_t 	o_c_id;
+        uint32_t 	o_carrier_id;
+        uint32_t 	o_ol_cnt;
+        uint32_t 	o_all_local;
+        long 		o_entry_d;
+    } Oorder;
 
-typedef struct { 
-    uint32_t 	ol_w_id;
-    uint32_t 	ol_d_id;
-    uint32_t 	ol_o_id;
-    uint32_t 	ol_number;
-    uint32_t 	ol_i_id;
-    uint32_t 	ol_supply_w_id;
-    uint32_t 	ol_quantity;
-    long 		ol_delivery_d;
-    float 		ol_amount;
-    char 		ol_dist_info[25];
-} OrderLine;
+    typedef struct { 
+        uint32_t 	ol_w_id;
+        uint32_t 	ol_d_id;
+        uint32_t 	ol_o_id;
+        uint32_t 	ol_number;
+        uint32_t 	ol_i_id;
+        uint32_t 	ol_supply_w_id;
+        uint32_t 	ol_quantity;
+        long 		ol_delivery_d;
+        float 		ol_amount;
+        char 		ol_dist_info[25];
+    } OrderLine;
 
-typedef struct {
-    int 		s_i_id; // PRIMARY KEY 2
-    int 		s_w_id; // PRIMARY KEY 1
-    int 		s_order_cnt;
-    int 		s_remote_cnt;
-    int 		s_quantity;
-    float 		s_ytd;
-    char 		s_data[51];
-    char		s_dist_01[25];
-    char 		s_dist_02[25];
-    char		s_dist_03[25];
-    char 		s_dist_04[25];    
-    char 		s_dist_05[25];
-    char 		s_dist_06[25];
-    char 		s_dist_07[25];
-    char 		s_dist_08[25];
-    char  		s_dist_09[25];
-    char 		s_dist_10[25];
-} Stock __attribute__((aligned(CACHE_LINE)));
+    typedef struct {
+        int 		s_i_id; // PRIMARY KEY 2
+        int 		s_w_id; // PRIMARY KEY 1
+        int 		s_order_cnt;
+        int 		s_remote_cnt;
+        int 		s_quantity;
+        float 		s_ytd;
+        char 		s_data[51];
+        char		s_dist_01[25];
+        char 		s_dist_02[25];
+        char		s_dist_03[25];
+        char 		s_dist_04[25];    
+        char 		s_dist_05[25];
+        char 		s_dist_06[25];
+        char 		s_dist_07[25];
+        char 		s_dist_08[25];
+        char  		s_dist_09[25];
+        char 		s_dist_10[25];
+    } Stock __attribute__((aligned(CACHE_LINE)));
 
-typedef struct {
-    int 		w_id; // PRIMARY KEY
-    float 		w_ytd;
-    float 		w_tax;
-    char 		w_name[11];
-    char 		w_street_1[21];
-    char 		w_street_2[21];
-    char 		w_city[21];
-    char 		w_state[4];
-    char 		w_zip[10];
-    //    District 	*w_district_table;
-    //    Stock 		*w_stock_table;
-} Warehouse;
+    typedef struct {
+        int 		w_id; // PRIMARY KEY
+        float 		w_ytd;
+        float 		w_tax;
+        char 		w_name[11];
+        char 		w_street_1[21];
+        char 		w_street_2[21];
+        char 		w_city[21];
+        char 		w_state[4];
+        char 		w_zip[10];
+        //    District 	*w_district_table;
+        //    Stock 		*w_stock_table;
+    } Warehouse;
   
-typedef struct {
-    uint64_t customer_id;
-    uint64_t order_id;
-} OrderLineIndex;
+    typedef struct {
+        uint64_t customer_id;
+        uint64_t order_id;
+    } OrderLineIndex;
 
-// Now phase tables
-extern HashTable<uint64_t, Warehouse> 				*s_warehouse_tbl;
-extern HashTable<uint64_t, District> 				*s_district_tbl;
-extern HashTable<uint64_t, Customer> 				*s_customer_tbl;
-extern HashTable<uint64_t, Item> 					*s_item_tbl;
+    // Now phase tables
+    extern HashTable<uint64_t, Warehouse> 				*s_warehouse_tbl;
+    extern HashTable<uint64_t, District> 				*s_district_tbl;
+    extern HashTable<uint64_t, Customer> 				*s_customer_tbl;
+    extern HashTable<uint64_t, Item> 					*s_item_tbl;
 
-extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
-extern HashTable<uint64_t, Stock> 					*s_stock_tbl;
-extern StringTable<Customer*>						*s_last_name_index;
-extern HashTable<uint64_t, uint32_t>				*s_next_delivery_tbl;
+    extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
+    extern HashTable<uint64_t, Stock> 					*s_stock_tbl;
+    extern StringTable<Customer*>						*s_last_name_index;
+    extern HashTable<uint64_t, uint32_t>				*s_next_delivery_tbl;
 
-// Later phase tables
-extern ConcurrentHashTable<uint64_t, Oorder>			 		*s_oorder_tbl;
-extern ConcurrentHashTable<uint64_t, History> 				*s_history_tbl;
-extern ConcurrentHashTable<uint64_t, NewOrder> 				*s_new_order_tbl;
-extern ConcurrentHashTable<uint64_t, OrderLine> 				*s_order_line_tbl;
+    // Later phase tables
+    extern ConcurrentHashTable<uint64_t, Oorder>			 		*s_oorder_tbl;
+    extern ConcurrentHashTable<uint64_t, History> 				*s_history_tbl;
+    extern ConcurrentHashTable<uint64_t, NewOrder> 				*s_new_order_tbl;
+    extern ConcurrentHashTable<uint64_t, OrderLine> 				*s_order_line_tbl;
 
-// Experiment parameters
-extern uint32_t										s_num_tables;
-extern uint32_t 									s_num_items;  
-extern uint32_t 									s_num_warehouses;
-extern uint32_t 									s_districts_per_wh;
-extern uint32_t 									s_customers_per_dist;
+    // Experiment parameters
+    extern uint32_t										s_num_tables;
+    extern uint32_t 									s_num_items;  
+    extern uint32_t 									s_num_warehouses;
+    extern uint32_t 									s_districts_per_wh;
+    extern uint32_t 									s_customers_per_dist;
     
-class TPCCUtil;
+    class TPCCUtil;
 
-class TPCCInit {
-private:
-    uint32_t m_num_warehouses;
-    uint32_t m_dist_per_wh;
-    uint32_t m_cust_per_dist;
-    uint32_t m_item_count;
+    class TPCCInit {
+    private:
+        uint32_t m_num_warehouses;
+        uint32_t m_dist_per_wh;
+        uint32_t m_cust_per_dist;
+        uint32_t m_item_count;
         
-    static const uint32_t s_first_unprocessed_o_id = 2101;
+        static const uint32_t s_first_unprocessed_o_id = 2101;
 
-    // Each of the functions below initializes an apriori allocated single 
-    // row.
-    void init_warehouses( TPCCUtil &random);
-    void init_districts(TPCCUtil &random);
-    void init_customers(TPCCUtil &random);
-    void init_history(TPCCUtil &random);
-    void init_orders(TPCCUtil &random);
-    void init_items(TPCCUtil &random);
-    void init_stock(TPCCUtil &random);
+        // Each of the functions below initializes an apriori allocated single 
+        // row.
+        void init_warehouses( TPCCUtil &random);
+        void init_districts(TPCCUtil &random);
+        void init_customers(TPCCUtil &random);
+        void init_history(TPCCUtil &random);
+        void init_orders(TPCCUtil &random);
+        void init_items(TPCCUtil &random);
+        void init_stock(TPCCUtil &random);
     
-    // Makes sure that everything is in order.
-    void test_init();
+        // Makes sure that everything is in order.
+        void test_init();
 
-public:
-    TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
-             uint32_t cust_per_dist, uint32_t item_count);
+    public:
+        TPCCInit(uint32_t num_warehouses, uint32_t dist_per_wh, 
+                 uint32_t cust_per_dist, uint32_t item_count);
 
-    // Must be called before running any experiments. 
-    void do_init();
-};
+        // Must be called before running any experiments. 
+        void do_init();
+    };
 
 
 
-class TPCCUtil {
-private:
-    static const int OL_I_ID_C = 7911; // in range [0, 8191]
-    static const int C_ID_C = 259; // in range [0, 1023]
-	// NOTE: TPC-C 2.1.6.1 specifies that abs(C_LAST_LOAD_C - C_LAST_RUN_C) must
-	// be within [65, 119]
-    static const int C_LAST_LOAD_C = 157; // in range [0, 255]
-    static const int C_LAST_RUN_C = 223; // in range [0, 255]
+    class TPCCUtil {
+    private:
+        static const int OL_I_ID_C = 7911; // in range [0, 8191]
+        static const int C_ID_C = 259; // in range [0, 1023]
+        // NOTE: TPC-C 2.1.6.1 specifies that abs(C_LAST_LOAD_C - C_LAST_RUN_C) must
+        // be within [65, 119]
+        static const int C_LAST_LOAD_C = 157; // in range [0, 255]
+        static const int C_LAST_RUN_C = 223; // in range [0, 255]
 
-    uint32_t m_seed;
+        uint32_t m_seed;
 
-    static void
-    gen_last_name(int num, char *buf) {
-        static const char *name_tokens[] = {"BAR", "OUGHT", "ABLE", "PRI", 
-                                            "PRES", "ESE", "ANTI", "CALLY", 
-                                            "ATION", "EING" };
-        static const int token_lengths[] = {3, 5, 4, 3, 4, 3, 5, 5, 4};
+        static void
+        gen_last_name(int num, char *buf) {
+            static const char *name_tokens[] = {"BAR", "OUGHT", "ABLE", "PRI", 
+                                                "PRES", "ESE", "ANTI", "CALLY", 
+                                                "ATION", "EING" };
+            static const int token_lengths[] = {3, 5, 4, 3, 4, 3, 5, 5, 4};
 
-        int indices[] = { num/100, (num/10)%10, num%10 };
-        int offset = 0;
+            int indices[] = { num/100, (num/10)%10, num%10 };
+            int offset = 0;
 
-        for (uint32_t i = 0; i < sizeof(indices)/sizeof(*indices); ++i) {
-            memcpy(buf+offset, name_tokens[indices[i]], 
-                   token_lengths[indices[i]]);
-            offset += token_lengths[indices[i]];
+            for (uint32_t i = 0; i < sizeof(indices)/sizeof(*indices); ++i) {
+                memcpy(buf+offset, name_tokens[indices[i]], 
+                       token_lengths[indices[i]]);
+                offset += token_lengths[indices[i]];
+            }
+            buf[offset] = '\0';
         }
-        buf[offset] = '\0';
-    }
 
-    int
-    gen_non_uniform_rand(int A, int C, int min, int max) {
-        int range = max - min + 1;
-        int diff = 
-            ((gen_rand_range(0, A) | gen_rand_range(min, max)) + C) % range;
-        return diff;
-    }
+        int
+        gen_non_uniform_rand(int A, int C, int min, int max) {
+            int range = max - min + 1;
+            int diff = 
+                ((gen_rand_range(0, A) | gen_rand_range(min, max)) + C) % range;
+            return diff;
+        }
     
-public:
-    TPCCUtil() {
-        m_seed = time(NULL);
-    }
+    public:
+        TPCCUtil() {
+            m_seed = time(NULL);
+        }
 
-    int
-    gen_customer_id() {
-        int ret = gen_non_uniform_rand(1023, C_ID_C, 0, s_customers_per_dist-1);
-        assert(ret >= 0 && ret < (int)s_customers_per_dist);
-        return ret;
-    }    
+        int
+        gen_customer_id() {
+            int ret = gen_non_uniform_rand(1023, C_ID_C, 0, s_customers_per_dist-1);
+            assert(ret >= 0 && ret < (int)s_customers_per_dist);
+            return ret;
+        }    
 
-    void
-    gen_last_name_load(char *buf) {
-        gen_last_name(gen_non_uniform_rand(255, C_LAST_LOAD_C, 0, 999), buf);
-    }
+        void
+        gen_last_name_load(char *buf) {
+            gen_last_name(gen_non_uniform_rand(255, C_LAST_LOAD_C, 0, 999), buf);
+        }
 
-    void
-    gen_last_name_run(char *buf) {
-        gen_last_name(gen_non_uniform_rand(255, C_LAST_RUN_C, 0, 999), buf);
-    }
+        void
+        gen_last_name_run(char *buf) {
+            gen_last_name(gen_non_uniform_rand(255, C_LAST_RUN_C, 0, 999), buf);
+        }
 
-    int
-    gen_item_id() {
-        return gen_non_uniform_rand(8191, OL_I_ID_C, 1, 100000);
-    }
+        int
+        gen_item_id() {
+            return gen_non_uniform_rand(8191, OL_I_ID_C, 1, 100000);
+        }
         
-    int
-    gen_rand_range(int min, int max) {
-        int range = max - min + 1;
-        return min + (rand_r(&m_seed) % range);
-    }    
+        int
+        gen_rand_range(int min, int max) {
+            int range = max - min + 1;
+            return min + (rand_r(&m_seed) % range);
+        }    
 
-    void
-    gen_rand_string(int min, int max, char *buf) {
-        int ch_first = (int)'a', ch_last = (int)'z';
-        int length = gen_rand_range(min, max);
-        for (int i = 0; i < length; ++i) {
-            buf[i] = (char)gen_rand_range(ch_first, ch_last);
+        void
+        gen_rand_string(int min, int max, char *buf) {
+            int ch_first = (int)'a', ch_last = (int)'z';
+            int length = gen_rand_range(min, max);
+            for (int i = 0; i < length; ++i) {
+                buf[i] = (char)gen_rand_range(ch_first, ch_last);
+            }
+            buf[length] = '\0';        
         }
-        buf[length] = '\0';        
-    }
     
-    static void
-    append_strings(char *dest, const char **sources, int dest_len, 
-                   int num_sources) {
-        int offset = 0;
-        for (int i = 0; i < num_sources; ++i) {
-            strcpy(dest+offset, sources[i]);
-            offset += strlen(sources[i]);
+        static void
+        append_strings(char *dest, const char **sources, int dest_len, 
+                       int num_sources) {
+            int offset = 0;
+            for (int i = 0; i < num_sources; ++i) {
+                strcpy(dest+offset, sources[i]);
+                offset += strlen(sources[i]);
+            }
+            dest[offset] = '\0';
         }
-        dest[offset] = '\0';
-    }
-};
+    };
 
+}
 
 #endif // TPCC_H_

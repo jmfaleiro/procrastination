@@ -9,14 +9,16 @@
 #include <tr1/unordered_map>
 #include <list>
 #include <vector>
-
 #include <table.hh>
 #include <action.h>
 #include "concurrent_queue.h"
 #include "cpuinfo.h"
 #include "util.h"
+#include <tpcc.hh>
 
 using namespace std;
+
+using namespace tpcc;
 
 class Heuristic {
  public:

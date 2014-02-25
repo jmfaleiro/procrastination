@@ -7,7 +7,7 @@
 #include <lock_manager.hh>
 #include <concurrent_queue.h>
 #include <pthread.h>
-#include <util.h>
+#include <cpuinfo.h>
 
 class EagerWorker {
 private:

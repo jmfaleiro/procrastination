@@ -35,6 +35,8 @@ std::vector<Action*>* last_txn_map = NULL;
 std::vector<int>* value_map = NULL;
 using namespace std;
 
+using namespace tpcc;
+
 static timespec 
 diff_time(timespec start, timespec end) 
 {

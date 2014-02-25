@@ -4,37 +4,67 @@
 #include <tpcc.hh>
 #include <eager_tpcc.hh>
 #include <iostream>
+#include <eager_generator.hh>
 
-class EagerTPCCGenerator {
+using namespace tpcc;
+
+class EagerTPCCGenerator : public EagerGenerator {
 private:
-    TPCCUtil m_util;
+    TPCCUtil 		m_util;
+    uint32_t 		m_new_order_f;
+    uint32_t 		m_payment_f;
+    uint32_t 		m_stock_level_f;
+    uint32_t 		m_delivery_f;
+    uint32_t		m_order_status_f;
+    uint32_t 		m_fraction_sum;
+
+    void
+    DefaultSplit() {
+        m_new_order_f = 45;
+        m_payment_f = m_new_order_f + 43;
+        m_stock_level_f = m_payment_f + 5;
+        m_delivery_f = m_stock_level_f + 5;
+        m_order_status_f = m_delivery_f + 5;
+        m_fraction_sum = m_order_status_f;
+    }
     
 public:
     EagerTPCCGenerator() {
         std::cout << "Num items: " << s_num_items << "\n";
+        DefaultSplit();
+    }
+    
+    EagerTPCCGenerator(uint32_t new_order, uint32_t payment, 
+                       uint32_t stock_level, uint32_t delivery, 
+                       uint32_t order_status) {
+        std::cout << "Num items: " << s_num_items << "\n";
+        m_new_order_f = new_order;
+        m_payment_f = m_new_order_f + payment;
+        m_stock_level_f = m_payment_f + stock_level;
+        m_delivery_f = m_stock_level_f + delivery;
+        m_order_status_f = m_delivery_f + order_status;
+        m_fraction_sum = m_order_status_f;
     }
 
     EagerAction*
     genNext() {
-        int pct = m_util.gen_rand_range(1, 100);
-        if (pct <= 45) {
+        uint32_t pct = m_util.gen_rand_range(1, m_fraction_sum);
+        if (pct <= m_new_order_f) {
             return gen_new_order();
         }
-        else if (pct <= 88) {
+        else if (pct <= (m_new_order_f + m_payment_f)) {
             return gen_payment();
         }
-        else {
-            int swtch_rand = m_util.gen_rand_range(1, 3);
-            switch (swtch_rand) {
-            case 1:
-                return gen_stock_level();
-            case 2:
-                return gen_delivery();
-            case 3:
-                return gen_order_status();
-            }
+        else if (pct <= (m_new_order_f+m_payment_f+m_stock_level_f)) {
+            return gen_stock_level();
         }
-        assert(false);
+        else if (pct <= (m_new_order_f+m_payment_f+m_stock_level_f+
+                         m_delivery_f)) {
+            return gen_delivery();
+        }
+        else {
+            return gen_order_status();
+        }
     }
     
     NewOrderEager*
@@ -69,12 +99,12 @@ public:
 
         // 1% of NewOrder transactions should abort.
         if (rand() % 100 == 1) {
-            item_ids[num_items-1] = NewOrderTxn::invalid_item_key;
+            item_ids[num_items-1] = NewOrderEager::invalid_item_key;
         }
         
         for (uint32_t i = 0; i < num_items; ++i) {
             assert(item_ids[i] < s_num_items || 
-                   item_ids[i] == NewOrderTxn::invalid_item_key);
+                   item_ids[i] == NewOrderEager::invalid_item_key);
         }
         NewOrderEager *ret = new NewOrderEager(w_id, d_id, c_id, 
                                                 all_local, num_items, 
