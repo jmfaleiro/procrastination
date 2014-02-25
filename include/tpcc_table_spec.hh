@@ -78,13 +78,13 @@ GetStockTableInit(TableInit *scratch) {
 
 static void
 GetOpenOrderIndexTableInit(TableInit *scratch) {
-    scratch->m_table_type = NONE;
+    GetCustomerTableInit(scratch);
 }
 
 // Essentially the same as the customer table
 static void
 GetNextDeliveryTableInit(TableInit *scratch) {
-    GetCustomerTableInit(scratch);
+    GetDistrictTableInit(scratch);
 }
 
 #endif 		 // TPCC_TABLE_SPEC_HH_

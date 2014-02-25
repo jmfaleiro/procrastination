@@ -57,7 +57,7 @@ EagerExperiment::InitializeTPCCLockManager() {
             GetStockTableInit(&lock_mgr_params[i]);
             break;
         case OPEN_ORDER_INDEX:
-            GetEmptyTableInit(&lock_mgr_params[i]);
+            GetOpenOrderIndexTableInit(&lock_mgr_params[i]);
             break;
         case NEXT_DELIVERY:
             GetNextDeliveryTableInit(&lock_mgr_params[i]);
@@ -153,7 +153,7 @@ EagerExperiment::RunTPCC() {
                                            m_info->order_status);
     }
     else {
-        txn_generator = EagerTPCCGenerator(0, 0, 1, 0, 0);
+        txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 

@@ -182,7 +182,7 @@ public:
         DeliveryEager1 *level1 = new DeliveryEager1(warehouse_id, district_id, 10, 
                                                     level2);
         DeliveryEager0 *level0 = new DeliveryEager0(warehouse_id, district_id, 10, 
-                                                level1);
+                                                    level1, true);
         return level0;
     }
 
@@ -196,7 +196,7 @@ public:
                                                           customer_id, NULL, false);
         OrderStatusEager0 *level0 = new OrderStatusEager0(warehouse_id, district_id,
                                                       customer_id, NULL, false, 
-                                                      level1);        
+                                                          level1, true);        
         return level0;
     }
 };

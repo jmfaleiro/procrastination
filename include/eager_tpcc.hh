@@ -134,7 +134,8 @@ protected:
 
 public:
     OrderStatusEager0(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last,
-                      bool c_by_name, OrderStatusEager1 *level1_txn);
+                      bool c_by_name, OrderStatusEager1 *level1_txn, 
+                      bool do_init);
 
     virtual bool
     IsLinked(EagerAction **ret);
@@ -178,11 +179,10 @@ protected:
     uint32_t 			*m_num_order_lines;
     uint32_t 			*m_amounts;
     uint64_t 			*m_customer_keys;
-
     
 public: 
     DeliveryEager0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
-                   DeliveryEager1 *level1_txn);
+                   DeliveryEager1 *level1_txn, bool do_init);
     
     virtual bool
     IsLinked(EagerAction **ret);

@@ -33,7 +33,7 @@ namespace tpcc {
 
     // Secondary indices
     StringTable<Customer*>								*s_last_name_index;
-    HashTable<uint64_t, Oorder*>						*s_oorder_index;
+    HashTable<uint64_t, uint64_t>						*s_oorder_index;
     HashTable<uint64_t, uint32_t>						*s_next_delivery_tbl;
 
     LockManager *s_lock_manager;
@@ -234,7 +234,7 @@ namespace tpcc {
                     assert(inserted == inserted_verify && inserted != NULL);
                     keys[2] = oorder.o_c_id;
                     uint64_t customer_key = TPCCKeyGen::create_customer_key(keys);                
-                    s_oorder_index->Put(customer_key, inserted);
+                    s_oorder_index->Put(customer_key, oorder_key);
 
                     if (c >= s_first_unprocessed_o_id) {
                         new_order.no_w_id = w;
@@ -430,7 +430,7 @@ namespace tpcc {
         s_order_line_tbl = new ConcurrentHashTable<uint64_t, OrderLine>(1<<20, 20);
         s_last_name_index = new StringTable<Customer*>(1<<24, 20);
         s_history_tbl = new ConcurrentHashTable<uint64_t, History>(1<<20, 20);
-        s_oorder_index = new HashTable<uint64_t, Oorder*>(1<<24, 20);
+        s_oorder_index = new HashTable<uint64_t, uint64_t>(1<<24, 20);
 
         cout << "Num warehouses: " << m_num_warehouses << "\n";
         cout << "Num districts: " << m_dist_per_wh << "\n";

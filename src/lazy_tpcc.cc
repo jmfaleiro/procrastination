@@ -254,8 +254,8 @@ NewOrderTxn::LaterPhase() {
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = m_timestamp;
     Oorder *new_oorder = s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
-    Oorder **old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
-    *old_index = new_oorder;    
+    uint64_t *old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
+    *old_index = writeset[2*m_num_items+1].record.m_key;
 }
 
 
@@ -647,7 +647,8 @@ OrderStatusTxn0::LaterPhase() {
 
     assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
     uint64_t index = readset[0].record.m_key;
-    Oorder *oorder = s_oorder_index->Get(index);
+    uint64_t oorder_key = s_oorder_index->Get(index);
+    Oorder *oorder = s_oorder_tbl->GetPtr(oorder_key);
     keys[2] = oorder->o_id;
     for (uint32_t i = 0; i < oorder->o_ol_cnt; ++i) {
         keys[3] = i;
@@ -707,7 +708,8 @@ OrderStatusTxn::NowPhase() {
     keys[1] = m_district_id;    
     keys[2] = m_customer_id;
     uint64_t cust_key = TPCCKeyGen::create_customer_key(keys);
-    Oorder *open_order = s_oorder_index->Get(cust_key);
+    uint64_t open_order_key = s_oorder_index->Get(cust_key);
+    Oorder *open_order = s_oorder_tbl->GetPtr(open_order_key);
     keys[2] = open_order->o_id;
     for (uint32_t i = 0; i < open_order->o_ol_cnt; ++i) {
         keys[3] = i;

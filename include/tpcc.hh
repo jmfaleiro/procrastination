@@ -30,9 +30,6 @@ namespace tpcc {
         NEXT_DELIVERY = 10,		// 10
     };
 
-
-
-
     class TPCCKeyGen {
     private:
         static const uint32_t s_customer_shift = 		24;
@@ -267,7 +264,7 @@ namespace tpcc {
     extern HashTable<uint64_t, Customer> 				*s_customer_tbl;
     extern HashTable<uint64_t, Item> 					*s_item_tbl;
 
-    extern HashTable<uint64_t, Oorder*>					*s_oorder_index;
+    extern HashTable<uint64_t, uint64_t>					*s_oorder_index;
     extern HashTable<uint64_t, Stock> 					*s_stock_tbl;
     extern StringTable<Customer*>						*s_last_name_index;
     extern HashTable<uint64_t, uint32_t>				*s_next_delivery_tbl;

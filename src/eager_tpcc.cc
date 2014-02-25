@@ -217,9 +217,9 @@ NewOrderEager::Execute() {
     oorder.o_entry_d = timestamp;
     Oorder *new_oorder = 
         s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
-    Oorder **old_index = 
+    uint64_t *old_index = 
         s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
-    *old_index = new_oorder;    
+    *old_index = writeset[2*m_num_items+1].record.m_key;
 }
 
 PaymentEager::PaymentEager(uint32_t w_id, uint32_t c_w_id, float h_amount,
@@ -484,7 +484,8 @@ StockLevelEager2::PostExec() {
 OrderStatusEager0::OrderStatusEager0(uint32_t w_id, uint32_t d_id, 
                                      uint32_t c_id, char *c_last, 
                                      bool c_by_name, 
-                                     OrderStatusEager1 *level1_txn) {
+                                     OrderStatusEager1 *level1_txn, 
+                                     bool do_init) {
     assert(w_id < s_num_warehouses);
     assert(d_id < s_districts_per_wh);
     assert(c_id < s_customers_per_dist);
@@ -496,14 +497,16 @@ OrderStatusEager0::OrderStatusEager0(uint32_t w_id, uint32_t d_id,
     m_c_last = c_last;
     m_level1_txn = level1_txn;
 
-    struct EagerRecordInfo info;
-    info.record.m_table = OPEN_ORDER_INDEX;
-    uint32_t keys[3];
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-    keys[2] = m_customer_id;
-    info.record.m_key = TPCCKeyGen::create_customer_key(keys);
-    readset.push_back(info);
+    if (do_init) {
+        struct EagerRecordInfo info;
+        info.record.m_table = OPEN_ORDER_INDEX;
+        uint32_t keys[3];
+        keys[0] = m_warehouse_id;
+        keys[1] = m_district_id;
+        keys[2] = m_customer_id;
+        info.record.m_key = TPCCKeyGen::create_customer_key(keys);
+        readset.push_back(info);
+    }
 }
 
 bool
@@ -515,8 +518,7 @@ OrderStatusEager0::IsLinked(EagerAction **ret) {
 void
 OrderStatusEager0::Execute() {
     assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
-    //    m_open_order_key = s_oorder_index->Get(readset[0].record.m_key);
-    m_open_order_key = 0;
+    m_open_order_key = s_oorder_index->Get(readset[0].record.m_key);
 }
 
 void
@@ -524,13 +526,14 @@ OrderStatusEager0::PostExec() {
     struct EagerRecordInfo info;
     info.record.m_table = OPEN_ORDER;
     info.record.m_key = m_open_order_key;
+    m_level1_txn->readset.push_back(info);
 }
 
 
 OrderStatusEager1::OrderStatusEager1(uint32_t w_id, uint32_t d_id, 
                                      uint32_t c_id, char *c_last, 
                                      bool c_by_name)
-    : OrderStatusEager0(w_id, d_id, c_id, c_last, c_by_name, this) {
+    : OrderStatusEager0(w_id, d_id, c_id, c_last, c_by_name, this, false) {
 
 }
 
@@ -563,7 +566,7 @@ OrderStatusEager1::PostExec() {
 
 DeliveryEager0::DeliveryEager0(uint32_t w_id, uint32_t d_id, 
                                uint32_t carrier_id, 
-                               DeliveryEager1 *level1_txn) {
+                               DeliveryEager1 *level1_txn, bool do_init) {
     assert(w_id < s_num_warehouses);
     assert(d_id < s_districts_per_wh);
 
@@ -575,25 +578,29 @@ DeliveryEager0::DeliveryEager0(uint32_t w_id, uint32_t d_id,
     m_amounts = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
     m_open_order_ids = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
     m_num_order_lines = (uint32_t*)malloc(sizeof(uint32_t)*s_districts_per_wh);
+    m_customer_keys = (uint64_t*)malloc(sizeof(uint64_t)*s_districts_per_wh);
 
     memset(m_num_order_lines, 0, sizeof(uint32_t)*s_districts_per_wh);
     memset(m_open_order_ids, 0, sizeof(uint32_t)*s_districts_per_wh);
     memset(m_amounts, 0, sizeof(uint32_t)*s_districts_per_wh);
+    memset(m_customer_keys, 0, sizeof(uint64_t)*s_districts_per_wh);
 
-    struct EagerRecordInfo info;
-    uint32_t keys[2];
-    keys[0] = m_warehouse_id;
-    for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
-        keys[1] = i;
-        info.record.m_table = DISTRICT;
-        info.record.m_key = TPCCKeyGen::create_district_key(keys);
-        readset.push_back(info);
+    if (do_init) {
+        struct EagerRecordInfo info;
+        uint32_t keys[2];
+        keys[0] = m_warehouse_id;
+        for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
+            keys[1] = i;
+            info.record.m_table = DISTRICT;
+            info.record.m_key = TPCCKeyGen::create_district_key(keys);
+            readset.push_back(info);
         
-        info.record.m_table = NEXT_DELIVERY;
-        writeset.push_back(info);
+            info.record.m_table = NEXT_DELIVERY;
+            writeset.push_back(info);
+        }
     }
-    
     assert(readset.size() == writeset.size());    
+    
 }
 
 bool
@@ -630,18 +637,18 @@ DeliveryEager0::PostExec() {
 
     for (uint32_t i = 0; i < s_districts_per_wh; ++i) {
         if (m_open_order_ids[i] > 0) {
-            keys[2] = i;            
+            keys[2] = m_open_order_ids[i];
             info.record.m_key = TPCCKeyGen::create_order_key(keys);
             m_level1_txn->writeset.push_back(info);
-            m_level1_txn->m_amounts[i] = 0;
         }
     }
 }
 
 DeliveryEager1::DeliveryEager1(uint32_t w_id, uint32_t d_id, 
                                uint32_t carrier_id, 
-                               DeliveryEager2 *level1_txn) 
-    : DeliveryEager0(w_id, d_id, carrier_id, this) {
+                               DeliveryEager2 *level2_txn) 
+    : DeliveryEager0(w_id, d_id, carrier_id, this, false) {
+    m_level2_txn = level2_txn;
 }
 
 void
@@ -714,4 +721,3 @@ DeliveryEager2::Execute() {
 
 void
 DeliveryEager2::PostExec() { }
-
