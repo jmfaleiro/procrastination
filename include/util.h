@@ -37,9 +37,12 @@ xchgq(volatile uint64_t *addr, uint64_t new_val)
 // Spin lock implementation. XXX: Is test-n-test-n-set better?
 static inline void
 lock(volatile uint64_t *word) {
-  while (xchgq(word, 1) == 1) {
-    do_pause();
-  }
+    while (true) {
+        if ((*word == 0) && (xchgq(word, 1) == 0)) {
+            break;
+        }
+        do_pause();
+    }
 }
 
 static inline void
