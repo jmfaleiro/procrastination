@@ -71,11 +71,15 @@ public:
     
     NewOrderEager*
     gen_new_order() {
-        uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);         
-        uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);        
-        uint64_t c_id = (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1);
+        uint64_t w_id = 0;
+        //        uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1); XXX: remove me
+        uint64_t d_id = 0;
+        // uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1); XXX: remove me
+        uint64_t c_id = 0;
+        // uint64_t c_id = (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1); XXX: remove me
         
-        uint32_t num_items = m_util.gen_rand_range(5, 15);
+        uint32_t num_items = 10;
+        //        uint32_t num_items = m_util.gen_rand_range(5, 15); XXX: remove me
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
         assert(item_ids != NULL);
         uint64_t *supplier_wh_ids = 
@@ -88,7 +92,8 @@ public:
 		for (uint32_t i = 0; i < num_items; i++) {
             uint64_t cur_item;
             do {
-                cur_item = (uint64_t)m_util.gen_rand_range(0, s_num_items-1);                
+                //      cur_item = (uint64_t)m_util.gen_rand_range(0, s_num_items-1); XXX: remove me
+                cur_item = i;
             }
             while (seen_items.find(cur_item) != seen_items.end());            
             seen_items.insert(cur_item);
@@ -124,13 +129,14 @@ public:
                                                 item_ids, 
                                                 supplier_wh_ids, 
                                                 quantities);
+        /*
         assert(ret->readset[NewOrderEager::s_warehouse_index].record.m_table 
                == WAREHOUSE);
         assert(ret->readset[NewOrderEager::s_customer_index].record.m_table 
                == CUSTOMER);        
         assert(ret->writeset[NewOrderEager::s_district_index].record.m_table 
                == DISTRICT);
-
+        */
         return ret;
     }
     

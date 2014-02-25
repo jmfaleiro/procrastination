@@ -19,7 +19,9 @@ private:
     pthread_t 			m_worker_thread;		// Worker thread
     EagerAction 		*m_queue_head;			// Head of queue of waiting txns
     EagerAction			*m_queue_tail;			// Tail of queue of waiting txns
-
+    int					m_num_elems;			// Number of elements in the queue
+    uint32_t 			m_num_done;
+    
     // The worker threads starts executing in this function
     static void*
     BootstrapWorker(void *arg);
@@ -34,14 +36,17 @@ private:
     void
     RemoveQueue(EagerAction *txn);
 
-    bool
-    CheckReady(EagerAction **to_proc);
+    void
+    CheckReady();
 
     void
     TryExec(EagerAction *txn);
 
     void
     DoExec(EagerAction *txn);
+    
+    uint32_t
+    QueueCount(EagerAction *txn);
 
 public:
     EagerWorker(LockManager *mgr, SimpleQueue *input_queue, 

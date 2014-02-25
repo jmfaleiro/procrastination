@@ -20,12 +20,10 @@ LockManager::CheckWrite(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
 
 bool
 LockManager::CheckRead(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
-    for (struct EagerRecordInfo *iter = queue->head; 
-         iter != dep; iter = iter->next) {
-        if (iter->is_write) {
-            //            assert(false);	// XXX: REMOVE ME
-            return false;
-        }
+    struct EagerRecordInfo *prev = dep->prev;
+    if (dep->prev != NULL && (dep->prev->is_write || 
+                              !dep->prev->is_held)) {
+        return false;
     }
     return true;
 }
@@ -261,7 +259,8 @@ LockManager::Unlock(EagerAction *txn) {
 
         struct EagerRecordInfo *dep = &txn->writeset[i];
 
-        lock(&value->lock_word);
+        //        lock(&value->lock_word);
+        pthread_mutex_lock(&value->mutex);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -271,8 +270,8 @@ LockManager::Unlock(EagerAction *txn) {
         AdjustWrite(dep);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
-
-        unlock(&value->lock_word);
+        pthread_mutex_unlock(&value->mutex);
+        //        unlock(&value->lock_word);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
         Table<uint64_t, TxnQueue> *tbl = 
@@ -281,7 +280,8 @@ LockManager::Unlock(EagerAction *txn) {
         assert(value != NULL);
 
         struct EagerRecordInfo *dep = &txn->readset[i];
-        lock(&value->lock_word);
+        pthread_mutex_lock(&value->mutex);
+        //        lock(&value->lock_word);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -290,10 +290,20 @@ LockManager::Unlock(EagerAction *txn) {
         AdjustRead(dep);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
-
-        unlock(&value->lock_word);
+        pthread_mutex_unlock(&value->mutex);
+        //        unlock(&value->lock_word);
     }
     txn->finished_execution = true;
+}
+
+void
+LockManager::FinishAcquisitions(EagerAction *txn) {
+    for (size_t i = 0; i < txn->writeset.size(); ++i) {
+        pthread_mutex_unlock(txn->writeset[i].latch);
+    }
+    for (size_t i = 0; i < txn->readset.size(); ++i) {
+        pthread_mutex_unlock(txn->readset[i].latch);
+    }
 }
 
 bool
@@ -312,10 +322,12 @@ LockManager::Lock(EagerAction *txn) {
         TxnQueue *value = 
             tbl->GetPtr(txn->writeset[i].record.m_key);
         assert(value != NULL);
+        txn->writeset[i].latch = &value->mutex;
 
         // Atomically add the transaction to the lock queue and check whether 
         // it managed to successfully acquire the lock
-        lock(&value->lock_word);
+        pthread_mutex_lock(&value->mutex);
+        //        lock(&value->lock_word);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -328,9 +340,6 @@ LockManager::Lock(EagerAction *txn) {
         }
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
-
-        // Unlatch the value
-        unlock(&value->lock_word);
     }
       
     for (size_t i = 0; i < txn->readset.size(); ++i) {
@@ -343,10 +352,12 @@ LockManager::Lock(EagerAction *txn) {
             m_tables[txn->readset[i].record.m_table];
         TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
         assert(value != NULL);
-          
+        txn->readset[i].latch = &value->mutex;
+
         // Atomically add the transaction to the lock queue and check whether 
         // it managed to successfully acquire the lock
-        lock(&value->lock_word);
+        pthread_mutex_lock(&value->mutex);
+        //        lock(&value->lock_word);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -356,9 +367,7 @@ LockManager::Lock(EagerAction *txn) {
         }        
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
-
-        unlock(&value->lock_word);
     }
-      
+    FinishAcquisitions(txn);
     return (txn->num_dependencies == 0);
 }

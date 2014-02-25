@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "machine.h"
 #include "util.h"
+#include <pthread.h>
 
 class Action;
 
@@ -57,6 +58,7 @@ struct EagerRecordInfo {
     EagerAction						*dependency;
     bool 							is_write;
     bool 							is_held;
+    pthread_mutex_t					*latch;
     struct EagerRecordInfo 			*next;
     struct EagerRecordInfo			*prev;
     
@@ -196,7 +198,7 @@ class EagerAction {
     virtual void Execute() { };
     virtual void PostExec() { };
 
-    EagerAction 	*next;
+    EagerAction 			*next;
     EagerAction 	*prev;
     bool 			finished_execution;
 };

@@ -12,6 +12,8 @@ EagerWorker::EagerWorker(LockManager *mgr, SimpleQueue *input_queue,
     m_start_signal = 0;
     m_queue_head = NULL;
     m_queue_tail = NULL;    
+    m_num_elems = 0;
+    m_num_done = 0;
 }
 
 void
@@ -59,6 +61,7 @@ EagerWorker::Enqueue(EagerAction *txn) {
         txn->prev = m_queue_tail;
         m_queue_tail = txn;
     }
+    m_num_elems += 1;
     assert((m_queue_head == NULL && m_queue_tail == NULL) ||
            (m_queue_head != NULL && m_queue_tail != NULL));
 }
@@ -83,20 +86,31 @@ EagerWorker::RemoveQueue(EagerAction *txn) {
     else {
         next->prev = prev;
     }
+    
+    m_num_elems -= 1;
+    assert(m_num_elems >= 0);
     assert((m_queue_head == NULL && m_queue_tail == NULL) ||
            (m_queue_head != NULL && m_queue_tail != NULL));
 }
 
-bool
-EagerWorker::CheckReady(EagerAction **to_proc) {
+uint32_t
+EagerWorker::QueueCount(EagerAction *iter) {
+    if (iter == NULL) {
+        return 0;
+    }
+    else {
+        return 1+QueueCount(iter->next);
+    }
+}
+
+void
+EagerWorker::CheckReady() {
     for (EagerAction *iter = m_queue_head; iter != NULL; iter = iter->next) {
         if (iter->num_dependencies == 0) {
             RemoveQueue(iter);
-            *to_proc = iter;
-            return true;
+            DoExec(iter);
         }
     }
-    return false;
 }
 
 void
@@ -120,7 +134,7 @@ EagerWorker::TryExec(EagerAction *txn) {
         }
     }    
     else {
-        assert(false);	// XXX: REMOVE ME
+        //        assert(false);	// XXX: REMOVE ME
         Enqueue(txn);
     }
 }
@@ -131,7 +145,7 @@ EagerWorker::DoExec(EagerAction *txn) {
     txn->Execute();
     m_lock_mgr->Unlock(txn);
     txn->PostExec();
-    
+
     EagerAction *link;
     if (txn->IsLinked(&link)) {
         TryExec(link);
@@ -145,14 +159,11 @@ void
 EagerWorker::WorkerFunction() {
     EagerAction *txn;
     uint32_t i = 0;
+    
     while (true) {        
-        while (CheckReady(&txn)) {
-            assert(false); 	// XXX: REMOVE ME
-            DoExec(txn);
-        }
-        if (m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
+        CheckReady();
+        if (m_num_elems < 1000 && m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
             TryExec(txn);
-            assert(txn->finished_execution && txn->num_dependencies == 0);
         }
     }
 }

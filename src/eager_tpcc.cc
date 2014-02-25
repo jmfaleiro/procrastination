@@ -46,7 +46,7 @@ NewOrderEager::NewOrderEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     for (size_t i = 0; i < num_items; ++i) {
         keys[1] = item_ids[i];
         info.record.m_key = TPCCKeyGen::create_stock_key(keys);
-        writeset.push_back(info);
+        writeset.push_back(info); 
     }
 
     // Make sure that all txns request locks in the same sorted order to avoid 
@@ -71,7 +71,7 @@ NewOrderEager::PostExec() {}
 
 void
 NewOrderEager::Execute() {
-    uint32_t keys[4];
+    uint32_t keys[4];    
     
     // A NewOrder txn aborts if any of the item keys are invalid. 
     for (uint32_t i = 0; i < m_num_items; ++i) {
@@ -80,8 +80,8 @@ NewOrderEager::Execute() {
         if (m_item_ids[i] == invalid_item_key) {
             return;
         }
-    }
-    
+    }    
+
     // Update the district record
     assert(writeset[s_district_index].record.m_table == DISTRICT);
     uint64_t d_key = writeset[s_district_index].record.m_key;
@@ -89,7 +89,7 @@ NewOrderEager::Execute() {
     uint32_t order_id = district->d_next_o_id;
     float district_tax = district->d_tax;
     district->d_next_o_id += 1;
-    
+        
     float warehouse_tax = s_warehouse_tbl->GetPtr(m_warehouse_id)->w_tax;
     
     // XXX: Hope this does not serialize in the OS!
@@ -225,6 +225,7 @@ NewOrderEager::Execute() {
     uint64_t *old_index = 
         s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
     *old_index = writeset[2*m_num_items+1].record.m_key;
+    
 }
 
 PaymentEager::PaymentEager(uint32_t w_id, uint32_t c_w_id, float h_amount,

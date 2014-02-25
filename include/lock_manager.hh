@@ -5,6 +5,7 @@
 #include <tpcc.hh>
 #include <deque>
 #include <concurrency_control_params.hh>
+#include <pthread.h>
 
 using namespace std;
 
@@ -12,11 +13,14 @@ struct TxnQueue {
     struct EagerRecordInfo												*head;
     struct EagerRecordInfo												*tail;
     volatile uint64_t __attribute((aligned(CACHE_LINE))) 				lock_word;
-    
+    pthread_mutex_t														mutex;
+
+
     TxnQueue() {
         head = NULL;
         tail = NULL;
         lock_word = 0;
+        mutex = PTHREAD_MUTEX_INITIALIZER;
     }
 };
 
@@ -47,6 +51,9 @@ private:
 
     bool
     QueueContains(TxnQueue *queue, EagerAction *txn);
+
+    void
+    FinishAcquisitions(EagerAction *txn);
 
 public:
     LockManager(cc_params::TableInit *params, int num_params);
