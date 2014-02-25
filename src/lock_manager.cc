@@ -14,6 +14,7 @@ bool
 LockManager::CheckWrite(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
     bool ret = (queue->head == dep);
     assert(!ret || (dep->prev == NULL));
+    //    assert(ret);	// XXX: REMOVE ME
     return ret;
 }
 
@@ -22,9 +23,57 @@ LockManager::CheckRead(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
     for (struct EagerRecordInfo *iter = queue->head; 
          iter != dep; iter = iter->next) {
         if (iter->is_write) {
+            //            assert(false);	// XXX: REMOVE ME
             return false;
         }
-    }    
+    }
+    return true;
+}
+
+// Checks if the given queue contains the lock
+bool
+LockManager::QueueContains(TxnQueue *queue, EagerAction *txn) {
+    struct EagerRecordInfo *iter = queue->head;
+    while (iter != NULL) {
+        if (txn == iter->dependency) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Check if the transaction still holds a lock. Used for debugging purposes
+bool
+LockManager::CheckLocks(EagerAction *txn) {
+    for (size_t i = 0; i < txn->writeset.size(); ++i) {
+        Table<uint64_t, TxnQueue> *tbl = 
+            m_tables[txn->writeset[i].record.m_table];
+        TxnQueue *value = tbl->GetPtr(txn->writeset[i].record.m_key);
+        assert(value != NULL);
+
+        struct EagerRecordInfo *dep = &txn->writeset[i];
+        lock(&value->lock_word);
+        bool check = QueueContains(value, txn);
+        unlock(&value->lock_word);        
+        if (check) {
+            return true;
+        }
+    }
+    for (size_t i = 0; i < txn->readset.size(); ++i) {
+        Table<uint64_t, TxnQueue> *tbl = 
+            m_tables[txn->writeset[i].record.m_table];
+        TxnQueue *value = tbl->GetPtr(txn->writeset[i].record.m_key);
+        assert(value != NULL);
+
+        struct EagerRecordInfo *dep = &txn->writeset[i];
+        lock(&value->lock_word);
+        bool check = QueueContains(value, txn);
+        unlock(&value->lock_word);        
+        if (check) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void
@@ -33,6 +82,7 @@ LockManager::AddTxn(struct TxnQueue *queue, struct EagerRecordInfo *dep) {
     dep->prev = NULL;
 
     if (queue->tail != NULL) {
+        //        assert(false);	// XXX: REMOVE ME
         assert(queue->head != NULL);
         dep->prev = queue->tail;
         queue->tail->next = dep;
@@ -63,6 +113,7 @@ LockManager::RemoveTxn(struct TxnQueue *queue,
         queue->head = next;
     }
     else {
+        //        assert(false); // XXX: REMOVE ME
         assert(prev->next == dep);
         prev->next = next;
     }
@@ -72,11 +123,13 @@ LockManager::RemoveTxn(struct TxnQueue *queue,
         queue->tail = prev;
     }
     else {
+        //        assert(false); // XXX: REMOVE ME
         assert(next->prev == dep);
         next->prev = prev;
     }
     *prev_txn = prev;
     *next_txn = next;
+    //    assert(queue->tail == NULL && queue->head == NULL); // XXX: REMOVE ME
 }
 
 void
@@ -240,11 +293,13 @@ LockManager::Unlock(EagerAction *txn) {
 
         unlock(&value->lock_word);
     }
+    txn->finished_execution = true;
 }
 
 bool
 LockManager::Lock(EagerAction *txn) {
     txn->num_dependencies = 0;
+    txn->finished_execution = false;
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         txn->writeset[i].dependency = txn;
         txn->writeset[i].is_write = true;

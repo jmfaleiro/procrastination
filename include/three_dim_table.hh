@@ -45,6 +45,9 @@ public:
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
         uint32_t index3 = m_access3(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
+        assert(index3 < m_dim3);
         m_table[index1][index2][index3] = value;
         return &m_table[index1][index2][index3];
     }
@@ -54,6 +57,9 @@ public:
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
         uint32_t index3 = m_access3(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
+        assert(index3 < m_dim3);
         return m_table[index1][index2][index3];
     }
 
@@ -62,6 +68,9 @@ public:
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
         uint32_t index3 = m_access3(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
+        assert(index3 < m_dim3);
         return &m_table[index1][index2][index3];
     }
   

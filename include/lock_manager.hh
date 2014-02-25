@@ -45,6 +45,9 @@ private:
     void
     AdjustWrite(struct EagerRecordInfo *dep);
 
+    bool
+    QueueContains(TxnQueue *queue, EagerAction *txn);
+
 public:
     LockManager(cc_params::TableInit *params, int num_params);
     
@@ -57,6 +60,9 @@ public:
     
     virtual void
     Kill(EagerAction *txn);
+
+    bool
+    CheckLocks(EagerAction *txn);
 };
 
 #endif // LOCK_MANAGER_HH_

@@ -36,6 +36,8 @@ public:
     Put(uint64_t key, V value) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
         m_table[index1][index2] = value;
         return &m_table[index1][index2];
     }
@@ -44,6 +46,8 @@ public:
     Get(uint64_t key) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
         return m_table[index1][index2];
     }
 
@@ -51,6 +55,8 @@ public:
     GetPtr(uint64_t key) {
         uint32_t index1 = m_access1(key);
         uint32_t index2 = m_access2(key);
+        assert(index1 < m_dim1);
+        assert(index2 < m_dim2);
         return &m_table[index1][index2];
     }
   

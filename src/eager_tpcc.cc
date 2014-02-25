@@ -56,6 +56,11 @@ NewOrderEager::NewOrderEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
 }
 
 bool
+NewOrderEager::IsRoot() {
+    return true;
+}
+
+bool
 NewOrderEager::IsLinked(EagerAction **ret) {
     *ret = NULL;
     return false;
@@ -275,6 +280,11 @@ PaymentEager::PaymentEager(uint32_t w_id, uint32_t c_w_id, float h_amount,
 }
 
 bool
+PaymentEager::IsRoot() {
+    return true;
+}
+
+bool
 PaymentEager::IsLinked(EagerAction **ret) {
     *ret = NULL;
     return false;
@@ -366,6 +376,11 @@ StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id,
         info.record.m_key = TPCCKeyGen::create_district_key(keys);
         readset.push_back(info);        
     }
+}
+
+bool
+StockLevelEager0::IsRoot() {
+    return true;
 }
 
 bool
@@ -510,6 +525,11 @@ OrderStatusEager0::OrderStatusEager0(uint32_t w_id, uint32_t d_id,
 }
 
 bool
+OrderStatusEager0::IsRoot() {
+    return true;
+}
+
+bool
 OrderStatusEager0::IsLinked(EagerAction **ret) {
     *ret = m_level1_txn;
     return true;
@@ -601,6 +621,11 @@ DeliveryEager0::DeliveryEager0(uint32_t w_id, uint32_t d_id,
     }
     assert(readset.size() == writeset.size());    
     
+}
+
+bool
+DeliveryEager0::IsRoot() {
+    return true;
 }
 
 bool

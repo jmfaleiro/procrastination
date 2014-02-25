@@ -101,23 +101,28 @@ EagerWorker::CheckReady(EagerAction **to_proc) {
 
 void
 EagerWorker::TryExec(EagerAction *txn) {
-    //    if (m_lock_mgr->Lock(txn)) {
-    //        assert(txn->num_dependencies == 0);
+    if (m_lock_mgr->Lock(txn)) {
+        assert(txn->num_dependencies == 0);
+        //        assert(m_lock_mgr->CheckLocks(txn));	// XXX: REMOVE ME
         txn->Execute();
-        //        m_lock_mgr->Unlock(txn);
+        m_lock_mgr->Unlock(txn);
+
+        assert(txn->finished_execution);
+        //        assert(!m_lock_mgr->CheckLocks(txn));	// XXX: REMOVE ME
         txn->PostExec();
 
         EagerAction *link;
         if (txn->IsLinked(&link)) {
             TryExec(link);
         }
-        //      m_output_queue->EnqueueBlocking((uint64_t)txn);
-        //    }
-/*
+        if (txn->IsRoot()) {
+            m_output_queue->EnqueueBlocking((uint64_t)txn);
+        }
+    }    
     else {
+        assert(false);	// XXX: REMOVE ME
         Enqueue(txn);
     }
-*/
 }
 
 void
@@ -131,7 +136,9 @@ EagerWorker::DoExec(EagerAction *txn) {
     if (txn->IsLinked(&link)) {
         TryExec(link);
     }
-    m_output_queue->EnqueueBlocking((uint64_t)txn);
+    if (txn->IsRoot()) {
+        m_output_queue->EnqueueBlocking((uint64_t)txn);
+    }
 }
 
 void
@@ -139,18 +146,13 @@ EagerWorker::WorkerFunction() {
     EagerAction *txn;
     uint32_t i = 0;
     while (true) {        
-        txn = (EagerAction*)m_txn_input_queue->DequeueBlocking();
-        TryExec(txn);
-        //        txn->Execute();
-        m_output_queue->EnqueueBlocking((uint64_t)txn);
-
-        /*
         while (CheckReady(&txn)) {
+            assert(false); 	// XXX: REMOVE ME
             DoExec(txn);
         }
         if (m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
             TryExec(txn);
+            assert(txn->finished_execution && txn->num_dependencies == 0);
         }
-        */
     }
 }

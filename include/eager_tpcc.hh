@@ -8,8 +8,6 @@ using namespace tpcc;
 
 class NewOrderEager : public EagerAction {
 private:
-
-
     uint64_t 			m_warehouse_id;
     uint64_t			m_district_id;
     uint64_t 			m_customer_id;
@@ -32,6 +30,9 @@ public:
 
     virtual void
     PostExec();
+
+    virtual bool
+    IsRoot();
 
     // Read set indices
     static const uint32_t 			s_customer_index 	= 1;
@@ -73,6 +74,9 @@ public:
     
     virtual void
     PostExec();
+
+    virtual bool
+    IsRoot();
 };
 
 class StockLevelEager1;
@@ -94,6 +98,7 @@ public:
     virtual bool IsLinked(EagerAction **ret);
     virtual void Execute();
     virtual void PostExec();
+    virtual bool IsRoot();
 };
 
 class StockLevelEager2;
@@ -145,6 +150,9 @@ public:
     
     virtual void
     PostExec();
+
+    virtual bool
+    IsRoot();
 };
 
 class OrderStatusEager1 : public OrderStatusEager0 {
@@ -192,6 +200,9 @@ public:
     
     virtual void
     PostExec();    
+    
+    virtual bool
+    IsRoot();
 };
 
 class DeliveryEager2;

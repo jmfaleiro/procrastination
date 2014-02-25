@@ -60,6 +60,16 @@ struct EagerRecordInfo {
     struct EagerRecordInfo 			*next;
     struct EagerRecordInfo			*prev;
     
+    EagerRecordInfo() {
+        record.m_table = 0;
+        record.m_key = 0;
+        dependency = NULL;
+        is_write = false;
+        is_held = false;
+        next = NULL;
+        prev = NULL;
+    }
+
     bool operator<(const struct EagerRecordInfo &other) const {
         return (this->record < other.record);
     }
@@ -181,12 +191,14 @@ class EagerAction {
     std::vector<struct EagerRecordInfo> writeset;
     std::vector<struct EagerRecordInfo> readset;
 
+    virtual bool IsRoot() { return false; }
     virtual bool IsLinked(EagerAction **ret) { *ret = NULL; return false; };
     virtual void Execute() { };
     virtual void PostExec() { };
 
     EagerAction 	*next;
     EagerAction 	*prev;
+    bool 			finished_execution;
 };
 
 

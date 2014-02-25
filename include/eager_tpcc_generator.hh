@@ -5,6 +5,7 @@
 #include <eager_tpcc.hh>
 #include <iostream>
 #include <eager_generator.hh>
+#include <set>
 
 using namespace tpcc;
 
@@ -48,6 +49,7 @@ public:
 
     EagerAction*
     genNext() {
+        return gen_new_order();
         uint32_t pct = m_util.gen_rand_range(1, m_fraction_sum);
         if (pct <= m_new_order_f) {
             return gen_new_order();
@@ -69,11 +71,11 @@ public:
     
     NewOrderEager*
     gen_new_order() {
-        uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);
-        uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);
+        uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1);         
+        uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);        
         uint64_t c_id = (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1);
         
-        uint32_t num_items = 5 + rand() % 11;
+        uint32_t num_items = m_util.gen_rand_range(5, 15);
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
         assert(item_ids != NULL);
         uint64_t *supplier_wh_ids = 
@@ -82,10 +84,19 @@ public:
         uint32_t *quantities = (uint32_t*)malloc(sizeof(uint32_t)*num_items);
         int all_local = 1;
 
+        std::set<uint64_t> seen_items;
 		for (uint32_t i = 0; i < num_items; i++) {
-            item_ids[i] = (uint64_t)m_util.gen_rand_range(0, s_num_items-1);
+            uint64_t cur_item;
+            do {
+                cur_item = (uint64_t)m_util.gen_rand_range(0, s_num_items-1);                
+            }
+            while (seen_items.find(cur_item) != seen_items.end());            
+            seen_items.insert(cur_item);
+
+            item_ids[i] = cur_item;
             assert(item_ids[i] < s_num_items);
             int pct = m_util.gen_rand_range(0, 99);
+
             if (pct > 1) {
                 supplier_wh_ids[i] = w_id;
             }
@@ -98,10 +109,12 @@ public:
 		}
 
         // 1% of NewOrder transactions should abort.
+        /*
         if (rand() % 100 == 1) {
             item_ids[num_items-1] = NewOrderEager::invalid_item_key;
         }
-        
+        */
+
         for (uint32_t i = 0; i < num_items; ++i) {
             assert(item_ids[i] < s_num_items || 
                    item_ids[i] == NewOrderEager::invalid_item_key);
