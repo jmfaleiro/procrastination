@@ -298,17 +298,20 @@ void
 PaymentEager::Execute() {
 
     // Update the warehouse
-    Warehouse *warehouse = s_warehouse_tbl->GetPtr(m_w_id);
+    assert(writeset[s_warehouse_index].record.m_table == WAREHOUSE);
+    Warehouse *warehouse = s_warehouse_tbl->GetPtr(writeset[s_warehouse_index].record.m_key);
     warehouse->w_ytd += m_h_amount;
 
     // Update the district
-    District *district = s_district_tbl->GetPtr(m_d_id);
+    assert(writeset[s_district_index].record.m_table == DISTRICT);
+    District *district = s_district_tbl->GetPtr(writeset[s_district_index].record.m_key);
     district->d_ytd += m_h_amount;
 
     char *warehouse_name = warehouse->w_name;
     char *district_name = district->d_name;
 
     // Update the customer
+    assert(writeset[s_customer_index].record.m_table == CUSTOMER);
     Customer *cust = 
         s_customer_tbl->GetPtr(writeset[s_customer_index].record.m_key);
     uint32_t customer_id = cust->c_id;

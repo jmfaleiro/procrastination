@@ -13,11 +13,13 @@ struct TxnQueue {
     struct EagerRecordInfo												*head;
     struct EagerRecordInfo												*tail;
     volatile uint64_t __attribute((aligned(CACHE_LINE))) 				lock_word;
+    //    pthread_mutex_t														mutex;
 
     TxnQueue() {
         head = NULL;
         tail = NULL;
         lock_word = 0;
+        //        mutex = PTHREAD_MUTEX_INITIALIZER;
     }
 };
 
@@ -51,6 +53,9 @@ private:
 
     void
     FinishAcquisitions(EagerAction *txn);
+
+    void
+    LockRecord(EagerAction *txn, struct EagerRecordInfo *dep);
 
 public:
     LockManager(cc_params::TableInit *params, int num_params);

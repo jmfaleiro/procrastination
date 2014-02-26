@@ -260,6 +260,7 @@ LockManager::Unlock(EagerAction *txn) {
         struct EagerRecordInfo *dep = &txn->writeset[i];
 
         lock(&value->lock_word);
+        // pthread_mutex_lock(&value->mutex);
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -270,6 +271,7 @@ LockManager::Unlock(EagerAction *txn) {
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
         unlock(&value->lock_word);
+        // pthread_mutex_unlock(&value->mutex);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
         Table<uint64_t, TxnQueue> *tbl = 
@@ -279,6 +281,8 @@ LockManager::Unlock(EagerAction *txn) {
 
         struct EagerRecordInfo *dep = &txn->readset[i];
         lock(&value->lock_word);
+        // pthread_mutex_lock(&value->mutex);
+
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
 
@@ -288,6 +292,7 @@ LockManager::Unlock(EagerAction *txn) {
         assert((value->head == NULL && value->tail == NULL) ||
                (value->head != NULL && value->tail != NULL));
         unlock(&value->lock_word);
+        // pthread_mutex_unlock(&value->mutex);
     }
     txn->finished_execution = true;
 }
@@ -296,72 +301,122 @@ void
 LockManager::FinishAcquisitions(EagerAction *txn) {
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
         unlock(txn->writeset[i].latch);
+        //        pthread_mutex_unlock(txn->writeset[i].latch);
     }
     for (size_t i = 0; i < txn->readset.size(); ++i) {
         unlock(txn->readset[i].latch);
+        // pthread_mutex_unlock(txn->readset[i].latch);
     }
 }
+
+void
+LockManager::LockRecord(EagerAction *txn, struct EagerRecordInfo *dep) {
+    dep->dependency = txn;
+    dep->next = NULL;
+    dep->prev = NULL;
+    dep->is_held = false;
+
+    Table<uint64_t, TxnQueue> *tbl = m_tables[dep->record.m_table];
+    TxnQueue *value =  tbl->GetPtr(dep->record.m_key);
+    assert(value != NULL);
+    // dep->latch = &value->mutex;
+    dep->latch = &value->lock_word;
+
+    // Atomically add the transaction to the lock queue and check whether 
+    // it managed to successfully acquire the lock
+    lock(&value->lock_word);
+    //    pthread_mutex_lock(&value->mutex);
+    assert((value->head == NULL && value->tail == NULL) ||
+           (value->head != NULL && value->tail != NULL));
+
+    AddTxn(value, dep);
+
+    if (dep->is_write) {
+        if ((dep->is_held = CheckWrite(value, dep)) == false) {
+            fetch_and_increment(&txn->num_dependencies);
+        }
+        else {
+            assert(dep->prev == NULL);
+        }
+    }
+    else {
+        if ((dep->is_held = CheckRead(value, dep)) == false) {
+            fetch_and_increment(&txn->num_dependencies);
+        }
+    }
+    assert((value->head == NULL && value->tail == NULL) ||
+           (value->head != NULL && value->tail != NULL));    
+}
+
+/*
+void
+LockManager::AcquireRead(EagerAction *txn, struct EagerRecordInfo *dep) {
+    dep->dependency = txn;
+    dep->is_write = false;
+    dep->is_held = false;
+
+    // We *must* find the key-value pair
+    Table<uint64_t, TxnQueue> *tbl = m_tables[dep->record.m_table];
+    TxnQueue *value = tbl->GetPtr(dep->record.m_key);
+    assert(value != NULL);
+    dep->latch = &value->mutex;
+
+    // Atomically add the transaction to the lock queue and check whether 
+    // it managed to successfully acquire the lock
+    //        lock(&value->lock_word);
+    pthread_mutex_lock(&value->mutex);
+    assert((value->head == NULL && value->tail == NULL) ||
+           (value->head != NULL && value->tail != NULL));
+
+    AddTxn(value, dep);
+    if ((dep->is_held = CheckRead(value, dep)) == false) {
+        fetch_and_increment(&txn->num_dependencies);
+    }        
+    assert((value->head == NULL && value->tail == NULL) ||
+           (value->head != NULL && value->tail != NULL));    
+}
+*/
 
 bool
 LockManager::Lock(EagerAction *txn) {
     txn->num_dependencies = 0;
     txn->finished_execution = false;
-    for (size_t i = 0; i < txn->writeset.size(); ++i) {
-        txn->writeset[i].dependency = txn;
-        txn->writeset[i].is_write = true;
-        txn->writeset[i].next = NULL;
-        txn->writeset[i].prev = NULL;
-        txn->writeset[i].is_held = false;
-
-        Table<uint64_t, TxnQueue> *tbl = 
-            m_tables[txn->writeset[i].record.m_table];
-        TxnQueue *value = 
-            tbl->GetPtr(txn->writeset[i].record.m_key);
-        assert(value != NULL);
-        txn->writeset[i].latch = &value->lock_word;
-
-        // Atomically add the transaction to the lock queue and check whether 
-        // it managed to successfully acquire the lock
-        lock(&value->lock_word);
-        assert((value->head == NULL && value->tail == NULL) ||
-               (value->head != NULL && value->tail != NULL));
-
-        AddTxn(value, &txn->writeset[i]);          
-        if ((txn->writeset[i].is_held = CheckWrite(value, &txn->writeset[i])) == false) {
-            fetch_and_increment(&txn->num_dependencies);
+    size_t read_index = 0;
+    size_t write_index = 0;
+    
+    // Acquire locks in sorted order. Both read and write sets are sorted according to 
+    // key we need to merge them together.
+    while (read_index < txn->readset.size() && write_index < txn->writeset.size()) {
+        assert(txn->readset[read_index] != txn->writeset[write_index]);
+        if (txn->readset[read_index] < txn->writeset[write_index]) {
+            txn->readset[read_index].is_write = false;
+            LockRecord(txn, &txn->readset[read_index]);
+            read_index += 1;
         }
         else {
-            assert(txn->writeset[i].prev == NULL);
+            txn->writeset[write_index].is_write = true;
+            LockRecord(txn, &txn->writeset[write_index]);
+            write_index += 1;
         }
-        assert((value->head == NULL && value->tail == NULL) ||
-               (value->head != NULL && value->tail != NULL));
     }
-      
-    for (size_t i = 0; i < txn->readset.size(); ++i) {
-        txn->readset[i].dependency = txn;
-        txn->readset[i].is_write = false;
-        txn->readset[i].is_held = false;
-
-        // We *must* find the key-value pair
-        Table<uint64_t, TxnQueue> *tbl = 
-            m_tables[txn->readset[i].record.m_table];
-        TxnQueue *value = tbl->GetPtr(txn->readset[i].record.m_key);
-        assert(value != NULL);
-        txn->readset[i].latch = &value->lock_word;
-
-        // Atomically add the transaction to the lock queue and check whether 
-        // it managed to successfully acquire the lock
-        lock(&value->lock_word);
-        assert((value->head == NULL && value->tail == NULL) ||
-               (value->head != NULL && value->tail != NULL));
-
-        AddTxn(value, &txn->readset[i]);
-        if ((txn->readset[i].is_held = CheckRead(value, &txn->readset[i])) == false) {
-            fetch_and_increment(&txn->num_dependencies);
-        }        
-        assert((value->head == NULL && value->tail == NULL) ||
-               (value->head != NULL && value->tail != NULL));
+    
+    // At most one of these two loops can be executed
+    while (write_index < txn->writeset.size()) {
+        assert(read_index == txn->readset.size());
+        txn->writeset[write_index].is_write = true;
+        LockRecord(txn, &txn->writeset[write_index]);
+        write_index += 1;
     }
+    while (read_index < txn->readset.size()) {        
+        assert(write_index == txn->writeset.size());
+        txn->readset[read_index].is_write = false;
+        LockRecord(txn, &txn->readset[read_index]);
+        read_index += 1;
+    }
+    
+    assert(write_index == txn->writeset.size() && 
+           read_index == txn->readset.size());
+
     FinishAcquisitions(txn);
     return (txn->num_dependencies == 0);
 }

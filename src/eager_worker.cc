@@ -117,24 +117,21 @@ void
 EagerWorker::TryExec(EagerAction *txn) {
     if (m_lock_mgr->Lock(txn)) {
         assert(txn->num_dependencies == 0);
-        //        assert(m_lock_mgr->CheckLocks(txn));	// XXX: REMOVE ME
         txn->Execute();
         m_lock_mgr->Unlock(txn);
 
         assert(txn->finished_execution);
-        //        assert(!m_lock_mgr->CheckLocks(txn));	// XXX: REMOVE ME
         txn->PostExec();
 
         EagerAction *link;
         if (txn->IsLinked(&link)) {
             TryExec(link);
         }
-        if (txn->IsRoot()) {
+        else {
             m_output_queue->EnqueueBlocking((uint64_t)txn);
         }
     }    
     else {
-        //        assert(false);	// XXX: REMOVE ME
         Enqueue(txn);
     }
 }
@@ -159,7 +156,18 @@ void
 EagerWorker::WorkerFunction() {
     EagerAction *txn;
     uint32_t i = 0;
-    
+
+    /*
+    while (m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
+        m_lock_mgr->Lock(txn);
+        Enqueue(txn);
+    }
+    std::cout << "Done locking...\n";    
+    CheckReady();
+    std::cout << "Done processing!\n";
+    while (true)
+        ;
+    */
     while (true) {        
         CheckReady();
         if (m_num_elems < 1000 && m_txn_input_queue->Dequeue((uint64_t*)&txn)) {

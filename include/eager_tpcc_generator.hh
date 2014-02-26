@@ -49,14 +49,15 @@ public:
 
     EagerAction*
     genNext() {
-        return gen_new_order();
         uint32_t pct = m_util.gen_rand_range(1, m_fraction_sum);
         if (pct <= m_new_order_f) {
             return gen_new_order();
         }
-        else if (pct <= (m_new_order_f + m_payment_f)) {
+        else {
             return gen_payment();
         }
+    
+        /*
         else if (pct <= (m_new_order_f+m_payment_f+m_stock_level_f)) {
             return gen_stock_level();
         }
@@ -67,6 +68,7 @@ public:
         else {
             return gen_order_status();
         }
+        */
     }
     
     NewOrderEager*
@@ -124,14 +126,12 @@ public:
                                                 item_ids, 
                                                 supplier_wh_ids, 
                                                 quantities);
-        /*
         assert(ret->readset[NewOrderEager::s_warehouse_index].record.m_table 
                == WAREHOUSE);
         assert(ret->readset[NewOrderEager::s_customer_index].record.m_table 
                == CUSTOMER);        
         assert(ret->writeset[NewOrderEager::s_district_index].record.m_table 
                == DISTRICT);
-        */
         return ret;
     }
     
@@ -147,7 +147,7 @@ public:
         uint32_t customer_d_id;
         uint32_t customer_w_id;
 
-        if (x <= 85) {
+        if (x <= 85 || (s_num_warehouses == 1)) {
             customer_d_id = district_id;
             customer_w_id = warehouse_id;
         }
