@@ -45,6 +45,7 @@ public:
         m_delivery_f = m_stock_level_f + delivery;
         m_order_status_f = m_delivery_f + order_status;
         m_fraction_sum = m_order_status_f;
+        std::cout << "Fraction: " << m_fraction_sum << "\n";
     }
 
     EagerAction*
@@ -53,22 +54,18 @@ public:
         if (pct <= m_new_order_f) {
             return gen_new_order();
         }
-        else {
+        else if (pct <= m_payment_f) {
             return gen_payment();
         }
-    
-        /*
-        else if (pct <= (m_new_order_f+m_payment_f+m_stock_level_f)) {
+        else if (pct <= m_stock_level_f) {
             return gen_stock_level();
         }
-        else if (pct <= (m_new_order_f+m_payment_f+m_stock_level_f+
-                         m_delivery_f)) {
+        else if (pct <= m_delivery_f) {
             return gen_delivery();
         }
         else {
             return gen_order_status();
         }
-        */
     }
     
     NewOrderEager*
