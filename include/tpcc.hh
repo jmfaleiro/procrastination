@@ -226,11 +226,11 @@ namespace tpcc {
     } OrderLine;
 
     typedef struct {
-        int 		s_i_id; // PRIMARY KEY 2
-        int 		s_w_id; // PRIMARY KEY 1
-        int 		s_order_cnt;
-        int 		s_remote_cnt;
-        int 		s_quantity;
+        uint32_t 		s_i_id; // PRIMARY KEY 2
+        uint32_t 		s_w_id; // PRIMARY KEY 1
+        uint32_t 		s_order_cnt;
+        uint32_t 		s_remote_cnt;
+        uint32_t 		s_quantity;
         float 		s_ytd;
         char 		s_data[51];
         char		s_dist_01[25];

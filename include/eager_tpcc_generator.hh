@@ -97,7 +97,7 @@ public:
 
             item_ids[i] = cur_item;
             assert(item_ids[i] < s_num_items);
-            int pct = m_util.gen_rand_range(1, 99);
+            int pct = m_util.gen_rand_range(1, 100);
 
             if (pct > 1) {
                 supplier_wh_ids[i] = w_id;

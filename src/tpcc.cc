@@ -368,6 +368,7 @@ namespace tpcc {
                 uint64_t stock_key = TPCCKeyGen::create_stock_key(keys);
                 Stock *verify = s_stock_tbl->Put(stock_key, container);
                 assert(s_stock_tbl->GetPtr(stock_key) == verify);
+                assert(i == s_stock_tbl->GetPtr(stock_key)->s_i_id);
             }
         }
     }

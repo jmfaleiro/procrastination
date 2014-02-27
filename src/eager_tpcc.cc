@@ -53,6 +53,7 @@ NewOrderEager::NewOrderEager(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     // deadlocks
     std::sort(readset.begin(), readset.end());
     std::sort(writeset.begin(), writeset.end());
+    std::sort(&m_item_ids[0], &m_item_ids[m_num_items]);
 }
 
 bool
@@ -139,7 +140,8 @@ NewOrderEager::Execute() {
         // Get the item and the stock records. 
         Item *item = s_item_tbl->GetPtr(ol_i_id);
         Stock *stock = s_stock_tbl->GetPtr(composite.m_key);
-    
+        assert((uint32_t)stock->s_i_id == m_item_ids[i]);
+
         // Update the inventory for the item in question. 
         if (stock->s_order_cnt - ol_quantity >= 10) {
             stock->s_quantity -= ol_quantity;
@@ -199,7 +201,7 @@ NewOrderEager::Execute() {
         new_order_line.ol_d_id = m_district_id;
         new_order_line.ol_w_id = m_warehouse_id;
         new_order_line.ol_number = i;
-        new_order_line.ol_i_id = item->i_id;
+        new_order_line.ol_i_id = m_item_ids[i];
         new_order_line.ol_supply_w_id = ol_w_id;
         new_order_line.ol_quantity = m_order_quantities[i];
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
