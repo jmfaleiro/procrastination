@@ -412,7 +412,7 @@ namespace tpcc {
     void
     TPCCInit::do_init() {    
         TPCCUtil random;
-        s_num_tables = 10;
+        s_num_tables = 11;
         s_num_items = m_item_count;
         s_num_warehouses = m_num_warehouses;
         s_districts_per_wh = m_dist_per_wh;

@@ -3,6 +3,8 @@
 
 #include <tpcc.hh>
 #include <action.h>
+#include <vector>
+
 
 using namespace tpcc;
 
@@ -173,11 +175,41 @@ public:
 };
 
 
+struct CustomerAmt {
+    uint64_t m_customer_key;
+    uint32_t m_amount;
+
+    bool operator<(const struct CustomerAmt &other) const {
+        return (this->m_customer_key < other.m_customer_key);
+    }
+    
+    bool operator>(const struct CustomerAmt &other) const {
+        return (this->m_customer_key > other.m_customer_key);
+    }
+    
+    bool operator==(const struct CustomerAmt &other) const {
+        return (this->m_customer_key == other.m_customer_key);
+    }
+    
+    bool operator!=(const struct CustomerAmt &other) const {
+        return (this->m_customer_key != other.m_customer_key);
+    }
+
+    bool operator>=(const struct CustomerAmt &other) const {
+        return !(this->m_customer_key < other.m_customer_key);
+    }
+
+    bool operator<=(const struct CustomerAmt &other) const {
+        return !(this->m_customer_key > other.m_customer_key);
+    }        
+};
+
 class DeliveryEager1;
 class DeliveryEager0 : public EagerAction {
 
 private:
     DeliveryEager1 		*m_level1_txn;
+
 
 protected:
     uint32_t 			m_warehouse_id;
@@ -185,7 +217,7 @@ protected:
     uint32_t 			m_carrier_id;
     uint32_t 			*m_open_order_ids;
     uint32_t 			*m_num_order_lines;
-    uint32_t 			*m_amounts;
+    CustomerAmt			*m_amounts;
     uint64_t 			*m_customer_keys;
     
 public: 
@@ -209,6 +241,10 @@ class DeliveryEager2;
 class DeliveryEager1 : public DeliveryEager0 {
 private:
     DeliveryEager2			*m_level2_txn;
+
+    int
+    GetIndex(std::vector<struct EagerRecordInfo> &info, uint32_t size, 
+             struct EagerRecordInfo cmp);
 
 public:
     DeliveryEager1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 

@@ -35,7 +35,7 @@ GetCustomerTableInit(TableInit *scratch) {
     scratch->m_params.m_three_params.m_dim3 = s_customers_per_dist;
     scratch->m_params.m_three_params.m_access1 = TPCCKeyGen::get_warehouse_key;
     scratch->m_params.m_three_params.m_access2 = TPCCKeyGen::get_district_key;
-    scratch->m_params.m_three_params.m_access3 = TPCCKeyGen::get_district_key;
+    scratch->m_params.m_three_params.m_access3 = TPCCKeyGen::get_customer_key;
 }
 
 static void
