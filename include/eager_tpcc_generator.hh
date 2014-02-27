@@ -166,7 +166,7 @@ public:
     gen_stock_level() {
         uint32_t warehouse_id = m_util.gen_rand_range(0, s_num_warehouses-1);
         uint32_t district_id = m_util.gen_rand_range(0, s_districts_per_wh-1);
-        int threshold = 1000;
+        int threshold = (int)m_util.gen_rand_range(10, 20);
         StockLevelEager2 *level2 = new StockLevelEager2(warehouse_id, 
                                                         district_id, 
                                                         threshold);
