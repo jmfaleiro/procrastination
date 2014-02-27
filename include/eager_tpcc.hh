@@ -5,7 +5,6 @@
 #include <action.h>
 #include <vector>
 
-
 using namespace tpcc;
 
 class NewOrderEager : public EagerAction {

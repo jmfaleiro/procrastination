@@ -417,13 +417,12 @@ StockLevelEager0::PostExec() {
     keys[1] = m_district_id;
 
     dep_info.record.m_table = OPEN_ORDER;
-    for (uint32_t i = 0; i < 20; ++i) {
-        keys[2] = m_next_order_id - 1 -i;
+    for (uint32_t i = 20; i > 0; --i) {
+        keys[2] = m_next_order_id - i;
         uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
         dep_info.record.m_key = open_order_key;
         m_level1_txn->readset.push_back(dep_info);
     }
-    std::sort(m_level1_txn->readset.begin(), m_level1_txn->readset.end());
 }
 
 StockLevelEager1::StockLevelEager1(uint32_t warehouse_id, uint32_t district_id, 
@@ -472,11 +471,21 @@ StockLevelEager1::PostExec() {
 
     // Create the keys and insert them into the readset
     uint32_t num_stocks = m_stock_ids.size();
+    uint32_t num_unique = 0;
     for (uint32_t i = 0; i < num_stocks; ++i) {
         assert(m_stock_ids[i] < s_num_items);
         keys[1] = m_stock_ids[i];
         info.record.m_key = TPCCKeyGen::create_stock_key(keys);
-        m_level2_txn->readset.push_back(info);
+        uint32_t j;
+        for (j = 0; j < num_unique; ++j) {
+            if (m_level2_txn->readset[j].record.m_key == info.record.m_key) {
+                break;
+            }
+        }
+        if (j == i) {
+            m_level2_txn->readset.push_back(info);
+            ++num_unique;
+        }        
     }
     std::sort(m_level2_txn->readset.begin(), m_level2_txn->readset.end());
 }
@@ -728,7 +737,7 @@ DeliveryEager1::GetIndex(const std::vector<struct EagerRecordInfo> &info, uint32
     for (uint32_t j = 0; j < size; ++j) {
         assert(info[j].record.m_table == cmp.record.m_table);
         if (info[j].record.m_key == cmp.record.m_key) {
-            assert((int)j == j);
+            //            assert((int)j == j);
             return (int)j;
         }
     }
@@ -743,15 +752,18 @@ DeliveryEager1::PostExec() {
     for (uint32_t i = 0; i < writeset.size(); ++i) {
         info.record.m_key = m_customer_keys[i];
         uint32_t j = 0;
-        for (j = 0; j < i; ++j) {
+
+        for (j = 0; j < m_level2_txn->writeset.size(); ++j) {
             if (m_level2_txn->writeset[j].record.m_key == info.record.m_key) {
                 break;
             }
         }
 
         if (j < i) {	// We've found a duplicate
-            assert(m_level2_txn->m_amounts[j].m_customer_key == info.record.m_key);
-            m_level2_txn->m_amounts[j].m_amount += m_level2_txn->m_amounts[i].m_amount;
+            assert(m_level2_txn->m_amounts[j].m_customer_key == 
+                   info.record.m_key);
+            m_level2_txn->m_amounts[j].m_amount += 
+                m_level2_txn->m_amounts[i].m_amount;
         }
         else {
             assert(m_amounts[i].m_customer_key == info.record.m_key);
