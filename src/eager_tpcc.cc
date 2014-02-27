@@ -783,7 +783,7 @@ DeliveryEager1::PostExec() {
 
     std::sort(m_level2_txn->writeset.begin(), m_level2_txn->writeset.end());
     std::sort(&m_level2_txn->m_amounts[0], &m_level2_txn->m_amounts[s_districts_per_wh]);
-    assert(m_level2_txn->writeset.size() != 0);
+    //    assert(m_level2_txn->writeset.size() != 0);
 }
 
 bool

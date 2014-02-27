@@ -48,7 +48,6 @@ EagerWorker::BootstrapWorker(void *arg) {
 
 void
 EagerWorker::Enqueue(EagerAction *txn) {
-    assert(txn->num_dependencies == 0);
     if (m_queue_head == NULL) {
         assert(m_queue_tail == NULL);
         m_queue_head = txn;
