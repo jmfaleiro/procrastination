@@ -43,6 +43,7 @@ namespace tpcc {
         static const uint64_t s_district_mask = 		0x0000000000FF0000;
         static const uint64_t s_warehouse_mask = 		0x000000000000FFFF;
         static const uint64_t s_stock_mask = 			0x0FFFFFFFFFFF0000;    
+        static const uint64_t s_order_mask = 			0x00FFFFFFFF000000;
 
     public:
         static inline uint32_t
@@ -63,6 +64,11 @@ namespace tpcc {
         static inline uint32_t
         get_district_key(uint64_t composite_key) {
             return (uint32_t)((composite_key & s_district_mask) >> s_district_shift);
+        }
+
+        static inline uint32_t
+        get_order_key(uint64_t composite_key) {
+            return (uint32_t)((composite_key & s_order_mask) >> s_order_shift);
         }
 
         // Expects: 	warehouse_id 	==> 	keys[0] 

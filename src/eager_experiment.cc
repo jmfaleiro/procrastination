@@ -84,6 +84,7 @@ EagerExperiment::InitQueues(int num_queues, uint32_t size) {
 void
 EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers,
                             EagerGenerator *gen) {
+    //    uint32_t no, pay, stock, 
     for (int i = 0; i < num_inputs; ++i) {
         input_queues[i%num_workers]->EnqueueBlocking((uint64_t)gen->genNext());
     }
@@ -154,7 +155,7 @@ EagerExperiment::RunTPCC() {
     }
     else {
         // txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
-        txn_generator = EagerTPCCGenerator(45, 43, 5, 0, 0);
+        txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 

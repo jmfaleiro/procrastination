@@ -48,6 +48,7 @@ EagerWorker::BootstrapWorker(void *arg) {
 
 void
 EagerWorker::Enqueue(EagerAction *txn) {
+    assert(txn->num_dependencies == 0);
     if (m_queue_head == NULL) {
         assert(m_queue_tail == NULL);
         m_queue_head = txn;
@@ -147,7 +148,7 @@ EagerWorker::DoExec(EagerAction *txn) {
     if (txn->IsLinked(&link)) {
         TryExec(link);
     }
-    if (txn->IsRoot()) {
+    else {
         m_output_queue->EnqueueBlocking((uint64_t)txn);
     }
 }

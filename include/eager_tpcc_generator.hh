@@ -81,6 +81,9 @@ public:
             (uint64_t*)malloc(sizeof(uint64_t)*num_items);
         assert(supplier_wh_ids != NULL);
         uint32_t *quantities = (uint32_t*)malloc(sizeof(uint32_t)*num_items);
+        for (uint32_t i = 0; i < num_items; ++i) {
+            quantities[i] = m_util.gen_rand_range(1, 10);
+        }
         int all_local = 1;
 
         std::set<uint64_t> seen_items;

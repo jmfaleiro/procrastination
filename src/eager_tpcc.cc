@@ -204,11 +204,13 @@ NewOrderEager::Execute() {
         new_order_line.ol_quantity = m_order_quantities[i];
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
         strcpy(new_order_line.ol_dist_info, ol_dist_info);
+        assert(m_order_quantities[i] != 0);
 
         // XXX: Make sure that the put operation is implemented on top of a 
         // concurrent hash table. 
-        s_order_line_tbl->Put(writeset[m_num_items+1+i].record.m_key, 
-                              new_order_line);
+        keys[3] = i;        
+        uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
+        s_order_line_tbl->Put(order_line_key, new_order_line);
     }
     // Insert an entry into the open order table.    
     Oorder oorder;
@@ -221,11 +223,10 @@ NewOrderEager::Execute() {
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = timestamp;
     Oorder *new_oorder = 
-        s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
+        s_oorder_tbl->Put(new_order_key, oorder);
     uint64_t *old_index = 
         s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
-    *old_index = writeset[2*m_num_items+1].record.m_key;
-    
+    *old_index = new_order_key;    
 }
 
 PaymentEager::PaymentEager(uint32_t w_id, uint32_t c_w_id, float h_amount,
@@ -405,11 +406,12 @@ StockLevelEager0::Execute() {
     assert(readset[0].record.m_table == DISTRICT);
     District *dist = s_district_tbl->GetPtr(readset[0].record.m_key);    
     m_next_order_id = dist->d_next_o_id;
+    assert(m_next_order_id >= 3000);
 }
 
 void
 StockLevelEager0::PostExec() {
-    assert(m_next_order_id != 0);
+    assert(m_next_order_id >= 3000);
     struct EagerRecordInfo dep_info;
 
     uint32_t keys[3];
@@ -446,9 +448,14 @@ StockLevelEager1::Execute() {
     keys[1] = m_district_id;
 
     for (size_t i = 0; i < readset.size(); ++i) {
+        uint32_t order_key = TPCCKeyGen::get_order_key(readset[i].record.m_key);
         assert(readset[i].record.m_table == OPEN_ORDER);
+        assert(order_key >= (3000-21));
+
         Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
         keys[2] = oorder->o_id;
+        assert(oorder->o_id == order_key); 	
+        assert(oorder->o_ol_cnt != 0);
         for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
@@ -488,6 +495,7 @@ StockLevelEager1::PostExec() {
         }        
     }
     std::sort(m_level2_txn->readset.begin(), m_level2_txn->readset.end());
+    assert(m_level2_txn->readset.size() != 0);    
 }
 
 
@@ -775,6 +783,7 @@ DeliveryEager1::PostExec() {
 
     std::sort(m_level2_txn->writeset.begin(), m_level2_txn->writeset.end());
     std::sort(&m_level2_txn->m_amounts[0], &m_level2_txn->m_amounts[s_districts_per_wh]);
+    assert(m_level2_txn->writeset.size() != 0);
 }
 
 bool

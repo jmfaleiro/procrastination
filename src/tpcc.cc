@@ -384,7 +384,7 @@ namespace tpcc {
                 assert(dist != NULL);
 
                 uint32_t next_order_id = dist->d_next_o_id;
-
+                assert(dist->d_next_o_id == 3000);
                 // Make sure that a stock level txn won't fail
                 for (uint32_t k = 0; k < 20; ++k) {
                     keys[2] = next_order_id - 1 - k;
