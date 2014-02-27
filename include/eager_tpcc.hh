@@ -243,8 +243,8 @@ private:
     DeliveryEager2			*m_level2_txn;
 
     int
-    GetIndex(std::vector<struct EagerRecordInfo> &info, uint32_t size, 
-             struct EagerRecordInfo cmp);
+    GetIndex(const std::vector<struct EagerRecordInfo> &info, uint32_t size, 
+             const struct EagerRecordInfo &cmp);
 
 public:
     DeliveryEager1(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 

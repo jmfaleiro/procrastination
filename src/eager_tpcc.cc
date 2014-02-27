@@ -707,22 +707,22 @@ DeliveryEager1::Execute() {
         keys[1] = oorder->o_d_id;
         keys[2] = oorder->o_c_id;        
         m_customer_keys[i] = TPCCKeyGen::create_customer_key(keys);
-        m_level2_txn->m_amounts[i].m_customer_key = m_customer_keys[i];
+        m_amounts[i].m_customer_key = m_customer_keys[i];
 
         keys[2] = oorder->o_id;
-        m_level2_txn->m_amounts[i].m_amount = 0;
+        m_amounts[i].m_amount = 0;
         for (uint32_t j = 0; j < num_items; ++j) {
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
             OrderLine *order_line = s_order_line_tbl->GetPtr(order_line_key);
-            m_level2_txn->m_amounts[i].m_amount += order_line->ol_amount;
+            m_amounts[i].m_amount += order_line->ol_amount;
         }
     }
 }
 
 int
-DeliveryEager1::GetIndex(std::vector<struct EagerRecordInfo> &info, uint32_t size, 
-                         struct EagerRecordInfo cmp) {
+DeliveryEager1::GetIndex(const std::vector<struct EagerRecordInfo> &info, uint32_t size, 
+                         const struct EagerRecordInfo &cmp) {
     for (uint32_t j = 0; j < size; ++j) {
         assert(info[j].record.m_table == cmp.record.m_table);
         if (info[j].record.m_key == cmp.record.m_key) {
@@ -740,16 +740,25 @@ DeliveryEager1::PostExec() {
 
     for (uint32_t i = 0; i < writeset.size(); ++i) {
         info.record.m_key = m_customer_keys[i];
-        int seen = GetIndex(m_level2_txn->writeset, i, info);
-        if (seen = -1) {
-            m_level2_txn->writeset.push_back(info);
+        uint32_t j = 0;
+        for (j = 0; j < i; ++j) {
+            if (m_level2_txn->writeset[j].record.m_key == info.record.m_key) {
+                break;
+            }
+        }
+
+        if (j < i) {	// We've found a duplicate
+            assert(m_level2_txn->m_amounts[j].m_customer_key == info.record.m_key);
+            m_level2_txn->m_amounts[j].m_amount += m_level2_txn->m_amounts[i].m_amount;
         }
         else {
-            m_level2_txn->m_amounts[seen].m_amount += 
-                m_level2_txn->m_amounts[i].m_amount;
-            m_level2_txn->m_amounts[i].m_customer_key = 0xFFFFFFFFFFFFFFFF;
+            assert(m_amounts[i].m_customer_key == info.record.m_key);
+            m_level2_txn->writeset.push_back(info);
+            size_t index = m_level2_txn->writeset.size()-1;
+            m_level2_txn->m_amounts[index] = m_amounts[i];
         }
     }
+
     std::sort(m_level2_txn->writeset.begin(), m_level2_txn->writeset.end());
     std::sort(&m_level2_txn->m_amounts[0], &m_level2_txn->m_amounts[s_districts_per_wh]);
 }
