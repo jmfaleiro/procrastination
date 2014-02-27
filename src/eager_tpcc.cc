@@ -366,6 +366,8 @@ StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id,
     assert(warehouse_id < s_num_warehouses);
     assert(district_id < s_districts_per_wh);
     
+    m_warehouse_id = warehouse_id;
+    m_district_id = district_id;
     m_threshold = threshold;
     m_level1_txn = level1_txn;
     m_next_order_id = 0;
