@@ -29,9 +29,10 @@ private:
     SimpleQueue 			*m_input_queue;			// Txns to process
     SimpleQueue 			*m_output_queue;		// Dump finished txns here
     SimpleQueue 			*m_feedback_queue;		
-    int						m_cpu_number;			// CPU to which to bind
+    uint64_t				m_cpu_number;			// CPU to which to bind
     volatile uint64_t 		m_start_signal;			// Flag indicating we've begun
     pthread_t 				m_worker_thread;		// Worker thread
+    
     
     // List of pending closures    
     ActionNode 				*m_pending_head;

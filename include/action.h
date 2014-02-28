@@ -164,6 +164,8 @@ class Action {
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
 
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) state;
+  uint64_t owner;
+
   
   // Use the following two functions while performing graph traversals, to 
   // ensure mutual exclusion between threads that touch the same transaction. 

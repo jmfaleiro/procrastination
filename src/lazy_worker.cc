@@ -7,7 +7,7 @@ LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *output_queue,
                        int cpu) {
     m_input_queue = input_queue;
     m_output_queue = output_queue;
-    m_cpu_number = cpu;
+    m_cpu_number = (uint64_t)cpu;
 }
 
 void
@@ -28,7 +28,7 @@ LazyWorker::BootstrapWorker(void *arg) {
     LazyWorker *worker = (LazyWorker*)arg;
     
     // Pin the thread to a cpu
-    if (pin_thread(worker->m_cpu_number) == -1) {
+    if (pin_thread((int)worker->m_cpu_number) == -1) {
         std::cout << "LazyWorker couldn't bind to a cpu!!!\n";
         exit(-1);
     }
@@ -133,17 +133,20 @@ LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
         
         // We only care if this txn has not been substantiated
         if (prev->state != SUBSTANTIATED) {
-            if (prev->state == PROCESSING) {	
-                // Someone's taken ownership of this dependency
-                ActionNode *to_wait = GetActionNode();
-                to_wait->m_action = prev;
-                ListAppend(w_head, w_tail, to_wait, to_wait);
+            if (prev->state == PROCESSING) {                
+                if (prev->owner == m_cpu_number) {
+                    // Someone's taken ownership of this dependency
+                    ActionNode *to_wait = GetActionNode();
+                    to_wait->m_action = prev;
+                    ListAppend(w_head, w_tail, to_wait, to_wait);
+                }
             }
             else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
                 // The dependency is our responsibility
                 ProcessTxn(prev, p_head, p_tail, w_head, w_tail);            
             }
             else {
+                assert(prev->owner != m_cpu_number);
                 ActionNode *to_wait = GetActionNode();
                 to_wait->m_action = prev;
                 ListAppend(w_head, w_tail, to_wait, to_wait);
@@ -184,18 +187,22 @@ LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head,
                 return;
             }            
             else if (prev->state == PROCESSING) {	
-                // Someone's taken ownership of this dependency
-                ActionNode *to_wait = GetActionNode();
-                to_wait->m_action = prev;
-                *w_head = to_wait;
-                *w_tail = to_wait;
+                if (prev->owner != m_cpu_number) {
+                    // Someone's taken ownership of this dependency
+                    ActionNode *to_wait = GetActionNode();
+                    to_wait->m_action = prev;
+                    *w_head = to_wait;
+                    *w_tail = to_wait;
+                }
             }
             else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
                 // The dependency is our responsibility
+                prev->owner = m_cpu_number;
                 ProcessTxn(prev, p_head, p_tail, w_head, w_tail);
                 return;
             }
             else {
+                assert(prev->owner != m_cpu_number);
                 ActionNode *to_wait = GetActionNode();
                 to_wait->m_action = prev;
                 *w_head = to_wait;
@@ -319,9 +326,10 @@ LazyWorker::RunClosure(ActionNode *to_proc) {
     ActionNode *iter1 = to_proc, *iter2 = to_proc;
     while (iter1 != NULL) {
         Action *action = iter1->m_action;
-        assert(action->state == PROCESSING);
-        action->LaterPhase();
-        iter1 = iter1->m_next;
+        if (action->state == PROCESSING) {
+            action->LaterPhase();
+            iter1 = iter1->m_next;
+        }
     }
     while (iter2 != NULL) {
         lock(&iter2->m_action->lock_word);
