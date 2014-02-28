@@ -1,16 +1,13 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include "lazy_scheduler.h"
+#include "lazy_scheduler.hh"
 #include "workload_generator.h"
 #include "concurrent_queue.h"
 #include "util.h"
 
-
 #include <algorithm>
 #include <fstream>
-
-
 
 // Use this for "peak" workloads. 
 class Client {
@@ -72,7 +69,7 @@ public:
 
     void RunPeak() {        
         m_gen->preGen();                
-        m_sched->startScheduler();
+        m_sched->Run();
 
         volatile uint64_t start_time = rdtsc();
         volatile uint64_t phase_time; 
@@ -102,7 +99,7 @@ public:
         }
 
         volatile int start_count = m_worker->numDone();
-        volatile uint64_t start_stick = m_sched->numStick();
+        volatile uint64_t start_stick = m_sched->NumStickified();
         // Regular load for 1 second. 
         for (int j = 0; j < 100; ++j) {
             while (true) {
@@ -126,7 +123,7 @@ public:
                     buckets_done[j] = end_count - start_count;
                     start_count = end_count;
                     
-                    volatile uint64_t end_stick = m_sched->numStick();
+                    volatile uint64_t end_stick = m_sched->NumStickified();
                     buckets_stick[j] = end_stick - start_stick;
                     start_stick = end_stick;
                     break;
@@ -164,7 +161,7 @@ public:
                     buckets_done[100+j] = end_count - start_count;
                     start_count = end_count;
 
-                    volatile uint64_t end_stick = m_sched->numStick();
+                    volatile uint64_t end_stick = m_sched->NumStickified();
                     buckets_stick[100+j] = end_stick - start_stick;
                     start_stick = end_stick;
 
@@ -200,7 +197,7 @@ public:
                     buckets_done[200+j] = end_count - start_count;
                     start_count = end_count;
 
-                    volatile uint64_t end_stick = m_sched->numStick();
+                    volatile uint64_t end_stick = m_sched->NumStickified();
                     buckets_stick[200+j] = end_stick - start_stick;
                     start_stick = end_stick;
 
@@ -265,7 +262,7 @@ public:
         uint64_t num_completed = 0;
         uint64_t to_wait = 0;
 
-        m_sched->startScheduler();
+        m_sched->Run();
 
         // Generate a bunch of txns to run, give them each a "start" time. 
         for (int i = 0; i < m_num_runs; ++i) {            
