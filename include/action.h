@@ -147,7 +147,6 @@ class Action {
 
  public:  
   bool is_checkout;
-  int state;
   int num_writes;
   bool materialize;
   int is_blind;
@@ -164,6 +163,7 @@ class Action {
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_end_time;    
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
 
+  volatile uint64_t __attribute__((aligned(CACHE_LINE))) state;
   
   // Use the following two functions while performing graph traversals, to 
   // ensure mutual exclusion between threads that touch the same transaction. 

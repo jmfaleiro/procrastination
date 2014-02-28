@@ -12,8 +12,8 @@ do_pause()
 
 static inline bool
 cmp_and_swap(volatile uint64_t *to_write,
-	     volatile uint64_t to_cmp,
-	     volatile uint64_t new_value) {
+             volatile uint64_t to_cmp,
+             volatile uint64_t new_value) {
   volatile uint64_t out;
   asm volatile("lock; cmpxchgq %2, %1"
 	       : "=a" (out), "+m"(*to_write)

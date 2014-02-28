@@ -120,16 +120,55 @@ LazyWorker::ProcessTxn(Action *txn, ActionNode **proc_head,
 }
 
 void
-LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head, 
+LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
                          ActionNode **p_tail, ActionNode **w_head, 
                          ActionNode **w_tail) {
     
+    // Get the record and txn this action is dependent on. 
+    Action* prev = action->writeset[writeIndex].dependency;
+    bool is_write = action->writeset[writeIndex].is_write;
+    int index = action->writeset[writeIndex].index;
+
+    while (prev != NULL) {
+        
+        // We only care if this txn has not been substantiated
+        if (prev->state != SUBSTANTIATED) {
+            if (prev->state == PROCESSING) {	
+                // Someone's taken ownership of this dependency
+                ActionNode *to_wait = GetActionNode();
+                to_wait->m_action = prev;
+                ListAppend(w_head, w_tail, to_wait, to_wait);
+            }
+            else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
+                // The dependency is our responsibility
+                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);            
+            }
+            else {
+                ActionNode *to_wait = GetActionNode();
+                to_wait->m_action = prev;
+                ListAppend(w_head, w_tail, to_wait, to_wait);
+            }
+        }
+        
+        if (is_write) {
+            break;
+        }        
+        int cur_index = index;
+        is_write = prev->readset[cur_index].is_write;
+        index = prev->readset[cur_index].index;
+        prev = prev->readset[cur_index].dependency;        
+    }    
 }
 
 void
 LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head, 
                          ActionNode **p_tail, ActionNode **w_head, 
                          ActionNode **w_tail) {
+    *p_head = NULL;
+    *p_tail = NULL;
+    *w_head = NULL;
+    *w_tail = NULL;
+
     Action* prev = action->readset[readIndex].dependency;
     int index = action->readset[readIndex].index;
     bool is_write = action->readset[readIndex].is_write;
@@ -140,24 +179,42 @@ LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head,
         if (is_write) {
             int state;
             
-            // Start processing the dependency. 
-            /*
-            Action::Lock(action);
-            state = Action::CheckState(action);
-            Action::Unlock(action);
-            
-            if (state == STICKY) {
-                substantiate(prev);
+            if (prev->state == SUBSTANTIATED) {
+                // The dependency is already processed, nothing to do here
+                return;
+            }            
+            else if (prev->state == PROCESSING) {	
+                // Someone's taken ownership of this dependency
+                ActionNode *to_wait = GetActionNode();
+                to_wait->m_action = prev;
+                *w_head = to_wait;
+                *w_tail = to_wait;
             }
-            */
+            else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
+                // The dependency is our responsibility
+                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);
+                return;
+            }
+            else {
+                ActionNode *to_wait = GetActionNode();
+                to_wait->m_action = prev;
+                *w_head = to_wait;
+                *w_tail = to_wait;
+            }
+
             // We can end since this is a write. 
             prev = NULL;
         }
-        else {
-            int cur_index = index;
-            is_write = prev->readset[cur_index].is_write;
-            index = prev->readset[cur_index].index;
-            prev = prev->readset[cur_index].dependency;
+        else {  
+            if (prev->state == SUBSTANTIATED) {
+                return;
+            }
+            else {
+                int cur_index = index;
+                is_write = prev->readset[cur_index].is_write;
+                index = prev->readset[cur_index].index;
+                prev = prev->readset[cur_index].dependency;
+            }
         }
     }    
 }
