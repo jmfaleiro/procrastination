@@ -162,6 +162,8 @@ class Action {
   std::vector<int> real_writes;
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_start_time;    
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_end_time;    
+  volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
+
   
   // Use the following two functions while performing graph traversals, to 
   // ensure mutual exclusion between threads that touch the same transaction. 

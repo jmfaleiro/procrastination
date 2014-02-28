@@ -10,20 +10,14 @@
 #include <tpcc_table_spec.hh>
 #include <concurrent_queue.h>
 #include <time.h>
+#include <experiment.hh>
 
-class EagerExperiment {
+class EagerExperiment : public Experiment {
 private:
-    ExperimentInfo 		*m_info;
     LockManager			*m_lock_mgr;
-
-    static timespec
-    diff_time(timespec end, timespec start);
 
     void
     InitializeTPCCLockManager();
-    
-    SimpleQueue**
-    InitQueues(int num_queues, uint32_t size);
 
     void
     InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers, 
@@ -40,12 +34,8 @@ private:
     void
     RunTPCC();
 
-
 public:
     EagerExperiment(ExperimentInfo *info);
-    
-    void
-    Run();
 };
 
 #endif 		// EAGER_EXPERIMENT_HH_

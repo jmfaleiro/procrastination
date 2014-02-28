@@ -1,21 +1,7 @@
 #include <eager_experiment.hh>
 
-timespec
-EagerExperiment::diff_time(timespec end, timespec start) {
-    timespec temp;
-    if ((end.tv_nsec - start.tv_nsec) < 0) {
-        temp.tv_sec = end.tv_sec - start.tv_sec - 1;
-        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-    }
-    else {
-        temp.tv_sec = end.tv_sec-start.tv_sec;
-        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-    }
-    return temp;
-}
-
-EagerExperiment::EagerExperiment(ExperimentInfo *info) {
-    m_info = info;
+EagerExperiment::EagerExperiment(ExperimentInfo *info) 
+    : Experiment(info) {
 }
 
 void
@@ -70,16 +56,6 @@ EagerExperiment::InitializeTPCCLockManager() {
     m_lock_mgr = new LockManager(lock_mgr_params, s_num_tables);
 }
 
-SimpleQueue**
-EagerExperiment::InitQueues(int num_queues, uint32_t size) {
-    assert(!(size & (size-1)));
-    SimpleQueue **input_queues = new SimpleQueue*[m_info->num_workers];
-    for (int i = 0; i < m_info->num_workers; ++i) {
-        char *raw_queue_data = (char*)malloc(CACHE_LINE*size);
-        input_queues[i] = new SimpleQueue(raw_queue_data, size);
-    }
-    return input_queues;
-}
 
 void
 EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers,
@@ -168,6 +144,7 @@ EagerExperiment::RunTPCC() {
     
 }
 
+/*
 void
 EagerExperiment::Run() {
     switch (m_info->experiment) {
@@ -179,5 +156,5 @@ EagerExperiment::Run() {
         break;
     }
 }
-
+*/
 
