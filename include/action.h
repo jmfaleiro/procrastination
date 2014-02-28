@@ -187,6 +187,7 @@ class Action {
   
   virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
+  virtual bool IsLinked(Action **cont) { *cont = NULL; return false; }
 };
 
 class EagerAction {

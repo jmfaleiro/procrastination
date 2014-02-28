@@ -26,11 +26,12 @@ public:
 
 class LazyWorker {
 private:
-    SimpleQueue 			*m_input_queue;		// Txns to process
-    SimpleQueue 			*m_output_queue;	// Dump finished txns here
-    int						m_cpu_number;		// CPU to which to bind
-    volatile uint64_t 		m_start_signal;		// Flag indicating we've begun
-    pthread_t 				m_worker_thread;	// Worker thread
+    SimpleQueue 			*m_input_queue;			// Txns to process
+    SimpleQueue 			*m_output_queue;		// Dump finished txns here
+    SimpleQueue 			*m_feedback_queue;		
+    int						m_cpu_number;			// CPU to which to bind
+    volatile uint64_t 		m_start_signal;			// Flag indicating we've begun
+    pthread_t 				m_worker_thread;		// Worker thread
     
     // List of pending closures    
     ActionNode 				*m_pending_head;
@@ -83,7 +84,13 @@ private:
                ActionNode **wait_head, ActionNode **wait_tail);
     
     void
+    RunClosure(ActionNode *to_proc);
+
+    void
     CheckReady();
+
+    bool
+    CheckDependencies(ActionNode *waits);
     
 public:
     LazyWorker(SimpleQueue *input_queue, SimpleQueue *output_queue, int cpu);

@@ -165,6 +165,7 @@ LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head,
 void
 LazyWorker::Enqueue(ActionNode *proc_node, ActionNode *wait_node) {
     if (m_pending_head == NULL) {
+        assert(m_num_elems == 0);
         assert(m_pending_tail == NULL);
         assert(m_waiting_head == NULL && m_waiting_tail == NULL);
 
@@ -179,6 +180,7 @@ LazyWorker::Enqueue(ActionNode *proc_node, ActionNode *wait_node) {
         wait_node->m_right = NULL;
     }
     else {
+        assert(m_num_elems != 0);
         assert((m_pending_tail != NULL) && (m_pending_tail->m_right == NULL));
         assert((m_waiting_head != NULL) && (m_waiting_tail != NULL) && 
                (m_waiting_tail->m_right == NULL));
@@ -192,6 +194,7 @@ LazyWorker::Enqueue(ActionNode *proc_node, ActionNode *wait_node) {
         wait_node->m_right = NULL;
         m_waiting_tail = wait_node;
     }
+    m_num_elems += 1;
 }
 
 void
@@ -199,39 +202,50 @@ LazyWorker::Dequeue(ActionNode *proc_node, ActionNode *wait_node) {
     
 }
 
+bool
+LazyWorker::CheckDependencies(ActionNode *waits) {
+    for (; waits != NULL && waits->m_action->state == SUBSTANTIATED; 
+         waits = waits->m_next) 
+        ;
+    return (waits == NULL);
+}
 
 // Goes through the list of pending transitive closures and tries to execute 
 // them
 void
 LazyWorker::CheckReady() {
-    /*
-    for (ActionNode *iter = m_pending_head; iter != NULL; 
-         iter = iter->m_right) {
-        Action *tail;
-        if (try_lock(iter->m_action)) {
-            ExecuteClosure(iter, &tail);
-            assert(tail != NULL);
-            
-            Action *head = iter;
-            if (tail->m_next != NULL) {
-                tail->m_next->m_left = iter->m_left;
-                tail->m_next->m_right = iter->m_right;
-                iter = 
-            }
-            
-            ReturnActionNodes(head, tail);
+    for (ActionNode *pending = m_pending_head, *waiting = m_waiting_head;
+         pending != NULL; 
+         pending = pending->m_right, waiting = waiting->m_right) {
+        assert(waiting != NULL);
+        if (CheckDependencies(waiting)) {
+            RunClosure(pending);
+            Dequeue(pending, waiting);
         }
     }
-    */
 }
 
-// Takes a transitive closure of nodes to execute as input. Returns the last 
-// node in the closure to have been successfully processed to completion.
+// Runs the entire transitive closure
 void
-RunClosure(ActionNode *to_proc) {
-
+LazyWorker::RunClosure(ActionNode *to_proc) {
+    ActionNode *iter1 = to_proc, *iter2 = to_proc;
+    while (iter1 != NULL) {
+        Action *action = iter1->m_action;
+        assert(action->state == PROCESSING);
+        action->LaterPhase();
+        iter1 = iter1->m_next;
+    }
+    while (iter2 != NULL) {
+        lock(&iter2->m_action->lock_word);
+        iter2->m_action->state = SUBSTANTIATED;
+        unlock(&iter2->m_action->lock_word);
+        Action *continuation = NULL;
+        if (iter2->m_action->IsLinked(&continuation)) {
+            m_feedback_queue->Enqueue((uint64_t)continuation);
+        }
+        iter2 = iter2->m_next;
+    }
 }
-
 
 void
 LazyWorker::WorkerFunction() {
