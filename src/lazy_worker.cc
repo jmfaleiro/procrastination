@@ -199,7 +199,38 @@ LazyWorker::Enqueue(ActionNode *proc_node, ActionNode *wait_node) {
 
 void
 LazyWorker::Dequeue(ActionNode *proc_node, ActionNode *wait_node) {
+    ActionNode *proc_prev = proc_node->m_left;
+    ActionNode *proc_next = proc_node->m_right;
+    ActionNode *wait_prev = wait_node->m_left;
+    ActionNode *wait_next = wait_node->m_right;
+
+    if (m_pending_head == proc_node) {
+        assert(m_waiting_head == wait_node);
+        assert((proc_node->m_left == NULL) && (wait_node->m_left == NULL));
+        
+        // Adjust the queue head
+        m_pending_head = proc_next;
+        m_waiting_head = wait_next;
+    }
+    else {
+        proc_prev->m_right = proc_next;
+        wait_prev->m_right = wait_next;
+    }
     
+    if (m_pending_tail == proc_node) {
+        assert(m_waiting_tail == wait_node);
+        assert((proc_node->m_right == NULL) && (wait_node->m_right == NULL));
+        
+        // Adjust the queue tail
+        m_pending_tail = proc_prev;
+        m_waiting_tail = wait_prev;
+    }
+    else {
+        proc_next->m_left = proc_prev;
+        wait_next->m_left = wait_prev;
+    }
+
+    m_num_elems -= 1;
 }
 
 bool
