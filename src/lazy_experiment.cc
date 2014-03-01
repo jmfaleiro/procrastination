@@ -7,10 +7,11 @@ LazyExperiment::LazyExperiment(ExperimentInfo *info)
 uint32_t
 LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs, 
                            WorkloadGenerator *gen) {
-    uint32_t num_waits = 0;
+    uint32_t num_waits = num_inputs;
     for (int i = 0; i < num_inputs; ++i) {
         Action *txn = gen->genNext();
-        num_waits += txn->materialize;
+        txn->materialize = 1;
+        //        num_waits += txn->materialize; XXX: REMOVE ME
         input_queue->EnqueueBlocking((uint64_t)txn);
     }
     return num_waits;
@@ -25,17 +26,27 @@ LazyExperiment::RunTPCC() {
     assert(m_output_queues != NULL);
     
     // Put txns in the input queue
-    TPCCGenerator *tpcc_gen = new TPCCGenerator();
-    uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, tpcc_gen);
+    TPCCGenerator *txn_generator;
+    if (m_info->given_split) {
+        txn_generator = new TPCCGenerator(m_info->new_order, m_info->district, 
+                                          m_info->stock_level, m_info->delivery, 
+                                          m_info->order_status);
+    }
+    else {
+        txn_generator = new TPCCGenerator(45, 43, 5, 5, 5);
+    }
+    uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, txn_generator);
     DoThroughputExperiment(m_info->num_workers, num_waits);    
 }
 
 void
 LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     // Start the workers and the scheduler
+    /*
     for (int i = 0; i < m_info->num_workers; ++i) {
         m_workers[i]->Run();
     }
+    */
     m_scheduler->Run();
 
     timespec start_time, end_time;
@@ -44,6 +55,10 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     // Wait for the exeriment to complete
     uint32_t num_done = 0;
     uint32_t num_waits_done = 0;
+    while (!m_input_queue->isEmpty())
+        ;
+
+    /*
     while (num_waits_done < num_waits) {
         for (int i = 0; i < num_workers; ++i) {
             Action *dummy;
@@ -53,6 +68,7 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
             }
         }
     }
+    */
     
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
     timespec diff = diff_time(end_time, start_time);
@@ -94,7 +110,8 @@ LazyExperiment::InitializeTPCC() {
     
     // Initialize the scheduler input queue
     SimpleQueue **input_queue = InitQueues(1, LARGE_QUEUE);
-    m_input_queue = *input_queue;
+    m_input_queue = input_queue[0];
+    assert(m_input_queue != NULL);
     
     // Initialize the scheduler
     m_scheduler =  new LazyScheduler(m_input_queue, feedback, worker_inputs, 
