@@ -8,9 +8,11 @@ SimpleQueue**
 Experiment::InitQueues(int num_queues, uint32_t size) {
     assert(!(size & (size-1)));
     SimpleQueue **input_queues = new SimpleQueue*[m_info->num_workers];
+    assert(input_queues != NULL);
     for (int i = 0; i < m_info->num_workers; ++i) {
         char *raw_queue_data = (char*)malloc(CACHE_LINE*size);
         input_queues[i] = new SimpleQueue(raw_queue_data, size);
+        assert(input_queues[i] != NULL);
     }
     return input_queues;
 }

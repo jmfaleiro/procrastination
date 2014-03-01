@@ -16,14 +16,23 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
                              int num_params, int max_chain) 
     : Runnable(cpu_number) {
     m_tables = do_tbl_init<Heuristic>(params, num_params);
+    assert(m_tables != NULL);
     m_max_chain = max_chain;
     m_last_used = 0;
-    assert(m_tables != NULL);
+    
+    m_input_queue = input_queue;
+    m_feedback_queues = feedback_queues;
+    m_worker_queues = worker_queues;
+
+    assert(m_input_queue != NULL);
+    assert(m_feedback_queues != NULL);
+    assert(m_worker_queues != NULL);
 }
 
 void
 LazyScheduler::StartWorking() {
     Action *txn;
+    assert(m_input_queue != NULL);
     while (true) {        
         // Check if any of the workers need to continue a txn
         for (int i = 0; i < m_num_workers; ++i) {
@@ -104,7 +113,7 @@ void LazyScheduler::AddGraph(Action* action) {
         }        
             
         int index = m_last_used % m_num_workers;
-        m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
+        //        m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
         m_last_used += 1;        
     }
 }
