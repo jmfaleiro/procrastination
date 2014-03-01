@@ -67,22 +67,6 @@ public:
     void LaterPhase();
 };
 
-
-
-class StockLevelTxn : public Action {
-private:
-    static const int s_district_index = 0;
-    int 			m_threshold;
-    int 			m_stock_count;
-    uint32_t 		m_warehouse_id;
-    uint32_t 		m_district_id;
-
-public:
-    StockLevelTxn(uint32_t warehouse_id, uint32_t district_id, int threshold);
-    bool NowPhase();
-    void LaterPhase();
-};
-
 class StockLevelTxn1;
 class StockLevelTxn0 : public Action {
 private:
@@ -90,7 +74,7 @@ private:
 
 protected:
     int 			m_threshold;
-    int 			m_stock_count;
+    int 			m_num_stocks;
     uint32_t 		m_warehouse_id;
     uint32_t 		m_district_id;
     uint32_t 		m_next_order_id;    
@@ -100,6 +84,7 @@ public:
                    StockLevelTxn1 *level1_txn);
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 class StockLevelTxn2;
@@ -112,26 +97,17 @@ public:
                    StockLevelTxn2 *level2_txn);
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 class StockLevelTxn3;
 class StockLevelTxn2 : public StockLevelTxn1 {
-private:
-    StockLevelTxn3 *m_level3_txn;
 public:
-    StockLevelTxn2(uint32_t warehouse_id, uint32_t district_id, int threshold, 
-                   StockLevelTxn3 *level3_txn);
+    StockLevelTxn2(uint32_t warehouse_id, uint32_t district_id, int threshold);
+
     virtual bool NowPhase();
     virtual void LaterPhase();
 };
-
-class StockLevelTxn3 : public StockLevelTxn2 {
-public:
-    StockLevelTxn3(uint32_t warehouse_id, uint32_t district_id, int threshold);
-    virtual bool NowPhase();
-    virtual void LaterPhase();
-};
-
 
 class OrderStatusTxn1;
 class OrderStatusTxn0 : public Action {
@@ -150,28 +126,13 @@ public:
                     bool c_by_name, OrderStatusTxn1 *level1_txn);
     bool NowPhase();
     void LaterPhase();
+    bool IsLinked(Action **action);
 };
 
 class OrderStatusTxn1 : public OrderStatusTxn0 {
 public:
     OrderStatusTxn1(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
                     bool c_by_name);
-    bool NowPhase();
-    void LaterPhase();
-};
-
-class OrderStatusTxn : public Action {
-private:
-    uint32_t 		m_warehouse_id;
-    uint32_t 		m_district_id;
-    uint32_t 		m_customer_id;
-    bool 			m_c_by_name;
-    char 			*m_c_last;
-    uint64_t 		m_order_line_quantity;
-
-public:
-    OrderStatusTxn(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
-                   bool c_by_name);
     bool NowPhase();
     void LaterPhase();
 };
@@ -193,6 +154,7 @@ public:
                 DeliveryTxn1 *level1_txn);
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 class DeliveryTxn2;
@@ -205,6 +167,7 @@ public:
 
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 class DeliveryTxn2 : public DeliveryTxn1 {
@@ -212,18 +175,6 @@ public:
     DeliveryTxn2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
     virtual bool NowPhase();
     virtual void LaterPhase();
-};
-
-class DeliveryTxn : public Action {
-private:
-    uint32_t 		m_warehouse_id;
-    uint32_t 		m_district_id;
-    uint32_t 		m_carrier_id;
-    std::vector<int>		m_num_order_lines;
-public:
-    DeliveryTxn(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
-    bool NowPhase();
-    void LaterPhase();
 };
 
 #endif		//  LAZY_TPCC_HH_

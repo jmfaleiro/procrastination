@@ -71,8 +71,10 @@ public:
     NewOrderEager*
     gen_new_order() {
         uint64_t w_id = (uint64_t)m_util.gen_rand_range(0, s_num_warehouses-1); 
-        uint64_t d_id = (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);        
-        uint64_t c_id = (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1);         
+        uint64_t d_id = 
+            (uint64_t)m_util.gen_rand_range(0, s_districts_per_wh-1);        
+        uint64_t c_id = 
+            (uint64_t)m_util.gen_rand_range(0, s_customers_per_dist-1);         
 
         uint32_t num_items = m_util.gen_rand_range(5, 15); 
         uint64_t *item_ids = (uint64_t*)malloc(sizeof(uint64_t)*num_items);
