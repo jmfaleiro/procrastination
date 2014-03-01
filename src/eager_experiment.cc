@@ -28,10 +28,10 @@ EagerExperiment::InitializeTPCCLockManager() {
             GetHistoryTableInit(&lock_mgr_params[i]);
             break;
         case NEW_ORDER:
-            GetNewOrderTableInit(1<<24, &lock_mgr_params[i]);
+            GetNewOrderTableInit(1<<24, &lock_mgr_params[i], true);
             break;
         case OPEN_ORDER:
-            GetOpenOrderTableInit(1<<24, &lock_mgr_params[i]);
+            GetOpenOrderTableInit(1<<24, &lock_mgr_params[i], true);
             break;            
         case ORDER_LINE:	// All order lines implicitly sync on open order
             GetEmptyTableInit(&lock_mgr_params[i]);

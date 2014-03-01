@@ -3,41 +3,12 @@
 
 #include <lazy_worker.hh>
 
-LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *output_queue, 
-                       int cpu) {
+LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue, 
+                       SimpleQueue *output_queue, int cpu) 
+    : Runnable(cpu) {
     m_input_queue = input_queue;
     m_output_queue = output_queue;
     m_cpu_number = (uint64_t)cpu;
-}
-
-void
-LazyWorker::Run() {
-    assert(m_start_signal == 0);
-    
-    // Kickstart the worker thread
-    pthread_create(&m_worker_thread, NULL, BootstrapWorker, this);
-    
-    // Wait for the newly spawned thread to report that it has successfully
-    // initialized
-    while (!m_start_signal)
-        ;    
-}
-
-void*
-LazyWorker::BootstrapWorker(void *arg) {
-    LazyWorker *worker = (LazyWorker*)arg;
-    
-    // Pin the thread to a cpu
-    if (pin_thread((int)worker->m_cpu_number) == -1) {
-        std::cout << "LazyWorker couldn't bind to a cpu!!!\n";
-        exit(-1);
-    }
-
-    // Signal that we've initialized
-    fetch_and_increment(&worker->m_start_signal);	
-
-	// Start processing input
-    worker->WorkerFunction();
 }
 
 void
@@ -344,7 +315,7 @@ LazyWorker::RunClosure(ActionNode *to_proc) {
 }
 
 void
-LazyWorker::WorkerFunction() {
+LazyWorker::StartWorking() {
     Action *txn;
     while (true) {
         if ((m_num_elems < 1000) && (m_input_queue->Dequeue((uint64_t*)&txn))) {

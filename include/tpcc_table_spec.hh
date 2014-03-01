@@ -44,17 +44,33 @@ GetHistoryTableInit(TableInit *scratch) {
 }
 
 static void
-GetNewOrderTableInit(uint32_t size, TableInit *scratch) {
-    scratch->m_table_type = CONCURRENT_HASH_TABLE;
-    scratch->m_params.m_conc_params.m_size = size;
-    scratch->m_params.m_conc_params.m_chain_bound = 20;
+GetNewOrderTableInit(uint32_t size, TableInit *scratch, bool is_eager) {
+    if (is_eager) {
+        scratch->m_table_type = CONCURRENT_HASH_TABLE;
+        scratch->m_params.m_conc_params.m_size = size;
+        scratch->m_params.m_conc_params.m_chain_bound = 20;
+    }
+    else {
+        scratch->m_table_type = BULK_ALLOCATING_TABLE;
+        scratch->m_params.m_bulk_params.m_size = size;
+        scratch->m_params.m_bulk_params.m_chain_bound = 10;
+        scratch->m_params.m_bulk_params.m_allocation_size = 1<<24;
+    }
 }
 
 static void
-GetOpenOrderTableInit(uint32_t size, TableInit *scratch) {
-    scratch->m_table_type = CONCURRENT_HASH_TABLE;
-    scratch->m_params.m_conc_params.m_size = size;
-    scratch->m_params.m_conc_params.m_chain_bound = 20;
+GetOpenOrderTableInit(uint32_t size, TableInit *scratch, bool is_eager) {
+    if (is_eager) {
+        scratch->m_table_type = CONCURRENT_HASH_TABLE;
+        scratch->m_params.m_conc_params.m_size = size;
+        scratch->m_params.m_conc_params.m_chain_bound = 20;
+    }
+    else {
+        scratch->m_table_type = BULK_ALLOCATING_TABLE;
+        scratch->m_params.m_bulk_params.m_size = size;
+        scratch->m_params.m_bulk_params.m_chain_bound = 10;
+        scratch->m_params.m_bulk_params.m_allocation_size = 1<<24;
+    }
 }
 
 static void

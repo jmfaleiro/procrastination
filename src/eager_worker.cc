@@ -4,12 +4,12 @@
 #include <eager_worker.hh>
 
 EagerWorker::EagerWorker(LockManager *mgr, SimpleQueue *input_queue, 
-                         SimpleQueue *output_queue, int cpu) {
+                         SimpleQueue *output_queue, int cpu) 
+    : Runnable(cpu) {
     m_lock_mgr = mgr;
     m_txn_input_queue = input_queue;
     m_output_queue = output_queue;
     m_cpu_number = cpu;
-    m_start_signal = 0;
     m_queue_head = NULL;
     m_queue_tail = NULL;    
     m_num_elems = 0;
@@ -17,33 +17,8 @@ EagerWorker::EagerWorker(LockManager *mgr, SimpleQueue *input_queue,
 }
 
 void
-EagerWorker::Run() {
-    assert(m_start_signal == 0);    
-    
-    // Kickstart the worker thread
-    pthread_create(&m_worker_thread, NULL, BootstrapWorker, this);
-
-    // Wait for the newly spawned thread to report that it has successfully 
-    // initialized
-    while (!m_start_signal)
-        ;
-}
-
-void*
-EagerWorker::BootstrapWorker(void *arg) {
-    EagerWorker *worker = (EagerWorker*)arg;
-
-	// Pin the thread to a cpu
-    if (pin_thread(worker->m_cpu_number) == -1) {
-        std::cout << "EagerWorker couldn't bind to a cpu!!!\n";
-        exit(-1);
-    }
-
-    // Signal that we've initialized
-    fetch_and_increment(&worker->m_start_signal);	
-
-	// Start processing input
-    worker->WorkerFunction();
+EagerWorker::StartWorking() {
+    WorkerFunction();
 }
 
 void

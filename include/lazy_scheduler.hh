@@ -15,8 +15,9 @@
 #include "cpuinfo.h"
 #include "util.h"
 #include <tpcc.hh>
-
+#include <lazy_worker.hh>
 #include <concurrency_control_params.hh>
+#include <runnable.hh>
 
 using namespace std;
 using namespace cc_params;
@@ -36,17 +37,8 @@ public:
     }    
 };
 
-
-enum TxnState {
-    STICKY = 0,
-    ANALYZING = 1,
-    PROCESSING = 2,
-    SUBSTANTIATED = 3,
-};
-
-
-class LazyScheduler {
-private:    
+class LazyScheduler : public Runnable {
+private:
     SimpleQueue 						*m_input_queue;
     SimpleQueue							**m_feedback_queues;
     SimpleQueue							**m_worker_queues;
@@ -56,23 +48,18 @@ private:
     uint64_t 							m_last_used;
     int		 							m_max_chain;
 
-    void*
-    BootstrapScheduler(void *arg);
-    
-    void
-    SchedulerFunction();
-
     void
     AddGraph(Action *txn);
+
+protected:
+    virtual void
+    StartWorking();
 
 public:
     LazyScheduler(SimpleQueue *input_queue, SimpleQueue **feedback_queues, 
                   SimpleQueue **worker_queues, int num_workers, int cpu_number,
                   cc_params::TableInit *params, int num_params, 
                   int max_chain);
-    
-    void
-    Run();
 
     uint64_t
     NumStickified();

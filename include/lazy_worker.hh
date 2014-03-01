@@ -6,9 +6,8 @@
 
 #include <action.h>
 #include <concurrent_queue.h>
-#include <cpuinfo.h>
-#include <pthread.h>
 #include <util.h>
+#include <runnable.hh>
 
 enum ActionState {
     STICKY,
@@ -24,15 +23,12 @@ public:
     ActionNode			*m_right;
 };
 
-class LazyWorker {
+class LazyWorker : public Runnable {
 private:
     SimpleQueue 			*m_input_queue;			// Txns to process
     SimpleQueue 			*m_output_queue;		// Dump finished txns here
     SimpleQueue 			*m_feedback_queue;		
     uint64_t				m_cpu_number;			// CPU to which to bind
-    volatile uint64_t 		m_start_signal;			// Flag indicating we've begun
-    pthread_t 				m_worker_thread;		// Worker thread
-    
     
     // List of pending closures    
     ActionNode 				*m_pending_head;
@@ -61,17 +57,11 @@ private:
     // Return a list of action nodes to the free-list
     inline void
     ReturnActionNodes(ActionNode *head, ActionNode *tail);
-    
-    static void*
-    BootstrapWorker(void *arg);
 
     static void
     ListAppend(ActionNode **lst_head, ActionNode **lst_tail, ActionNode *head, 
                ActionNode *tail);
 
-    virtual void
-    WorkerFunction();
-    
     void
     processWrite(Action *action, int writeIndex, ActionNode **p_head, 
                  ActionNode **p_tail, ActionNode **w_head, ActionNode **w_tail);
@@ -92,12 +82,15 @@ private:
 
     bool
     CheckDependencies(ActionNode *waits);
+
+protected:    
+    void
+    StartWorking();
     
 public:
-    LazyWorker(SimpleQueue *input_queue, SimpleQueue *output_queue, int cpu);
+    LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue, 
+               SimpleQueue *output_queue, int cpu);
     
-    virtual void
-    Run();    
 };
 
 #endif 		//  LAZY_WORKER_HH_

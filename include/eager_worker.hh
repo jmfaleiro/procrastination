@@ -8,24 +8,19 @@
 #include <concurrent_queue.h>
 #include <pthread.h>
 #include <cpuinfo.h>
+#include <runnable.hh>
 
-class EagerWorker {
+class EagerWorker : public Runnable {
 private:
     LockManager			*m_lock_mgr;			// Global lock manager
     SimpleQueue 		*m_txn_input_queue;		// Thread-local input queue
     SimpleQueue 		*m_output_queue;		// Thread-local output queue
     int 				m_cpu_number;			// CPU to which to bind
-    volatile uint64_t	m_start_signal;			// Flag indicating we've begun
-    pthread_t 			m_worker_thread;		// Worker thread
     EagerAction 		*m_queue_head;			// Head of queue of waiting txns
     EagerAction			*m_queue_tail;			// Tail of queue of waiting txns
     int					m_num_elems;			// Number of elements in the queue
     uint32_t 			m_num_done;
     
-    // The worker threads starts executing in this function
-    static void*
-    BootstrapWorker(void *arg);
-
     // Worker thread function
     virtual void
     WorkerFunction();
@@ -48,17 +43,13 @@ private:
     uint32_t
     QueueCount(EagerAction *txn);
 
+protected:    
+    virtual void
+    StartWorking();
+
 public:
     EagerWorker(LockManager *mgr, SimpleQueue *input_queue, 
                 SimpleQueue *output_queue, int cpu);
-    
-    // Should be called from the co-ordinating function
-    //
-    // Spawns a thread dedicated to processing txns pinned to a particular cpu 
-    // (as specified by m_cpu_number).
-    virtual void
-    Run();    
-
 };
 
 #endif 		 // EAGER_WORKER_HH_
