@@ -9,6 +9,20 @@ LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue,
     m_input_queue = input_queue;
     m_output_queue = output_queue;
     m_cpu_number = (uint64_t)cpu;
+    InitActionNodes();
+}
+
+void
+LazyWorker::InitActionNodes() {
+    size_t num_nodes = 1<<24;
+    size_t size = sizeof(ActionNode)*num_nodes;
+    m_free_list = (ActionNode*)malloc(size);
+    memset(m_free_list, 0, size);
+
+    for (size_t i = 0; i < num_nodes-1; ++i) {
+        m_free_list[i].m_next = &m_free_list[i+1];
+    }
+    m_free_list[num_nodes-1].m_next = NULL;
 }
 
 void
@@ -40,27 +54,14 @@ void
 LazyWorker::ProcessTxn(Action *txn, ActionNode **proc_head, 
                        ActionNode **proc_tail, ActionNode **wait_head, 
                        ActionNode **wait_tail) {
-    
+    assert(txn->state == PROCESSING);
+    assert(txn->owner == m_cpu_number);
+
     // Initialize the state we're going to return
     *proc_head = NULL;
     *proc_tail = NULL;
     *wait_head = NULL;
     *wait_tail = NULL;    
-    
-    // Try to get permission to run this transaction. We get permission if the 
-    // its a sticy. Otherwise, someone else has already taken ownership of the 
-    // txn.
-    int txn_state;
-    lock(&txn->lock_word);
-    if ((txn_state = txn->state) == STICKY) {
-        txn->state = PROCESSING;
-    }    
-    unlock(&txn->lock_word);
-
-    // We didn't get permission to run this txn
-    if (txn_state != STICKY) {
-        return;
-    }
     
     // If we've reached this point, we have permission to run the txn
     int num_reads = txn->readset.size();
@@ -105,7 +106,7 @@ LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
         // We only care if this txn has not been substantiated
         if (prev->state != SUBSTANTIATED) {
             if (prev->state == PROCESSING) {                
-                if (prev->owner == m_cpu_number) {
+                if (prev->owner != m_cpu_number) {
                     // Someone's taken ownership of this dependency
                     ActionNode *to_wait = GetActionNode();
                     to_wait->m_action = prev;
@@ -114,9 +115,11 @@ LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
             }
             else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
                 // The dependency is our responsibility
-                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);            
+                prev->owner = m_cpu_number;
+                asm volatile("":::"memory");
+                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);
             }
-            else {
+            else {                
                 assert(prev->owner != m_cpu_number);
                 ActionNode *to_wait = GetActionNode();
                 to_wait->m_action = prev;
@@ -269,10 +272,13 @@ LazyWorker::Dequeue(ActionNode *proc_node, ActionNode *wait_node) {
 }
 
 bool
-LazyWorker::CheckDependencies(ActionNode *waits) {
+LazyWorker::CheckDependencies(ActionNode *waits, ActionNode **tail) {
+    ActionNode *ret = NULL;
     for (; waits != NULL && waits->m_action->state == SUBSTANTIATED; 
-         waits = waits->m_next) 
-        ;
+         waits = waits->m_next) {
+        ret = waits;
+    }
+    *tail = ret;
     return (waits == NULL);
 }
 
@@ -284,16 +290,18 @@ LazyWorker::CheckReady() {
          pending != NULL; 
          pending = pending->m_right, waiting = waiting->m_right) {
         assert(waiting != NULL);
-        if (CheckDependencies(waiting)) {
-            RunClosure(pending);
-            Dequeue(pending, waiting);
+        ActionNode *w_tail, *p_tail;
+        if (CheckDependencies(waiting, &w_tail)) {
+            RunClosure(pending, &p_tail);
+            ReturnActionNodes(pending, p_tail);
+            ReturnActionNodes(waiting, w_tail);
         }
     }
 }
 
 // Runs the entire transitive closure
 void
-LazyWorker::RunClosure(ActionNode *to_proc) {
+LazyWorker::RunClosure(ActionNode *to_proc, ActionNode **tail) {
     ActionNode *iter1 = to_proc, *iter2 = to_proc;
     while (iter1 != NULL) {
         Action *action = iter1->m_action;
@@ -302,16 +310,20 @@ LazyWorker::RunClosure(ActionNode *to_proc) {
             iter1 = iter1->m_next;
         }
     }
+    iter1 = NULL;
     while (iter2 != NULL) {
-        lock(&iter2->m_action->lock_word);
-        iter2->m_action->state = SUBSTANTIATED;
-        unlock(&iter2->m_action->lock_word);
+        xchgq(&iter2->m_action->state, SUBSTANTIATED);
         Action *continuation = NULL;
         if (iter2->m_action->IsLinked(&continuation)) {
             m_feedback_queue->Enqueue((uint64_t)continuation);
         }
+        else {
+            m_output_queue->Enqueue((uint64_t)iter2);
+        }
+        iter1 = iter2;
         iter2 = iter2->m_next;
     }
+    *tail = iter1;
 }
 
 void
@@ -325,7 +337,9 @@ LazyWorker::StartWorking() {
             // If there are no dependencies to wait for, we can execute the 
             // closure immediately
             if (wait_head == NULL) {
-                RunClosure(proc_head);
+                ActionNode *temp;
+                RunClosure(proc_head, &temp);
+                assert(temp == proc_tail);
                 ReturnActionNodes(proc_head, proc_tail);
             }
             else { // Defer closure execution

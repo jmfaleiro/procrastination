@@ -26,7 +26,8 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     dep_info.record.m_table = CUSTOMER;
     dep_info.record.m_key = customer_key;
     readset.push_back(dep_info);
-
+    
+     
     // Create stock, and item keys for each item. 
     for (uint32_t i = 0; i < numItems; ++i) {
 
@@ -54,14 +55,6 @@ NewOrderTxn::NewOrderTxn(uint64_t w_id, uint64_t d_id, uint64_t c_id,
     dep_info.record.m_table = NEW_ORDER;
     dep_info.record.m_key = 0;
     writeset.push_back(dep_info);
-     
-    /*
-      for (uint32_t i = 0; i < numItems; ++i) {
-      dep_info.record.m_table = ORDER_LINE;
-      dep_info.record.m_key = 0;
-      writeset.push_back(dep_info);
-      }
-    */
 
     dep_info.record.m_table = OPEN_ORDER;
     dep_info.record.m_key = 0;
@@ -117,17 +110,6 @@ NewOrderTxn::NowPhase() {
     uint64_t new_order_key = TPCCKeyGen::create_new_order_key(keys);
     writeset[m_num_items].record.m_key = new_order_key;
     writeset[m_num_items+1].record.m_key = new_order_key;
-    //     writeset[m_num_items].record.m_key = new_order_key;
-    /*
-      for (int i = 0; i < m_num_items; ++i) {
-      keys[3] = (uint32_t)i;
-      writeset[m_num_items+1+i].record.m_key = 
-      TPCCKeyGen::create_order_line_key(keys);
-      } 
-
-      writeset[m_num_items+1].record.m_key = new_order_key;
-      writeset[2*m_num_items+1].record.m_key = new_order_key;    
-    */
     return true;		// The txn can be considered committed. 
 }
 
@@ -162,9 +144,8 @@ NewOrderTxn::LaterPhase() {
         assert(composite.m_table == STOCK);
         uint64_t ol_w_id = TPCCKeyGen::get_warehouse_key(composite.m_key);
         uint64_t ol_s_id = TPCCKeyGen::get_stock_key(composite.m_key);
-        uint64_t ol_i_id = readset[s_item_index+i].record.m_key;
+        uint64_t ol_i_id = m_item_ids[i];
 
-        assert(readset[s_item_index+i].record.m_table == ITEM);        
         assert(ol_i_id == ol_s_id);
         assert(ol_i_id < s_num_items);
 
@@ -253,9 +234,9 @@ NewOrderTxn::LaterPhase() {
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = m_timestamp;
-    Oorder *new_oorder = s_oorder_tbl->Put(writeset[2*m_num_items+1].record.m_key, oorder);
+    Oorder *new_oorder = s_oorder_tbl->Put(writeset[m_num_items+1].record.m_key, oorder);
     uint64_t *old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
-    *old_index = writeset[2*m_num_items+1].record.m_key;
+    *old_index = writeset[m_num_items+2].record.m_key;
 }
 
 

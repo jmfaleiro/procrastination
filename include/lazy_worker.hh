@@ -49,6 +49,9 @@ private:
 
 
     ActionNode				*m_free_list;		// Free-list of ActionNodes
+
+    void
+    InitActionNodes();
     
     // Get an action node from the free-list
     inline ActionNode*
@@ -75,13 +78,13 @@ private:
                ActionNode **wait_head, ActionNode **wait_tail);
     
     void
-    RunClosure(ActionNode *to_proc);
+    RunClosure(ActionNode *to_proc, ActionNode **tail);
 
     void
     CheckReady();
 
     bool
-    CheckDependencies(ActionNode *waits);
+    CheckDependencies(ActionNode *waits, ActionNode **tail);
 
 protected:    
     void

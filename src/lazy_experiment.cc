@@ -7,11 +7,13 @@ LazyExperiment::LazyExperiment(ExperimentInfo *info)
 uint32_t
 LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs, 
                            WorkloadGenerator *gen) {
-    uint32_t num_waits = num_inputs;
+    uint32_t num_waits = 0;
     for (int i = 0; i < num_inputs; ++i) {
         Action *txn = gen->genNext();
-        txn->materialize = 1;
-        //        num_waits += txn->materialize; XXX: REMOVE ME
+        txn->materialize = (rand() % m_info->substantiate_period) == 0;
+        if (txn->materialize) {
+            num_waits += 1;
+        }
         input_queue->EnqueueBlocking((uint64_t)txn);
     }
     return num_waits;
@@ -28,12 +30,13 @@ LazyExperiment::RunTPCC() {
     // Put txns in the input queue
     TPCCGenerator *txn_generator;
     if (m_info->given_split) {
+        assert(false);		// XXX: REMOVE ME
         txn_generator = new TPCCGenerator(m_info->new_order, m_info->district, 
                                           m_info->stock_level, m_info->delivery, 
                                           m_info->order_status);
     }
     else {
-        txn_generator = new TPCCGenerator(45, 43, 5, 5, 5);
+        txn_generator = new TPCCGenerator(45, 0, 0, 0, 0);
     }
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, txn_generator);
     DoThroughputExperiment(m_info->num_workers, num_waits);    
@@ -42,11 +45,10 @@ LazyExperiment::RunTPCC() {
 void
 LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     // Start the workers and the scheduler
-    /*
     for (int i = 0; i < m_info->num_workers; ++i) {
         m_workers[i]->Run();
     }
-    */
+    
     m_scheduler->Run();
 
     timespec start_time, end_time;
@@ -55,24 +57,31 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     // Wait for the exeriment to complete
     uint32_t num_done = 0;
     uint32_t num_waits_done = 0;
+    std::cout << "To wait: " << num_waits << "\n";
+    /*
     while (!m_input_queue->isEmpty())
         ;
+    */
 
-    /*
     while (num_waits_done < num_waits) {
         for (int i = 0; i < num_workers; ++i) {
             Action *dummy;
-            if (m_output_queues[i]->Dequeue((uint64_t*)&dummy)) {
-                ++num_done;
-                num_waits_done += dummy->materialize;
+            while (m_output_queues[i]->Dequeue((uint64_t*)&dummy)) {
+                num_done += 1;
+                if (dummy->materialize) {
+                    num_waits_done += 1;
+                }
             }
         }
     }
-    */
-    
+
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
+    if (num_done < num_waits_done) {
+        std::cout << num_done << " " << num_waits_done << "\n";
+    }
+    assert(num_done >= num_waits_done);
     timespec diff = diff_time(end_time, start_time);
-    std::cout << diff.tv_sec << "." << diff.tv_nsec << "\n";
+    std::cout << num_done << " " << diff.tv_sec << "." << diff.tv_nsec << "\n";
 }
 
 void

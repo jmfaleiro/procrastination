@@ -148,7 +148,7 @@ class Action {
  public:  
   bool is_checkout;
   int num_writes;
-  bool materialize;
+  uint32_t materialize;
   int is_blind;
 
 

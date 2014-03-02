@@ -20,6 +20,7 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
     m_max_chain = max_chain;
     m_last_used = 0;
     
+    m_num_workers = num_workers;
     m_input_queue = input_queue;
     m_feedback_queues = feedback_queues;
     m_worker_queues = worker_queues;
@@ -63,7 +64,7 @@ void LazyScheduler::AddGraph(Action* action) {
     int* count_ptrs[num_reads+num_writes];
         
     // Go through the read set. 
-    bool force_materialize = action->materialize;
+    uint32_t force_materialize = action->materialize;
     for (int i = 0; i < num_reads; ++i) {
         CompositeKey record = action->readset[i].record;
         Heuristic *dep_info = m_tables[record.m_table]->GetPtr(record.m_key);
@@ -82,7 +83,7 @@ void LazyScheduler::AddGraph(Action* action) {
         // Increment the length of the chain corresponding to this record, 
         // check if it exceeds our threshold value. 
         dep_info->chain_length += 1;
-        force_materialize |= (dep_info->chain_length >= m_max_chain);
+        force_materialize += (uint32_t)(dep_info->chain_length >= m_max_chain);
     }
         
     // Go through the write set. 
@@ -104,16 +105,18 @@ void LazyScheduler::AddGraph(Action* action) {
         // Increment the length of the chain corresponding to this record, 
         // check if it exceeds our threshold value. 
         dep_info->chain_length += 1;
-        force_materialize |= (dep_info->chain_length >= m_max_chain);
+        force_materialize += (uint32_t)(dep_info->chain_length >= m_max_chain);
     }  
 
-    if (force_materialize) {
+    if (force_materialize != 0) {
         for (int i = 0; i < num_reads+num_writes; ++i) {
             *(count_ptrs[i]) = 0;		  
-        }        
-            
+        }                
         int index = m_last_used % m_num_workers;
-        //        m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
+        action->state = PROCESSING;
+        action->owner = index+1;
+        asm volatile("":::"memory");
+        m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
         m_last_used += 1;        
     }
 }
