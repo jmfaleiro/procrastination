@@ -42,11 +42,19 @@ private:
     uint32_t 				m_num_elems;		
 
     void
+    CheckList(ActionNode *list);
+
+    void
+    EnqueueInner(ActionNode *list, ActionNode **head, ActionNode **tail);
+
+    void
+    DequeueInner(ActionNode *node, ActionNode **head, ActionNode **tail);
+
+    void
     Enqueue(ActionNode *proc_node, ActionNode *wait_node);
 
     void
     Dequeue(ActionNode *proc_node, ActionNode *wait_node);
-
 
     ActionNode				*m_free_list;		// Free-list of ActionNodes
 
@@ -62,8 +70,8 @@ private:
     ReturnActionNodes(ActionNode *head, ActionNode *tail);
 
     static void
-    ListAppend(ActionNode **lst_head, ActionNode **lst_tail, ActionNode *head, 
-               ActionNode *tail);
+    ListAppend(ActionNode **lst_head, ActionNode **lst_tail, ActionNode *head);
+           
 
     void
     processWrite(Action *action, int writeIndex, ActionNode **p_head, 
