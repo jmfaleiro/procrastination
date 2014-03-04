@@ -5,7 +5,8 @@ NormalGenerator::NormalGenerator(int read_size,
                                  int num_records,
                                  int freq,
                                  int std_dev) {
-				 
+    
+    /*
     m_read_set_size = read_size;
     m_write_set_size = write_size;
     m_num_records = num_records;
@@ -18,6 +19,7 @@ NormalGenerator::NormalGenerator(int read_size,
 	m_use_next = 0;
 
     srand(time(NULL));
+    */
 }
 
 int NormalGenerator::genUnique(std::default_random_engine* generator,
@@ -36,6 +38,8 @@ int NormalGenerator::genUnique(std::default_random_engine* generator,
 }
 
 Action* NormalGenerator::genNext() {
+    return NULL;
+    /*
     // Make sure that we generate unique records in the read/write set. 
     std::set<int> done;
 
@@ -82,4 +86,5 @@ Action* NormalGenerator::genNext() {
     }
     
     return ret;
+    */
 }

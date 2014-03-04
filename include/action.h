@@ -106,87 +106,56 @@ struct DependencyInfo {
     bool is_held;
     int index;
 
-    struct DependencyInfo *next;
-    struct DependencyInfo *prev;
-
     bool operator<(const struct DependencyInfo &other) const {
-        return (this->record < other.record);
+        return (((uint64_t)this->dependency) > ((uint64_t)other.dependency));
     }
     
     bool operator>(const struct DependencyInfo &other) const {
-        return (this->record > other.record);
+        return (((uint64_t)this->dependency) < ((uint64_t)other.dependency));
     }
     
     bool operator==(const struct DependencyInfo &other) const {
-        return (this->record == other.record);
+        return (((uint64_t)this->dependency) == ((uint64_t)other.dependency));
     }
     
     bool operator!=(const struct DependencyInfo &other) const {
-        return (this->record != other.record);
+        return (((uint64_t)this->dependency) != ((uint64_t)other.dependency));
     }
 
     bool operator>=(const struct DependencyInfo &other) const {
-        return !(this->record < other.record);
+        return (((uint64_t)this->dependency) <= ((uint64_t)other.dependency));
     }
 
     bool operator<=(const struct DependencyInfo &other) const {
-        return !(this->record > other.record);
+        return (((uint64_t)this->dependency) >= ((uint64_t)other.dependency));
     }        
 };
 
-
-struct StateLock {
-  uint64_t values[8];
-} __attribute__ ((aligned(CACHE_LINE)));
-
 class Action {
-
- private:
-  // Use a 64-bit field to manage the lock + state of the transaction. 
-  volatile uint64_t values[8] __attribute__ ((aligned(CACHE_LINE)));
 
  public:  
   bool is_checkout;
-  int num_writes;
   uint32_t materialize;
   int is_blind;
 
-
-  volatile uint64_t start_time;
-  volatile uint64_t end_time;
-  volatile uint64_t system_start_time;
-  volatile uint64_t system_end_time;
+  //  volatile uint64_t start_time;
+  //  volatile uint64_t end_time;
+  //  volatile uint64_t system_start_time;
+  //  volatile uint64_t system_end_time;
   std::vector<struct DependencyInfo> readset;
   std::vector<struct DependencyInfo> writeset;
-  std::vector<int> real_writes;
-  volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_start_time;    
-  volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_end_time;    
-  volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
+  
+  uint32_t num_reads;
+  uint32_t num_writes;
+
+  //  std::vector<int> real_writes;
+  //  volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_start_time;    
+  //  volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_end_time;    
+  //  volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
 
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) state;
-  volatile uint64_t __attribute__((aligned(CACHE_LINE))) owner;
+  uint64_t owner;
 
-  
-  // Use the following two functions while performing graph traversals, to 
-  // ensure mutual exclusion between threads that touch the same transaction. 
-  static inline void Lock(Action* action) {
-
-    // Try to set the first element of the values array to 1. 
-    while (xchgq(&(action->values[0]), 1) == 1)
-      do_pause();
-  }
-  static inline void Unlock(Action* action) {
-    xchgq(&(action->values[0]), 0);
-  }
-
-  static inline void ChangeState(Action* action, uint64_t value) {
-    xchgq(&(action->values[4]), value);
-  }
-
-  static inline uint64_t CheckState(Action* action) {
-    return action->values[4];
-  }
-  
   virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
   virtual bool IsLinked(Action **cont) { *cont = NULL; return false; }

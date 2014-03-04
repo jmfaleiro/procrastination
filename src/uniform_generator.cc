@@ -34,6 +34,8 @@ int UniformGenerator::genUnique(std::set<int>* done) {
 }
 
 Action* UniformGenerator::genNext() {
+    return NULL;
+    /*
     std::set<int> done;
     Action* ret = &m_action_set[m_use_next];
     ret->start_time = 0;
@@ -70,5 +72,6 @@ Action* UniformGenerator::genNext() {
 		ret->materialize = false;
     }
     return ret;  
+    */
 }
 
