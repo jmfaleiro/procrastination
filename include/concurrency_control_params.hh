@@ -8,7 +8,7 @@
 #include <table.hh>
 #include <hash_table.hh>
 #include <bulk_allocating_table.hh>
-#include <concurrent_hash_table.hh>
+#include <concurrent_no_fail_table.hh>
 #include <two_dim_table.hh>
 #include <three_dim_table.hh>
 #include <one_dim_table.hh>
@@ -95,7 +95,7 @@ namespace cc_params {
                 break;
             case CONCURRENT_HASH_TABLE:
                 ret[i] =
-                    new ConcurrentHashTable<uint64_t, V>
+                    new ConcurrentNoFailTable<uint64_t, V>
                     (table_params.m_conc_params.m_size,
                      table_params.m_conc_params.m_chain_bound);
                 break;

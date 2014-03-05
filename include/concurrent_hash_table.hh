@@ -18,7 +18,7 @@ class ConcurrentHashTable : public HashTable<K, V> {
     //
     // *u means that the 8-byte word is unused. 
 
-private:
+protected:
     virtual BucketItem<K, V>*
     GetBucket(K key) {
         uint64_t index = this->m_hash_function(key) & this->m_mask;    
@@ -75,36 +75,6 @@ public:
     virtual V*
     GetPtr(K key) {
         BucketItem<K, V> *bucket = GetBucket(key);        
-
-        if (bucket == NULL) {
-            uint64_t index = this->m_hash_function(key) & this->m_mask;
-            BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, V());    
-
-            BucketItem<K, V> **table = this->m_table;
-            uint64_t *lock_word = 
-                (uint64_t*)((char*)table+CACHE_LINE*index+
-                            sizeof(BucketItem<K, V>*));
-            lock(lock_word);
-            BucketItem<K, V> **head = 
-                (BucketItem<K, V>**)((char*)table+CACHE_LINE*index);        
-            BucketItem<K, V> *to_ret = *head;
-            while (to_ret != NULL && to_ret->m_key != key) {
-                to_ret = to_ret->m_next;
-            }
-            if (to_ret == NULL) {
-                to_insert->m_next = *head;
-                *head = to_insert;
-            }
-            unlock(lock_word);            
-            if (to_ret != NULL) {
-                delete(to_insert);
-            }
-            else {
-                to_ret = to_insert;
-            }
-            return &to_ret->m_value;
-        }
-
         if (bucket == NULL) {
             return NULL;
         }
