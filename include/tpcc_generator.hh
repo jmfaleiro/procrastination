@@ -168,12 +168,8 @@ public:
                                                     threshold, level2);
         StockLevelTxn0 *level0 = new StockLevelTxn0(warehouse_id, district_id, 
                                                     threshold, level1);
-        /*
-        EagerAction *temp;
-        assert(level0->IsLinked(&temp));
-        assert(temp == level1);
-        assert(level1->IsLinked(&temp));
-        assert(temp == level2);*/
+        level1->materialize = true;
+        level2->materialize = true;
         return level0;
     }
     

@@ -107,6 +107,7 @@ public:
 
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 class OrderStatusTxn1;

@@ -241,10 +241,7 @@ NewOrderTxn::LaterPhase() {
     oorder.o_ol_cnt = m_num_items;
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = m_timestamp;
-    Oorder *new_oorder = s_oorder_tbl->Put(writeset[m_num_items+1].record.m_key, oorder);
-    
-    
-    
+    Oorder *new_oorder = s_oorder_tbl->Put(writeset[m_num_items+1].record.m_key, oorder);    
 
     // Write the order id into the customer's index
     uint64_t *old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
@@ -423,7 +420,7 @@ StockLevelTxn0::LaterPhase() {
         keys[2] = m_next_order_id - 1 -i;
         uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
         dep_info.record.m_key = open_order_key;
-        m_level1_txn->readset.push_back(dep_info);
+        m_level1_txn->readset.push_back(dep_info);	// XXX: FIXME
     }
 }
 
@@ -459,14 +456,22 @@ StockLevelTxn1::LaterPhase() {
     for (uint32_t i = 0; i < num_reads; ++i) {
         keys[1] = m_district_id;
         Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
+        assert(m_district_id == oorder->o_d_id);
+        assert(m_warehouse_id == oorder->o_w_id);
+        uint32_t order_id = TPCCKeyGen::get_order_key(readset[i].record.m_key);
+        assert(order_id == oorder->o_id);
         keys[2] = oorder->o_id;
         for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
             keys[3] = j;
             uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
             OrderLine *order_line = s_order_line_tbl->GetPtr(order_line_key);
+            if (order_line == NULL) {
+                std::cout << "OrderID: " << oorder->o_id << "\n";
+            }
+            assert(order_line != NULL);
             keys[1] = order_line->ol_i_id;
             dep_info.record.m_key = TPCCKeyGen::create_stock_key(keys);
-            m_level2_txn->readset.push_back(dep_info);
+            m_level2_txn->readset.push_back(dep_info);	// XXX: FIXME
         }
     }
 }
@@ -497,6 +502,12 @@ StockLevelTxn2::LaterPhase() {
         Stock *stock = s_stock_tbl->GetPtr(readset[i].record.m_key);
         m_num_stocks += ((uint32_t)(stock->s_quantity - m_threshold)) >> 31;
     }
+}
+
+bool
+StockLevelTxn2::IsLinked(Action **action) {
+    *action = NULL;
+    return false;
 }
 
 OrderStatusTxn0::OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, 
