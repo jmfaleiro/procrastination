@@ -200,7 +200,7 @@ public:
                                                       customer_id, NULL, false);
         OrderStatusTxn0 *level0 = new OrderStatusTxn0(warehouse_id, district_id,
                                                       customer_id, NULL, false, 
-                                                      level1);        
+                                                      level1, true);        
         return level0;
     }
 };

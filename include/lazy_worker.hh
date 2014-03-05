@@ -58,6 +58,12 @@ private:
 
     bool
     ProcessTxn(Action *txn);
+
+    bool
+    processRead(Action *action, int readIndex);
+
+    bool
+    processWrite(Action *action, int writeIndex);
     
     bool
     ProcessFunction(Action *txn);

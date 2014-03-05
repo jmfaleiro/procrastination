@@ -100,8 +100,8 @@ struct EagerRecordInfo {
 // The lazy scheduler has an entry of this type for every single record that is
 // read or written in the system.
 struct DependencyInfo {
-    CompositeKey record;
     Action *dependency;
+    CompositeKey record;
     bool is_write;
     bool is_held;
     int index;
@@ -144,9 +144,6 @@ class Action {
   //  volatile uint64_t system_end_time;
   std::vector<struct DependencyInfo> readset;
   std::vector<struct DependencyInfo> writeset;
-  
-  uint32_t num_reads;
-  uint32_t num_writes;
 
   //  std::vector<int> real_writes;
   //  volatile uint64_t __attribute__((aligned(CACHE_LINE))) sched_start_time;    
@@ -155,11 +152,23 @@ class Action {
 
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) state;
   uint64_t owner;
-
+  
   virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
   virtual bool IsLinked(Action **cont) { *cont = NULL; return false; }
 };
+
+/*
+static void
+ReplicateRecords(Action *action) {
+    for (size_t i = 0; i < action->read_deps.size(); ++i) {
+        action->readset.push_back(action->read_deps[i].record);        
+    }
+    for (size_t i = 0; i < action->write_deps.size(); ++i) {
+        action->writeset.push_back(action->write_deps[i].record);
+    }
+}
+*/
 
 class EagerAction {
  public:

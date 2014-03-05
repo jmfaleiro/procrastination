@@ -30,27 +30,6 @@ LazyWorker::InitActionNodes() {
     m_free_list[num_nodes-1].next = NULL;
 }
 
-/*
-void
-LazyWorker::ListAppend(ActionNode **lst_head, ActionNode **lst_tail, 
-                       ActionNode *head) {                       
-    assert((*lst_head == NULL && *lst_tail == NULL) || 
-           (*lst_head != NULL && *lst_tail != NULL));    
-    assert(head != NULL);
-    assert(head->m_action != NULL);
-    head->m_next = NULL;
-
-    if (*lst_head == NULL) {
-        *lst_head = head;
-        *lst_tail = head;
-    }
-    else {
-        (*lst_tail)->m_next = head;
-        *lst_tail = head;
-    }
-}
-*/
-
 void
 LazyWorker::Enqueue(ActionNode *txn) {
     if (m_queue_head == NULL) {
@@ -100,6 +79,7 @@ LazyWorker::RemoveQueue(ActionNode *txn) {
 
 bool
 LazyWorker::ProcessFunction(Action *txn) {
+    assert(txn != NULL);
     if (txn->state != SUBSTANTIATED) {
         if (cmp_and_swap(&txn->state, STICKY, PROCESSING)) {
             if (ProcessTxn(txn)) {
@@ -107,7 +87,7 @@ LazyWorker::ProcessFunction(Action *txn) {
                 return true;
             }
             else {
-                assert(txn->state == STICKY);
+                xchgq(&txn->state, STICKY);        
                 return false;
             }
         }
@@ -120,100 +100,8 @@ LazyWorker::ProcessFunction(Action *txn) {
     }
 }
 
-// Returns two values: 1. The transitive closure of txns to process 
-// 						(proc_head, proc_tail)
-//
-// 					   2. The set of txns we need to wait for
-//						(wait_head, wait_tail)
 bool
-LazyWorker::ProcessTxn(Action *txn) {
-    assert(txn != NULL);
-    assert(txn->state == PROCESSING);
-    
-    std::sort(txn->readset.begin(), txn->readset.end());
-    std::sort(txn->writeset.begin(), txn->writeset.end());
-    
-    uint32_t read_index = 0, write_index = 0;
-    bool ret = true;
-    uint32_t reads_done = 0, writes_done = 0;
-
-    // Acquire locks in sorted order. Both read and write sets are sorted according to 
-    // key we need to merge them together.
-    while (read_index < txn->num_reads && write_index < txn->num_writes) {
-
-        if (txn->readset[read_index] < txn->writeset[write_index]) {
-            if (ProcessFunction(txn->readset[read_index].dependency)) {
-                assert(txn->readset[read_index].dependency->state == SUBSTANTIATED);
-                txn->readset[read_index].dependency = NULL;
-                reads_done += 1;
-            }
-            else {
-                assert(txn->readset[read_index].dependency->state == STICKY);
-                ret = false;
-            }
-            read_index += 1;
-        }
-        else {
-            if (ProcessFunction(txn->writeset[write_index].dependency)) {
-                assert(txn->writeset[write_index].dependency->state == SUBSTANTIATED);
-                txn->writeset[write_index].dependency = NULL;
-                writes_done += 1;
-            }
-            else {
-                assert(txn->writeset[write_index].dependency->state == STICKY);
-                ret = false;
-            }
-            write_index += 1;
-        }
-    }
-
-    // At most one of these two loops can be executed
-    while (write_index < txn->num_writes) {
-        assert(read_index == txn->num_reads);
-        if (ProcessFunction(txn->writeset[write_index].dependency)) {
-            assert(txn->writeset[write_index].dependency->state == SUBSTANTIATED);
-            txn->writeset[write_index].dependency = NULL;            
-            writes_done += 1;
-        }
-        else {
-            assert(txn->writeset[write_index].dependency->state == STICKY);
-            ret = false;
-        }
-        write_index += 1;
-    }
-    while (read_index < txn->num_reads) {    
-        assert(write_index == txn->num_writes);
-        if (ProcessFunction(txn->readset[read_index].dependency)) {
-            assert(txn->readset[read_index].dependency->state == SUBSTANTIATED);
-            txn->readset[read_index].dependency = NULL;
-            reads_done += 1;
-        }
-        else {
-            assert(txn->readset[read_index].dependency->state == STICKY);
-            ret = false;
-        }
-        read_index += 1;
-    }
-    
-    txn->num_reads -= reads_done;
-    txn->num_writes -= writes_done;
-    if (ret) {
-        assert((txn->num_reads == 0) && (txn->num_writes == 0));
-        
-        xchgq(&txn->state, SUBSTANTIATED);
-    }
-    else {
-        assert((txn->num_reads > 0) || (txn->num_writes > 0));
-        xchgq(&txn->state, STICKY);
-    }
-    return ret;
-}
-
-/*
-void
-LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
-                         ActionNode **p_tail, ActionNode **w_head, 
-                         ActionNode **w_tail) {
+LazyWorker::processWrite(Action *action, int writeIndex) {
     
     // Get the record and txn this action is dependent on. 
     Action* prev = action->writeset[writeIndex].dependency;
@@ -223,36 +111,23 @@ LazyWorker::processWrite(Action *action, int writeIndex, ActionNode **p_head,
     while (prev != NULL) {
         
         // We only care if this txn has not been substantiated
-        if (prev->state != SUBSTANTIATED) {
-            if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
-                // The dependency is our responsibility
-                xchgq(&prev->owner, m_cpu_number);
-                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);
-            }
-            else { 
-                assert(prev->owner != m_cpu_number);
-                // Someone's taken ownership of this dependency
-                ActionNode *to_wait = GetActionNode();
-                to_wait->m_action = prev;
-                ListAppend(w_head, w_tail, to_wait);
-            }
+        if (!ProcessFunction(prev)) {
+            return false;
         }
         
         if (is_write) {
-            break;
+            return true;
         }        
         int cur_index = index;
-        is_write = prev->readset[cur_index].is_write;
-        index = prev->readset[cur_index].index;
-        prev = prev->readset[cur_index].dependency;        
-    }    
+        is_write = prev->writeset[cur_index].is_write;
+        index = prev->writeset[cur_index].index;
+        prev = prev->writeset[cur_index].dependency;        
+    }
+    return true;
 }
 
-void
-LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head, 
-                         ActionNode **p_tail, ActionNode **w_head, 
-                         ActionNode **w_tail) {
-
+bool
+LazyWorker::processRead(Action *action, int readIndex) {
     Action* prev = action->readset[readIndex].dependency;
     int index = action->readset[readIndex].index;
     bool is_write = action->readset[readIndex].is_write;
@@ -265,28 +140,15 @@ LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head,
             
             if (prev->state == SUBSTANTIATED) {
                 // The dependency is already processed, nothing to do here
-                return;
+                return true;
             }
-            else if (cmp_and_swap(&prev->state, STICKY, PROCESSING)) {
-                // The dependency is our responsibility
-                xchgq(&prev->owner, m_cpu_number);
-                ProcessTxn(prev, p_head, p_tail, w_head, w_tail);
-                return;
-            }            
             else {
-                assert(prev->state == PROCESSING);
-                assert(prev->owner != m_cpu_number);
-                ActionNode *to_wait = GetActionNode();
-                to_wait->m_action = prev;
-                ListAppend(w_head, w_tail, to_wait);
+                return ProcessFunction(prev);
             }
-
-            // We can end since this is a write. 
-            prev = NULL;
         }
         else {  
             if (prev->state == SUBSTANTIATED) {
-                return;
+                return true;
             }
             else {
                 int cur_index = index;
@@ -295,169 +157,49 @@ LazyWorker::processRead(Action *action, int readIndex, ActionNode **p_head,
                 prev = prev->readset[cur_index].dependency;
             }
         }
-    }    
+    }
+    return true;
 }
 
-void
-LazyWorker::CheckList(ActionNode *list) {
-    while (list != NULL) {
-        assert(list->m_action != NULL);
-        list = list->m_next;
-    }
-}
-
-void
-LazyWorker::EnqueueInner(ActionNode *list, ActionNode **head, ActionNode **tail) {
-    //    assert(list->m_left == NULL);
-    //    assert(list->m_right == NULL);
-    CheckList(list);
-
-    if (*head == NULL) {
-        assert(*tail == NULL);
-        list->m_left = NULL;
-        list->m_right = NULL;
-        *head = list;
-        *tail = list;
-    }
-    else {
-        assert(*tail != NULL);
-        assert((*tail)->m_right == NULL);
-        
-        (*tail)->m_right = list;
-        list->m_left = (*tail);
-        list->m_right = NULL;
-        *tail = list;
-    }
-    assert((*tail)->m_right == NULL && (*head)->m_left == NULL);
-}
-
-void
-LazyWorker::DequeueInner(ActionNode *node, ActionNode **head, ActionNode **tail) {
-    assert(node != NULL && head != NULL && tail != NULL);
-    assert(*head != NULL && *tail != NULL);
-    assert((*tail)->m_right == NULL && (*head)->m_left == NULL);
-
-    ActionNode *left = node->m_left;
-    ActionNode *right = node->m_right;
-    
-    // We're at the head of the queue
-    if (left == NULL) {
-        assert(*head == node);
-        *head = right;
-    }
-    else {
-        assert(*head != node);
-        assert(left->m_right == node);
-        left->m_right = right;
-    }
-    
-    // We're at the tail of the queue
-    if (right == NULL) {
-        assert(*tail == node);
-        *tail = left;
-    }
-    else {
-        assert(*tail != node);
-        assert(right->m_left == node);
-        right->m_left = left;
-    }
-    node->m_left = NULL;
-    node->m_right = NULL;
-    
-    assert((*tail == NULL) || ((*tail)->m_right == NULL && (*head)->m_left == NULL));
-}
-
-void
-LazyWorker::Enqueue(ActionNode *proc_node, ActionNode *wait_node) {
-    assert((m_pending_head == NULL && m_pending_tail == NULL) ||
-           (m_pending_head != NULL && m_pending_tail != NULL));
-    assert((m_waiting_head == NULL && m_waiting_tail == NULL) ||
-           (m_waiting_head != NULL && m_waiting_tail != NULL));
-    assert(proc_node != NULL && wait_node != NULL);
-    assert((m_pending_head == NULL && m_waiting_head == NULL) ||
-           (m_pending_head != NULL && m_waiting_head != NULL));
-
-    EnqueueInner(proc_node, &m_pending_head, &m_pending_tail);
-    EnqueueInner(wait_node, &m_waiting_head, &m_waiting_tail);
-    m_num_elems += 1;
-}
-
-void
-LazyWorker::Dequeue(ActionNode *proc_node, ActionNode *wait_node) {
-    DequeueInner(proc_node, &m_pending_head, &m_pending_tail);
-    DequeueInner(wait_node, &m_waiting_head, &m_waiting_tail);
-    m_num_elems -= 1;
-}
-
+// Returns two values: 1. The transitive closure of txns to process 
+// 						(proc_head, proc_tail)
+//
+// 					   2. The set of txns we need to wait for
+//						(wait_head, wait_tail)
 bool
-LazyWorker::CheckDependencies(ActionNode *waits, ActionNode **tail) {
-    ActionNode *ret = NULL;
-    for (; waits != NULL && waits->m_action->state == SUBSTANTIATED; 
-         waits = waits->m_next) {
-        ret = waits;
-    }
-    *tail = ret;
-    return (waits == NULL);
-}
+LazyWorker::ProcessTxn(Action *txn) {
+    assert(txn != NULL);
+    assert(txn->state == PROCESSING);
+    
+    uint32_t read_index = 0, write_index = 0;
+    bool ret = true;
+    uint32_t reads_done = 0, writes_done = 0;
 
-// Goes through the list of pending transitive closures and tries to execute 
-// them
-void
-LazyWorker::CheckReady() {
-    ActionNode *pending = m_pending_head;
-    ActionNode *waiting = m_waiting_head;
-
-    while (pending != NULL) {
-        assert(waiting != NULL);
-        CheckList(waiting);			// XXX: REMOVE ME
-        CheckList(pending);			// XXX: REMOVE ME
-        
-        ActionNode *run_head, *wait_head;
-        run_head = pending;
-        wait_head = waiting;
-
-        pending = pending->m_right;
-        waiting = waiting->m_right;
-
-        ActionNode *w_tail, *p_tail;
-        if (CheckDependencies(wait_head, &w_tail)) {
-            RunClosure(run_head, &p_tail);
-            Dequeue(run_head, wait_head);
-            ReturnActionNodes(run_head, p_tail);
-            ReturnActionNodes(wait_head, w_tail);
-        }        
-    }
-}
-
-// Runs the entire transitive closure
-void
-LazyWorker::RunClosure(ActionNode *to_proc, ActionNode **tail) {
-    assert(to_proc != NULL);
-
-    ActionNode *iter1 = to_proc, *iter2 = to_proc;
-    while (iter1 != NULL) {
-        Action *action = iter1->m_action;
-        if (action->state == PROCESSING) {
-            action->LaterPhase();
+    for (size_t i = 0; i < txn->readset.size(); ++i) {
+        if (!processWrite(txn, i)) {
+            ret = false;
         }
-        iter1 = iter1->m_next;
     }
-    iter1 = NULL;
-    while (iter2 != NULL) {
-        xchgq(&iter2->m_action->state, SUBSTANTIATED);
-        Action *continuation = NULL;
-        if (iter2->m_action->IsLinked(&continuation)) {
-            m_feedback_queue->Enqueue((uint64_t)continuation);
+    for (size_t i = 0; i < txn->writeset.size(); ++i) {
+        if (!processWrite(txn, i)) {
+            ret = false;
+        }
+    }
+
+    if (ret) {
+        txn->LaterPhase();
+        xchgq(&txn->state, SUBSTANTIATED);
+        Action *next_link;
+        if (txn->IsLinked(&next_link)) {
+            assert(next_link != NULL);
+            m_feedback_queue->Enqueue((uint64_t)next_link);
         }
         else {
-            m_output_queue->Enqueue((uint64_t)iter2);
+            m_output_queue->Enqueue((uint64_t)txn);
         }
-        iter1 = iter2;
-        iter2 = iter2->m_next;
     }
-    *tail = iter1;
+    return ret;
 }
-*/
 
 void
 LazyWorker::CheckWaits() {
@@ -477,6 +219,7 @@ void
 LazyWorker::StartWorking() {
     Action *txn;
     while (true) {
+
         if (m_num_elems < 1000 && m_input_queue->Dequeue((uint64_t*)&txn)) {
             if (!ProcessFunction(txn)) {
                 ActionNode *wait_node = GetActionNode();

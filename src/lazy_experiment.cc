@@ -36,7 +36,7 @@ LazyExperiment::RunTPCC() {
                                           m_info->order_status);
     }
     else {
-        txn_generator = new TPCCGenerator(45, 0, 0, 0, 0);
+        txn_generator = new TPCCGenerator(45, 43, 0, 0, 0);
     }
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, txn_generator);
     DoThroughputExperiment(m_info->num_workers, num_waits);    

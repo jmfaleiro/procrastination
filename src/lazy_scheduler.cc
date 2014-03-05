@@ -83,14 +83,14 @@ void LazyScheduler::AddGraph(Action* action) {
         // Increment the length of the chain corresponding to this record, 
         // check if it exceeds our threshold value. 
         dep_info->chain_length += 1;
-        force_materialize += (uint32_t)(dep_info->chain_length >= m_max_chain);
+        force_materialize |= (uint32_t)(dep_info->chain_length >= m_max_chain);
     }
         
     // Go through the write set. 
     for (int i = 0; i < num_writes; ++i) {
         CompositeKey record = action->writeset[i].record;
         Heuristic *dep_info = m_tables[record.m_table]->GetPtr(record.m_key);
-            
+        
         // Keep the information about the previous txn around. 
         action->writeset[i].dependency = dep_info->last_txn;
         action->writeset[i].is_write = dep_info->is_write;
@@ -105,17 +105,15 @@ void LazyScheduler::AddGraph(Action* action) {
         // Increment the length of the chain corresponding to this record, 
         // check if it exceeds our threshold value. 
         dep_info->chain_length += 1;
-        force_materialize += (uint32_t)(dep_info->chain_length >= m_max_chain);
+        force_materialize |= (uint32_t)(dep_info->chain_length >= m_max_chain);
     }  
 
-    if (force_materialize != 0) {
+    if (force_materialize) {
         for (int i = 0; i < num_reads+num_writes; ++i) {
             *(count_ptrs[i]) = 0;		  
         }                
         int index = m_last_used % m_num_workers;
-        action->state = PROCESSING;
-        action->owner = index+1;
-        asm volatile("":::"memory");
+        action->state = STICKY;
         m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
         m_last_used += 1;        
     }

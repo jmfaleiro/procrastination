@@ -123,10 +123,10 @@ protected:
 
 public:
     OrderStatusTxn0(uint32_t w_id, uint32_t d_id, uint32_t c_id, char *c_last, 
-                    bool c_by_name, OrderStatusTxn1 *level1_txn);
+                    bool c_by_name, OrderStatusTxn1 *level1_txn, bool do_init);
     bool NowPhase();
     void LaterPhase();
-    bool IsLinked(Action **action);
+    virtual bool IsLinked(Action **action);
 };
 
 class OrderStatusTxn1 : public OrderStatusTxn0 {
@@ -135,6 +135,13 @@ public:
                     bool c_by_name);
     bool NowPhase();
     void LaterPhase();
+    virtual bool IsLinked(Action **action);
+};
+
+class LazyCustAmt {
+public:
+    uint64_t 		m_customer_key;
+    uint32_t 		m_amount;    
 };
 
 class DeliveryTxn1;
@@ -148,6 +155,7 @@ protected:
     uint32_t 				m_carrier_id;
     uint32_t				*m_num_order_lines;
     uint32_t 				*m_open_order_ids;
+    LazyCustAmt				*m_amounts;
     
 public:
     DeliveryTxn0(uint32_t w_id, uint32_t d_id, uint32_t carrier_id, 
@@ -175,6 +183,7 @@ public:
     DeliveryTxn2(uint32_t w_id, uint32_t d_id, uint32_t carrier_id);
     virtual bool NowPhase();
     virtual void LaterPhase();
+    virtual bool IsLinked(Action **action);
 };
 
 #endif		//  LAZY_TPCC_HH_
