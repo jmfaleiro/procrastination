@@ -9,6 +9,7 @@ LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue,
     : Runnable(cpu) {
     m_input_queue = input_queue;
     m_output_queue = output_queue;
+    m_feedback_queue = feedback_queue;
     m_cpu_number = (uint64_t)cpu;
     InitActionNodes();
     
@@ -119,9 +120,9 @@ LazyWorker::processWrite(Action *action, int writeIndex) {
             return true;
         }        
         int cur_index = index;
-        is_write = prev->writeset[cur_index].is_write;
-        index = prev->writeset[cur_index].index;
-        prev = prev->writeset[cur_index].dependency;        
+        is_write = prev->readset[cur_index].is_write;
+        index = prev->readset[cur_index].index;
+        prev = prev->readset[cur_index].dependency;        
     }
     return true;
 }
@@ -176,7 +177,7 @@ LazyWorker::ProcessTxn(Action *txn) {
     uint32_t reads_done = 0, writes_done = 0;
 
     for (size_t i = 0; i < txn->readset.size(); ++i) {
-        if (!processWrite(txn, i)) {
+        if (!processRead(txn, i)) {
             ret = false;
         }
     }

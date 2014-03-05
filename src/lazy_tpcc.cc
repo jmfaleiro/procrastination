@@ -118,6 +118,11 @@ NewOrderTxn::LaterPhase() {
     float total_amount = 0;
     CompositeKey composite;
     
+    uint32_t keys[4];
+    keys[0] = m_warehouse_id;
+    keys[1] = m_district_id;
+    keys[2] = m_order_id;
+
     // Read the customer record.
     composite = readset[s_customer_index].record;
     assert(composite.m_table == CUSTOMER);
@@ -220,9 +225,11 @@ NewOrderTxn::LaterPhase() {
         new_order_line.ol_amount = m_order_quantities[i] * (item->i_price);
         strcpy(new_order_line.ol_dist_info, ol_dist_info);
 
+        keys[3] = i;
+        uint64_t ol_key = TPCCKeyGen::create_order_line_key(keys);
         // XXX: Make sure that the put operation is implemented on top of a 
         // concurrent hash table. 
-        s_order_line_tbl->Put(writeset[m_num_items+1+i].record.m_key, new_order_line);
+        s_order_line_tbl->Put(ol_key, new_order_line);
     }
     // Insert an entry into the open order table.    
     Oorder oorder;
@@ -235,10 +242,13 @@ NewOrderTxn::LaterPhase() {
     oorder.o_all_local = m_all_local;
     oorder.o_entry_d = m_timestamp;
     Oorder *new_oorder = s_oorder_tbl->Put(writeset[m_num_items+1].record.m_key, oorder);
+    
+    
+    
 
     // Write the order id into the customer's index
     uint64_t *old_index = s_oorder_index->GetPtr(readset[s_customer_index].record.m_key);
-    *old_index = m_order_id;
+    *old_index = writeset[m_num_items+1].record.m_key;
 }
 
 
@@ -533,15 +543,11 @@ OrderStatusTxn0::LaterPhase() {
     dep_info.index = -1;
     dep_info.record.m_table = OPEN_ORDER;
 
-    uint32_t keys[4];
-    keys[0] = m_warehouse_id;
-    keys[1] = m_district_id;
-
     assert(readset[0].record.m_table == OPEN_ORDER_INDEX);
     uint64_t index = readset[0].record.m_key;
+    assert(TPCCKeyGen::get_customer_key(index) < s_customers_per_dist);
     uint64_t oorder_key = s_oorder_index->Get(index);
-    keys[2] = oorder_key;    
-    dep_info.record.m_key = TPCCKeyGen::create_order_key(keys);
+    dep_info.record.m_key = oorder_key;
     m_level1_txn->readset.push_back(dep_info);
 }
 
