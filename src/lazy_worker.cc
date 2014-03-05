@@ -3,6 +3,7 @@
 
 #include <lazy_worker.hh>
 #include <algorithm>
+#include <tpcc.hh>
 
 LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue, 
                        SimpleQueue *output_queue, int cpu) 
@@ -102,12 +103,14 @@ LazyWorker::ProcessFunction(Action *txn) {
 }
 
 bool
-LazyWorker::processWrite(Action *action, int writeIndex) {
+LazyWorker::processWrite(struct DependencyInfo *info) {
+
+                         //Action *action, int writeIndex) {
     
     // Get the record and txn this action is dependent on. 
-    Action* prev = action->writeset[writeIndex].dependency;
-    bool is_write = action->writeset[writeIndex].is_write;
-    int index = action->writeset[writeIndex].index;
+    Action* prev = info->dependency;
+    bool is_write = info->is_write;
+    int index = info->index;
 
     while (prev != NULL) {
         
@@ -132,6 +135,7 @@ LazyWorker::processRead(Action *action, int readIndex) {
     Action* prev = action->readset[readIndex].dependency;
     int index = action->readset[readIndex].index;
     bool is_write = action->readset[readIndex].is_write;
+    uint32_t order_id = 0;
     
     bool ret = false;
     
@@ -182,12 +186,13 @@ LazyWorker::ProcessTxn(Action *txn) {
         }
     }
     for (size_t i = 0; i < txn->writeset.size(); ++i) {
-        if (!processWrite(txn, i)) {
+        if (!processWrite(&txn->writeset[i])) {
             ret = false;
         }
     }
 
     if (ret) {
+
         txn->LaterPhase();
         xchgq(&txn->state, SUBSTANTIATED);
         Action *next_link;

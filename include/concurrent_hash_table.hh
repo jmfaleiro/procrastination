@@ -75,7 +75,7 @@ public:
     virtual V*
     GetPtr(K key) {
         BucketItem<K, V> *bucket = GetBucket(key);        
-        /*
+
         if (bucket == NULL) {
             uint64_t index = this->m_hash_function(key) & this->m_mask;
             BucketItem<K, V> *to_insert = new BucketItem<K, V>(key, V());    
@@ -104,7 +104,7 @@ public:
             }
             return &to_ret->m_value;
         }
-        */
+
         if (bucket == NULL) {
             return NULL;
         }

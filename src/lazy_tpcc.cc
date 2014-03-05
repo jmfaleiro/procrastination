@@ -417,8 +417,8 @@ StockLevelTxn0::LaterPhase() {
     keys[1] = m_district_id;
 
     for (uint32_t i = 0; i < 20; ++i) {
-        keys[2] = m_next_order_id - 1 -i;
-        uint64_t open_order_key = TPCCKeyGen::create_order_key(keys);
+        keys[2] = m_next_order_id - 2 -i;
+        uint64_t open_order_key = TPCCKeyGen::create_new_order_key(keys);
         dep_info.record.m_key = open_order_key;
         m_level1_txn->readset.push_back(dep_info);	// XXX: FIXME
     }
@@ -449,29 +449,22 @@ StockLevelTxn1::LaterPhase() {
     dep_info.index = -1;
     dep_info.record.m_table = STOCK;
 
+    uint32_t stock_keys[2];
+    stock_keys[0] = m_warehouse_id;
     uint32_t keys[4];
     keys[0] = m_warehouse_id;
-
-    uint32_t num_reads = readset.size();
-    for (uint32_t i = 0; i < num_reads; ++i) {
-        keys[1] = m_district_id;
+    keys[1] = m_district_id;
+    for (uint32_t i = 0; i < readset.size(); ++i) {
         Oorder *oorder = s_oorder_tbl->GetPtr(readset[i].record.m_key);
-        assert(m_district_id == oorder->o_d_id);
-        assert(m_warehouse_id == oorder->o_w_id);
-        uint32_t order_id = TPCCKeyGen::get_order_key(readset[i].record.m_key);
-        assert(order_id == oorder->o_id);
         keys[2] = oorder->o_id;
-        for (uint32_t j = 0; j < oorder->o_ol_cnt; ++j) {
-            keys[3] = j;
-            uint64_t order_line_key = TPCCKeyGen::create_order_line_key(keys);
-            OrderLine *order_line = s_order_line_tbl->GetPtr(order_line_key);
-            if (order_line == NULL) {
-                std::cout << "OrderID: " << oorder->o_id << "\n";
-            }
+        for (uint32_t idx = 0; idx < oorder->o_ol_cnt; ++idx) {
+            keys[3] = idx;
+            uint64_t ol_key = TPCCKeyGen::create_order_line_key(keys);
+            OrderLine *order_line = s_order_line_tbl->GetPtr(ol_key);            
             assert(order_line != NULL);
-            keys[1] = order_line->ol_i_id;
-            dep_info.record.m_key = TPCCKeyGen::create_stock_key(keys);
-            m_level2_txn->readset.push_back(dep_info);	// XXX: FIXME
+            stock_keys[1] = order_line->ol_i_id;
+            dep_info.record.m_key = TPCCKeyGen::create_stock_key(stock_keys);
+            m_level2_txn->readset.push_back(dep_info);
         }
     }
 }

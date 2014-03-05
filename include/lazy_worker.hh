@@ -63,7 +63,7 @@ private:
     processRead(Action *action, int readIndex);
 
     bool
-    processWrite(Action *action, int writeIndex);
+    processWrite(struct DependencyInfo *info);
     
     bool
     ProcessFunction(Action *txn);

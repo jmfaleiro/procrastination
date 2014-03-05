@@ -276,11 +276,27 @@ namespace tpcc {
                         keys[3] = order_line.ol_number;
                         uint64_t order_line_key = 
                             TPCCKeyGen::create_order_line_key(keys);
-                        s_order_line_tbl->Put(order_line_key, order_line);
+                        OrderLine *blahblah = s_order_line_tbl->Put(order_line_key, order_line);
+                        assert(s_order_line_tbl->GetPtr(order_line_key) == blahblah);                        
                     }
                 }            
             }
         }
+
+        for (uint32_t w = 0; w < s_num_warehouses; ++w) {
+            keys[0] = w;
+            for (uint32_t d = 0; d < s_districts_per_wh; ++d) {
+                keys[1] = d;
+                keys[2] = 2999;
+                uint64_t oorder_key = TPCCKeyGen::create_order_key(keys);
+                Oorder *open_order = s_oorder_tbl->GetPtr(oorder_key);
+                for (uint32_t i = 0; i < open_order->o_ol_cnt; ++i) {
+                    keys[3] = i;
+                    uint64_t ol_key = TPCCKeyGen::create_order_line_key(keys);
+                    assert(s_order_line_tbl->GetPtr(ol_key) != NULL);
+                }
+            }
+        }        
     }
 
     void
