@@ -187,6 +187,8 @@ public:
                                                 level2);
         DeliveryTxn0 *level0 = new DeliveryTxn0(warehouse_id, district_id, 10, 
                                                 level1);
+        level1->materialize = true;
+        level2->materialize = true;
         return level0;
     }
 
@@ -198,6 +200,7 @@ public:
         
         OrderStatusTxn1 *level1 = new OrderStatusTxn1(warehouse_id, district_id, 
                                                       customer_id, NULL, false);
+        level1->materialize = true;
         OrderStatusTxn0 *level0 = new OrderStatusTxn0(warehouse_id, district_id,
                                                       customer_id, NULL, false, 
                                                       level1, true);        

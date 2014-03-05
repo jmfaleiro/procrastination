@@ -685,10 +685,6 @@ DeliveryTxn1::LaterPhase() {
     
     for (uint32_t i = 0; i < num_orders; ++i) {
         Oorder *open_order = s_oorder_tbl->GetPtr(writeset[i].record.m_key);
-        if (open_order->o_id <= 2000) {
-            std::cout << "blah: " << TPCCKeyGen::get_order_key(writeset[i].record.m_key) << "\n";            
-        }
-        
         assert(open_order->o_id > 2000);
         open_order->o_carrier_id = m_carrier_id;        
         keys[1] = open_order->o_d_id;
@@ -707,7 +703,7 @@ DeliveryTxn1::LaterPhase() {
             m_amounts[i].m_amount += order_line->ol_amount;
         }
     }    
-    /*
+
     for (uint32_t i = 0; i < num_orders; ++i) {
         dep_info.record.m_key = m_amounts[i].m_customer_key;
         uint32_t j = 0;
@@ -731,17 +727,43 @@ DeliveryTxn1::LaterPhase() {
             m_level2_txn->m_amounts[index] = m_amounts[i];
         }
     }
-    */
+
 }
 
 bool
 DeliveryTxn1::IsLinked(Action **action) {
-    *action = NULL;
-    return false;
-    /*
+    struct DependencyInfo dep_info;
+    dep_info.dependency = NULL;
+    dep_info.is_write = false;
+    dep_info.index = -1;
+    dep_info.record.m_table = CUSTOMER;
+
+    uint32_t num_orders = writeset.size();
+    for (uint32_t i = 0; i < num_orders; ++i) {
+        dep_info.record.m_key = m_amounts[i].m_customer_key;
+        uint32_t j = 0;
+
+        for (j = 0; j < m_level2_txn->writeset.size(); ++j) {
+            if (m_level2_txn->writeset[j].record.m_key == dep_info.record.m_key) {
+                break;
+            }
+        }
+
+        if (j < m_level2_txn->writeset.size()) {	// We've found a duplicate
+            assert(m_level2_txn->m_amounts[j].m_customer_key == 
+                   dep_info.record.m_key);
+            m_level2_txn->m_amounts[j].m_amount += 
+                m_level2_txn->m_amounts[i].m_amount;
+        }
+        else {
+            assert(m_amounts[i].m_customer_key == dep_info.record.m_key);
+            m_level2_txn->writeset.push_back(dep_info);
+            size_t index = m_level2_txn->writeset.size()-1;
+            m_level2_txn->m_amounts[index] = m_amounts[i];
+        }
+    }
     *action = m_level2_txn;
     return true;
-    */
 }
 
 bool DeliveryTxn2::IsLinked(Action **action) {
