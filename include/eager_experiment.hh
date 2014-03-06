@@ -11,6 +11,7 @@
 #include <concurrent_queue.h>
 #include <time.h>
 #include <experiment.hh>
+#include <normal_generator.h>
 
 class EagerExperiment : public Experiment {
 private:
@@ -33,6 +34,9 @@ private:
 
     void
     RunTPCC();
+
+    void
+    RunThroughput();
 
 public:
     EagerExperiment(ExperimentInfo *info);

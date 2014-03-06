@@ -19,6 +19,8 @@ protected:
     
     virtual void RunTPCC() = 0;
 
+    virtual void RunThroughput() = 0;
+
 public:
     Experiment(ExperimentInfo *info);
 

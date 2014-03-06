@@ -10,7 +10,6 @@ LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs,
     uint32_t num_waits = 0;
     for (int i = 0; i < num_inputs; ++i) {
         Action *txn = gen->genNext();
-        txn->materialize = (rand() % m_info->substantiate_period) == 0;
         if (txn->materialize) {
             num_waits += 1;
         }
@@ -18,6 +17,77 @@ LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs,
     }
     return num_waits;
 }
+
+void
+LazyExperiment::RunThroughput() {
+    TableInit table_init_params[1];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = m_info->num_records;
+
+    SimpleQueue **input_queue = InitQueues(1, LARGE_QUEUE);
+    m_input_queue = input_queue[0];
+    
+    SimpleQueue **worker_inputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **worker_outputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    m_output_queues = worker_outputs;
+    m_workers = (LazyWorker**)malloc(sizeof(LazyWorker*)*m_info->num_workers);
+
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        m_workers[i] = new LazyWorker(worker_inputs[i], NULL, worker_outputs[i], 
+                                      i+1);
+    }
+    m_scheduler =  new LazyScheduler(m_input_queue, NULL, worker_inputs, 
+                                     (uint32_t)m_info->num_workers, 0, 
+                                     table_init_params, 1,
+                                     (uint32_t)m_info->substantiate_threshold);
+    
+    WorkloadGenerator *gen = NULL;
+    if (m_info->is_normal) {
+        gen = new NormalGenerator(m_info->read_set_size, 
+                                  m_info->write_set_size, m_info->num_records, 
+                                  m_info->substantiate_period, m_info->std_dev);
+    }
+    else {
+        gen = new UniformGenerator(m_info->read_set_size, 
+                                   m_info->write_set_size, m_info->num_records, 
+                                   m_info->substantiate_period);
+    }
+    
+    uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, gen);
+    DoThroughputExperiment(m_info->num_workers, num_waits);
+}
+
+/*
+void
+LazyExperiment::RunYCSB() {
+    TableInit table_init_params[1];
+    TableInit temp;
+    temp.m_table_type = ONE_DIM_TABLE;
+    temp.m_params.m_one_params.m_dim1 = m_info->num_records;
+    
+    SimpleQueue **input_queue = InitQueues(1, LARGE_QUEUE);    
+    m_input_queue = input_queue[0];
+    
+    // Initialize the worker input and output queues, we don't need to include 
+    // feedback queues because there are no split transactions for YCSB.
+    SimpleQueue **worker_inputs = InitQueues(m_info->num_workers, SMALL_QUEUE);
+    SimpleQueue **worker_outputs = InitQueues(m_info->num_workers, SMALL_QUEUE);    
+    m_output_queues = worker_outputs;
+    m_workers = (LazyWorker**)malloc(sizeof(LazyWorker*)*info->num_workers);
+
+    for (uint32_t i = 0; i < m_info->num_workers; ++i) {
+        m_workers[i] = new LazyWorker(worker_inputs[i], NULL, worker_outputs[i], 
+                                      i+1);
+    }
+
+
+    m_scheduler =  new LazyScheduler(m_input_queue, feedback, worker_inputs, 
+                                     (uint32_t)m_info->num_workers, 0, 
+                                     table_init_params, 1,
+                                     (uint32_t)m_info->substantiate_threshold);
+
+}
+*/
 
 void
 LazyExperiment::RunTPCC() {
@@ -63,7 +133,7 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
         ;
     */
 
-    while (num_done < num_waits) {
+    while (num_waits_done < num_waits) {
         for (int i = 0; i < num_workers; ++i) {
             Action *dummy;
             while (m_output_queues[i]->Dequeue((uint64_t*)&dummy)) {

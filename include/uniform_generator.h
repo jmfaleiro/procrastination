@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <set>
+#include <eager_generator.hh>
 
 class UniformGenerator : public WorkloadGenerator {
     
@@ -24,6 +25,26 @@ class UniformGenerator : public WorkloadGenerator {
 
 
     virtual Action* genNext();
+};
+
+class EagerUniformGenerator : public EagerGenerator {
+    
+    // Generator specific parameters.
+    int m_read_set_size;
+    int m_write_set_size;
+    int m_num_records;
+    int m_freq;
+
+    virtual int genUnique(std::set<int>* done);
+
+ public:
+    EagerUniformGenerator(int read_size, 
+                          int write_size, 
+                          int num_records,
+                          int freq);
+
+
+    virtual EagerAction* genNext();
 };
 
 

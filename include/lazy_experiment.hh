@@ -11,6 +11,9 @@
 #include <concurrent_queue.h>
 #include <workload_generator.h>
 #include <tpcc_generator.hh>
+#include <normal_generator.h>
+#include <uniform_generator.h>
+
 
 class LazyExperiment : public Experiment {
 private:
@@ -43,6 +46,9 @@ protected:
 
     virtual void
     RunTPCC();
+
+    virtual void
+    RunThroughput();
     
 public:
     LazyExperiment(ExperimentInfo *info);    

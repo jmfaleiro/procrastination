@@ -139,22 +139,33 @@ EagerExperiment::RunTPCC() {
 
     
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
-                           (uint32_t)m_info->num_txns);
+                           (uint32_t)m_info->num_txns);    
+}
+
+void
+EagerExperiment::RunThroughput() {
+    TableInit table_init_params[1];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = m_info->num_records;
+    
+    SimpleQueue **input_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **output_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    
+    // Initialize the workload generator
+    EagerGenerator *gen = NULL;
+    if (m_info->is_normal) {
+        gen = new EagerNormalGenerator(m_info->read_set_size, 
+                                       m_info->write_set_size, 
+                                       m_info->num_records, 
+                                       m_info->substantiate_period, 
+                                       m_info->std_dev);
+
+    }
+    InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);    
+    EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
+                                        output_queues);
 
     
+    DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
+                           (uint32_t)m_info->num_txns);    
 }
-
-/*
-void
-EagerExperiment::Run() {
-    switch (m_info->experiment) {
-    case TPCC:        
-        TPCCInit tpcc_initializer(m_info->warehouses, m_info->districts, 
-                                  m_info->customers, m_info->items);
-        tpcc_initializer.do_init();
-        RunTPCC();
-        break;
-    }
-}
-*/
-

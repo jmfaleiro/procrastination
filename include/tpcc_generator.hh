@@ -124,6 +124,7 @@ public:
         NewOrderTxn *ret = new NewOrderTxn(w_id, d_id, c_id, all_local, 
                                            num_items, item_ids, supplier_wh_ids,
                                            quantities);
+        ret->materialize = true;
         return ret;
     }
     
@@ -152,9 +153,11 @@ public:
         }
         
         float payment_amt = (float)m_util.gen_rand_range(100, 500000)/100.0;
-        return new PaymentTxn(warehouse_id, customer_w_id, payment_amt, 
+        PaymentTxn *ret = new PaymentTxn(warehouse_id, customer_w_id, payment_amt, 
                               district_id, customer_d_id, customer_id, NULL, 
                               false);
+        ret->materialize = true;
+        return ret;
     }
 
     StockLevelTxn0*
@@ -185,6 +188,7 @@ public:
                                                 level1);
         level1->materialize = true;
         level2->materialize = true;
+        level0->materialize = true;
         return level0;
     }
 
@@ -200,6 +204,7 @@ public:
         OrderStatusTxn0 *level0 = new OrderStatusTxn0(warehouse_id, district_id,
                                                       customer_id, NULL, false, 
                                                       level1, true);        
+        level0->materialize = true;
         return level0;
     }
 };

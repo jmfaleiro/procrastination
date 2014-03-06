@@ -1,4 +1,5 @@
 #include <experiment.hh>
+#include <simple_action.hh>
 
 Experiment::Experiment(ExperimentInfo *info) {
     m_info = info;
@@ -34,12 +35,18 @@ Experiment::diff_time(timespec end, timespec start) {
 void
 Experiment::Run() {
     using namespace tpcc;
+    TPCCInit *tpcc_initializer = new TPCCInit(m_info->warehouses, 
+                                              m_info->districts, 
+                                              m_info->customers, m_info->items);
     switch (m_info->experiment) {
     case TPCC:        
-        TPCCInit tpcc_initializer(m_info->warehouses, m_info->districts, 
-                                  m_info->customers, m_info->items);
-        tpcc_initializer.do_init();
+        tpcc_initializer->do_init();
         RunTPCC();
+        break;
+        
+    case THROUGHPUT:
+        simple::do_init(m_info->num_records);
+        RunThroughput();
         break;
     }
 }
