@@ -13,7 +13,8 @@
 #include <tpcc_generator.hh>
 #include <normal_generator.h>
 #include <uniform_generator.h>
-
+#include <iostream>
+#include <fstream>
 
 class LazyExperiment : public Experiment {
 private:
@@ -41,6 +42,14 @@ private:
 
     void
     InitializeTPCCScheduler();
+
+    void
+    WaitPeak(uint32_t duration, Action **input_actions, 
+             SimpleQueue *input_queue);
+    
+
+    uint32_t 
+    NumWorkerDone();
     
 protected:
 

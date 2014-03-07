@@ -20,10 +20,14 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
     m_max_chain = max_chain;
     m_last_used = 0;
     
+    m_num_stickified = 0;
     m_num_workers = num_workers;
     m_input_queue = input_queue;
     m_feedback_queues = feedback_queues;
     m_worker_queues = worker_queues;
+
+    m_materialize_counter = 0;
+    m_materialize_on = true;
 
     assert(m_input_queue != NULL);
     //    assert(m_feedback_queues != NULL);
@@ -43,9 +47,10 @@ LazyScheduler::StartWorking() {
                 }
             }
         }
-        
+
         // Check if there's any input
         if (m_input_queue->Dequeue((uint64_t*)&txn)) {
+            m_num_stickified += 1;
             if (txn->NowPhase()) {
                 AddGraph(txn);
             }
@@ -110,14 +115,17 @@ void LazyScheduler::AddGraph(Action* action) {
         dep_info->chain_length += 1;
         force_materialize |= (uint32_t)(dep_info->chain_length >= m_max_chain);
     }  
-    action->state = STICKY;    
-    if (force_materialize) {
-        int index = m_last_used % m_num_workers;
-        if (m_worker_queues[index]->Enqueue((uint64_t)action)) {
-            for (int i = 0; i < num_reads+num_writes; ++i) {
-                *(count_ptrs[i]) = 0;		  
-            }
+    m_materialize_counter += 1;
+    m_materialize_on |= m_materialize_counter & (1<<14);
 
+    if (m_materialize_on && force_materialize) {
+        int index = m_last_used % m_num_workers;
+        if (!m_worker_queues[index]->Enqueue((uint64_t)action)) {
+            m_materialize_counter = 0;
+            m_materialize_on = false;
+        }
+        for (int i = 0; i < num_reads+num_writes; ++i) {
+            *(count_ptrs[i]) = 0;		  
         }
         m_last_used += 1;
     }
@@ -132,5 +140,5 @@ void LazyScheduler::AddGraph(Action* action) {
 
 uint64_t
 LazyScheduler::NumStickified() {
-    return 0;
+    return m_num_stickified;
 }

@@ -205,10 +205,242 @@ LazyExperiment::InitializeTPCC() {
                                      (uint32_t)m_info->substantiate_threshold);
 }
 
-// XXX: NOT YET IMPLEMENTED
+uint32_t 
+LazyExperiment::NumWorkerDone() {
+    uint64_t ret = 0;
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        ret += m_workers[i]->NumDone();
+    }
+    return ret;
+}
+
+
 void
 LazyExperiment::RunPeak() {
-    assert(false);
+    TableInit table_init_params[1];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = m_info->num_records;
+    
+    // Use a uniform distribution on keys
+    WorkloadGenerator *gen = new UniformGenerator(m_info->read_set_size, 
+                                                  m_info->write_set_size, 
+                                                  m_info->num_records, 
+                                                  m_info->substantiate_period);
+
+    // Generate the input actions
+    Action **input_actions = 
+        (Action**)malloc(sizeof(Action*)*m_info->num_txns);
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        input_actions[i] = gen->genNext();
+    }
+    
+    // Create the workers
+    SimpleQueue **worker_inputs = InitQueues(m_info->num_workers, SMALL_QUEUE);
+    SimpleQueue **worker_outputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **feedbacks = InitQueues(m_info->num_workers, SMALL_QUEUE);
+    m_output_queues = worker_outputs;
+    m_workers = (LazyWorker**)malloc(sizeof(LazyWorker*)*m_info->num_workers);
+    
+
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        m_workers[i] = new LazyWorker(worker_inputs[i], feedbacks[i], worker_outputs[i], 
+                                      i+1);
+    }
+
+    SimpleQueue **sched_input = InitQueues(1, SMALL_QUEUE);
+    m_scheduler =  new LazyScheduler(sched_input[0], feedbacks, worker_inputs, 
+                                     (uint32_t)m_info->num_workers, 0, 
+                                     table_init_params, 1,
+                                     (uint32_t)m_info->substantiate_threshold);
+
+    // Do the experiment
+    WaitPeak(180, input_actions, sched_input[0]);
+}
+
+void
+LazyExperiment::WaitPeak(uint32_t duration,
+                         Action **input_actions, 
+                         SimpleQueue *input_queue) {
+
+    if (pin_thread(m_info->num_workers+1) == -1) {
+        std::cout << "Lazy experiment: Client thread couldn't bind to cpu!!!";
+        std::cout << "\n";
+        exit(-1);
+    }
+
+    m_scheduler->Run();
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        m_workers[i]->Run();
+    }
+
+    volatile uint64_t start_time = rdtsc();
+    volatile uint64_t phase_time; 
+    duration *= 100;
+
+    uint64_t* buckets_in = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_in, 0, sizeof(uint64_t)*duration);
+
+    uint64_t* buckets_stick = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_stick, 0, sizeof(uint64_t)*duration);
+    
+
+    uint64_t* buckets_out = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_out, 0, sizeof(uint64_t)*duration);
+        
+    uint64_t* buckets_done = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_done, 0, sizeof(uint64_t)*duration);
+        
+    volatile uint64_t start_count = NumWorkerDone();
+    volatile uint64_t start_stick = m_scheduler->NumStickified();
+
+    // Run easy input for the first third of the experiment
+    uint64_t input_index = 0;
+    uint32_t j = 0;
+    for (; j < duration/3; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            Action *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }
+            else {
+                for (int i = 0; i < 110; ++i) {
+                    single_work();
+                }
+            }
+            phase_time = rdtsc();
+            if (phase_time - start_time >= (FREQUENCY/100)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+
+                volatile uint64_t end_stick = m_scheduler->NumStickified();
+                buckets_stick[j] = end_stick - start_stick;
+                start_stick = end_stick;
+                break;
+            }            
+            for (int i = 0; i < 100000; ++i) {
+                single_work();
+            }
+        }
+    }
+    
+    // Run spike for the next third
+    for (; j < 2*duration/3; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            Action *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }                
+            else {
+                for (int i = 0; i < 500; ++i) {
+                    single_work();
+                }
+            }
+                
+
+            phase_time = rdtsc();
+
+            // Check whether or not 1 second has elapsed. 
+            // XXX: The constant here is specific to smorz!!!
+            if (phase_time - start_time >= (FREQUENCY/100)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+
+                volatile uint64_t end_stick = m_scheduler->NumStickified();
+                buckets_stick[j] = end_stick - start_stick;
+                start_stick = end_stick;
+
+                break;
+            }
+            for (int i = 0; i < 1750; ++i) {
+                single_work();
+            }
+        }
+    }
+    
+    // Run easy input for the final third
+    for (; j < duration; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            Action *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }
+            else {
+                for (int i = 0; i < 110; ++i) {
+                    single_work();
+                }
+            }
+            phase_time = rdtsc();
+            if (phase_time - start_time >= (uint64_t)(FREQUENCY/100.0)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+
+                volatile uint64_t end_stick = m_scheduler->NumStickified();
+                buckets_stick[j] = end_stick - start_stick;
+                start_stick = end_stick;
+                break;
+            }            
+            for (int i = 0; i < 100000; ++i) {
+                single_work();
+            }
+        }
+    }
+
+    ofstream client_try;
+    client_try.open("lazy_client_try.txt");
+    double cur = 0.0;
+    double diff = 1.0 / 100.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        uint64_t throughput = buckets_in[i]*100;
+        client_try << cur << " " << throughput << "\n";
+        cur += diff;
+    }
+
+    client_try.close();
+
+    ofstream stick_file;
+    stick_file.open("lazy_client_stickification.txt");
+    cur = 0.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        uint64_t stick = buckets_stick[i]*100;
+        stick_file << cur << " " << stick << "\n";
+        cur += diff;
+    }
+    stick_file.close();
+
+    ofstream client_success;
+    client_success.open("lazy_client_success.txt");
+    cur = 0.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        double percentage = 
+            ((double)buckets_out[i])/((double)buckets_in[i]);
+        percentage = percentage*100.0;
+        client_success << cur << " " << percentage << "\n";
+        cur += diff;
+    }
+    client_success.close();
+        
+    ofstream throughput_file;
+    throughput_file.open("lazy_client_throughput.txt");
+    cur = 0.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        uint64_t throughput = buckets_done[i]*100;
+        throughput_file << cur << " " << throughput << "\n";
+        cur += diff;
+    }
+    throughput_file.close();
 }
 
 TableInit*

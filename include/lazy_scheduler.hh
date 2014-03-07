@@ -29,6 +29,7 @@ public:
     bool is_write;
     int chain_length;
 
+
     Heuristic() {
         last_txn = NULL;
         index = -1;
@@ -47,6 +48,9 @@ private:
     Table<uint64_t, Heuristic>			**m_tables;    
     uint64_t 							m_last_used;
     int		 							m_max_chain;
+    volatile uint64_t 					m_num_stickified;
+    uint64_t 							m_materialize_counter;
+    bool								m_materialize_on;
 
     void
     AddGraph(Action *txn);

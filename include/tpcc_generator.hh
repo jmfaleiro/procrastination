@@ -124,7 +124,7 @@ public:
         NewOrderTxn *ret = new NewOrderTxn(w_id, d_id, c_id, all_local, 
                                            num_items, item_ids, supplier_wh_ids,
                                            quantities);
-        ret->materialize = true;
+        ret->materialize = false;
         return ret;
     }
     
@@ -156,7 +156,7 @@ public:
         PaymentTxn *ret = new PaymentTxn(warehouse_id, customer_w_id, payment_amt, 
                               district_id, customer_d_id, customer_id, NULL, 
                               false);
-        ret->materialize = true;
+        ret->materialize = false;
         return ret;
     }
 
@@ -188,7 +188,7 @@ public:
                                                 level1);
         level1->materialize = true;
         level2->materialize = true;
-        level0->materialize = true;
+        level0->materialize = false;
         return level0;
     }
 

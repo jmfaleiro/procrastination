@@ -83,7 +83,7 @@ EagerExperiment::DoThroughputExperiment(EagerWorker **workers,
                                         int num_workers, uint32_t num_waits) {
     
     // Bind this thread to a particular cpu to avoid interfering with workers
-    if (pin_thread(num_workers) == -1) {
+    if (pin_thread(num_workers+1) == -1) {
         std::cout << "Eager experiment: Client thread couldn't bind to cpu!!!";
         std::cout << "\n";
         exit(-1);
@@ -299,7 +299,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
                 }
             }
             phase_time = rdtsc();
-            if (phase_time - start_time >= (FREQUENCY/100)) {
+            if (phase_time - start_time >= (uint64_t)(FREQUENCY/100.0)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -372,10 +372,18 @@ EagerExperiment::RunThroughput() {
                                         m_info->write_set_size, m_info->num_records, 
                                         m_info->substantiate_period);
     }
-    InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
                                         output_queues, 0);
-    
+    /*
+    SimpleQueue **sched_input = InitQueues(1, LARGE_QUEUE);
+
+    EagerScheduler *sched = new EagerScheduler(m_lock_mgr, sched_input[0], 
+                                               input_queues, (uint32_t)m_info->num_workers,
+                                               0);
+                                               sched->Run();
+    */
+
+    InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
                            (uint32_t)m_info->num_txns);    
 }
