@@ -52,6 +52,11 @@ class SimpleQueue {
         m_tail = 0;        
     }
     
+    uint64_t diff() {
+        return m_tail - m_head;
+    }
+        
+    
     bool isEmpty() {
         return m_head == m_tail;
     }

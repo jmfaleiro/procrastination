@@ -278,21 +278,21 @@ LazyExperiment::WaitPeak(uint32_t duration,
     duration *= 100;
 
     uint64_t* buckets_in = 
-        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
-    memset(buckets_in, 0, sizeof(uint64_t)*duration);
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
+    memset(buckets_in, 0, sizeof(uint64_t)*(duration+2*duration/3));
 
     uint64_t* buckets_stick = 
-        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
-    memset(buckets_stick, 0, sizeof(uint64_t)*duration);
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
+    memset(buckets_stick, 0, sizeof(uint64_t)*(duration+2*duration/3));
     
 
     uint64_t* buckets_out = 
-        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
-    memset(buckets_out, 0, sizeof(uint64_t)*duration);
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
+    memset(buckets_out, 0, sizeof(uint64_t)*(duration+2*duration/3));
         
     uint64_t* buckets_done = 
-        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
-    memset(buckets_done, 0, sizeof(uint64_t)*duration);
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
+    memset(buckets_done, 0, sizeof(uint64_t)*(duration+2*duration/3));
         
     volatile uint64_t start_count = NumWorkerDone();
     volatile uint64_t start_stick = m_scheduler->NumStickified();
@@ -324,7 +324,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
                 start_stick = end_stick;
                 break;
             }            
-            for (int i = 0; i < 100000; ++i) {
+            for (int i = 0; i < 10000; ++i) {
                 single_work();
             }
         }
@@ -361,14 +361,14 @@ LazyExperiment::WaitPeak(uint32_t duration,
 
                 break;
             }
-            for (int i = 0; i < 1750; ++i) {
+            for (int i = 0; i < 1500; ++i) {
                 single_work();
             }
         }
     }
     
     // Run easy input for the final third
-    for (; j < duration; ++j) {
+    for (; j < duration+2*duration/3; ++j) {
         while (true) {
             buckets_in[j] += 1;
             Action *action = input_actions[input_index++];
@@ -392,7 +392,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
                 start_stick = end_stick;
                 break;
             }            
-            for (int i = 0; i < 100000; ++i) {
+            for (int i = 0; i < 10000; ++i) {
                 single_work();
             }
         }
@@ -402,7 +402,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     client_try.open("lazy_client_try.txt");
     double cur = 0.0;
     double diff = 1.0 / 100.0;
-    for (uint32_t i = 0; i < duration; ++i) {
+    for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
         uint64_t throughput = buckets_in[i]*100;
         client_try << cur << " " << throughput << "\n";
         cur += diff;
@@ -413,7 +413,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     ofstream stick_file;
     stick_file.open("lazy_client_stickification.txt");
     cur = 0.0;
-    for (uint32_t i = 0; i < duration; ++i) {
+    for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
         uint64_t stick = buckets_stick[i]*100;
         stick_file << cur << " " << stick << "\n";
         cur += diff;
@@ -423,7 +423,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     ofstream client_success;
     client_success.open("lazy_client_success.txt");
     cur = 0.0;
-    for (uint32_t i = 0; i < duration; ++i) {
+    for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
         double percentage = 
             ((double)buckets_out[i])/((double)buckets_in[i]);
         percentage = percentage*100.0;
@@ -435,7 +435,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     ofstream throughput_file;
     throughput_file.open("lazy_client_throughput.txt");
     cur = 0.0;
-    for (uint32_t i = 0; i < duration; ++i) {
+    for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
         uint64_t throughput = buckets_done[i]*100;
         throughput_file << cur << " " << throughput << "\n";
         cur += diff;

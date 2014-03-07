@@ -52,6 +52,7 @@ LazyScheduler::StartWorking() {
         if (m_input_queue->Dequeue((uint64_t*)&txn)) {
             m_num_stickified += 1;
             if (txn->NowPhase()) {
+
                 AddGraph(txn);
             }
         }        
@@ -124,8 +125,10 @@ void LazyScheduler::AddGraph(Action* action) {
             m_materialize_counter = 0;
             m_materialize_on = false;
         }
-        for (int i = 0; i < num_reads+num_writes; ++i) {
-            *(count_ptrs[i]) = 0;		  
+        else {
+            for (int i = 0; i < num_reads+num_writes; ++i) {
+                *(count_ptrs[i]) = 0;		  
+            }
         }
         m_last_used += 1;
     }
