@@ -26,7 +26,7 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
     m_worker_queues = worker_queues;
 
     assert(m_input_queue != NULL);
-    assert(m_feedback_queues != NULL);
+    //    assert(m_feedback_queues != NULL);
     assert(m_worker_queues != NULL);
 }
 
@@ -53,6 +53,7 @@ LazyScheduler::StartWorking() {
     }
 }
 
+
 // Add the given action to the dependency graph. 
 void LazyScheduler::AddGraph(Action* action) {
     action->state = STICKY;
@@ -70,7 +71,8 @@ void LazyScheduler::AddGraph(Action* action) {
         Heuristic *dep_info = m_tables[record.m_table]->GetPtr(record.m_key);
 
         // Keep the information about the previous txn around.
-        action->readset[i].dependency = dep_info->last_txn;
+        action->readset[i].dependency = dep_info->last_txn;	
+        //        action->readset[i].dependency = NULL;
         action->readset[i].is_write = dep_info->is_write;
         action->readset[i].index = dep_info->index;
         count_ptrs[i] = &(dep_info->chain_length);
@@ -93,6 +95,7 @@ void LazyScheduler::AddGraph(Action* action) {
         
         // Keep the information about the previous txn around. 
         action->writeset[i].dependency = dep_info->last_txn;
+        //        action->writeset[i].dependency = NULL;
         action->writeset[i].is_write = dep_info->is_write;
         action->writeset[i].index = dep_info->index;
         count_ptrs[num_reads+i] = &(dep_info->chain_length);
@@ -107,17 +110,25 @@ void LazyScheduler::AddGraph(Action* action) {
         dep_info->chain_length += 1;
         force_materialize |= (uint32_t)(dep_info->chain_length >= m_max_chain);
     }  
-
+    action->state = STICKY;    
     if (force_materialize) {
-        for (int i = 0; i < num_reads+num_writes; ++i) {
-            *(count_ptrs[i]) = 0;		  
-        }                
         int index = m_last_used % m_num_workers;
-        action->state = STICKY;
-        m_worker_queues[index]->EnqueueBlocking((uint64_t)action);
-        m_last_used += 1;        
+        if (m_worker_queues[index]->Enqueue((uint64_t)action)) {
+            for (int i = 0; i < num_reads+num_writes; ++i) {
+                *(count_ptrs[i]) = 0;		  
+            }
+
+        }
+        m_last_used += 1;
     }
+    /*
+    else {
+        action->state = STICKY;
+        m_worker_queues[0]->EnqueueBlocking((uint64_t)action);
+    }
+    */
 }
+
 
 uint64_t
 LazyScheduler::NumStickified() {

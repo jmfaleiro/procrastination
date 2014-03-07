@@ -5,7 +5,7 @@
 #include <one_dim_table.hh>
 #include <random>
 
-#define 	SIMPLE_RECORD_SIZE		256
+#define 	SIMPLE_RECORD_SIZE		1000
 
 namespace simple {
     struct SimpleRecord {
@@ -25,13 +25,10 @@ namespace simple {
         }
     };
 
-    static OneDimTable<SimpleRecord> 			*s_simple_table;
+    extern OneDimTable<SimpleRecord> 			*s_simple_table;
 
-    static void
-    do_init(uint32_t num_records) {
-        srand(time(NULL));
-        s_simple_table = new OneDimTable<SimpleRecord>(num_records);
-    }
+    extern void
+    do_simple_init(uint32_t num_records);
 
     class SimpleAction : public Action {
     public:
@@ -61,5 +58,5 @@ namespace simple {
             }
         }
     };
-};
+}
 #endif		//  SIMPLE_ACTION_HH_

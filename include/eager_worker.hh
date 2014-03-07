@@ -12,14 +12,14 @@
 
 class EagerWorker : public Runnable {
 private:
-    LockManager			*m_lock_mgr;			// Global lock manager
-    SimpleQueue 		*m_txn_input_queue;		// Thread-local input queue
-    SimpleQueue 		*m_output_queue;		// Thread-local output queue
-    int 				m_cpu_number;			// CPU to which to bind
-    EagerAction 		*m_queue_head;			// Head of queue of waiting txns
-    EagerAction			*m_queue_tail;			// Tail of queue of waiting txns
-    int					m_num_elems;			// Number of elements in the queue
-    uint32_t 			m_num_done;
+    LockManager				*m_lock_mgr;			// Global lock manager
+    SimpleQueue 			*m_txn_input_queue;		// Thread-local input queue
+    SimpleQueue 			*m_output_queue;		// Thread-local output queue
+    int 					m_cpu_number;			// CPU to which to bind
+    EagerAction 			*m_queue_head;			// Head of queue of waiting txns
+    EagerAction				*m_queue_tail;			// Tail of queue of waiting txns
+    int						m_num_elems;			// Number of elements in the queue
+    volatile uint32_t 		m_num_done;
     
     // Worker thread function
     virtual void
@@ -50,6 +50,11 @@ protected:
 public:
     EagerWorker(LockManager *mgr, SimpleQueue *input_queue, 
                 SimpleQueue *output_queue, int cpu);
+    
+    uint32_t 
+    NumProcessed() {
+        return m_num_done;
+    }
 };
 
 #endif 		 // EAGER_WORKER_HH_

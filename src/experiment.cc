@@ -45,8 +45,14 @@ Experiment::Run() {
         break;
         
     case THROUGHPUT:
-        simple::do_init(m_info->num_records);
+        simple::do_simple_init(m_info->num_records);
+        assert(simple::s_simple_table != NULL);
         RunThroughput();
         break;
+
+    case PEAK_LOAD:
+        simple::do_simple_init(m_info->num_records);
+        assert(simle::s_simple_table != NULL);
+        RunPeak();
     }
 }

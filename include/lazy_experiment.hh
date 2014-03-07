@@ -50,6 +50,9 @@ protected:
     virtual void
     RunThroughput();
     
+    virtual void
+    RunPeak();
+    
 public:
     LazyExperiment(ExperimentInfo *info);    
 };

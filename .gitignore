@@ -1,6 +1,8 @@
 *~
+*.txt
 src/*~
 include/*~
 temp/*~
 test/*~
 build/*
+results/*

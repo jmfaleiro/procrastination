@@ -8,8 +8,12 @@ uint32_t
 LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs, 
                            WorkloadGenerator *gen) {
     uint32_t num_waits = 0;
+
     for (int i = 0; i < num_inputs; ++i) {
         Action *txn = gen->genNext();
+        if (i >= num_inputs - m_info->num_workers -1) {
+            txn->materialize = true;
+        }
         if (txn->materialize) {
             num_waits += 1;
         }
@@ -29,14 +33,15 @@ LazyExperiment::RunThroughput() {
     
     SimpleQueue **worker_inputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
     SimpleQueue **worker_outputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **feedbacks = InitQueues(m_info->num_workers, LARGE_QUEUE);
     m_output_queues = worker_outputs;
     m_workers = (LazyWorker**)malloc(sizeof(LazyWorker*)*m_info->num_workers);
 
     for (int i = 0; i < m_info->num_workers; ++i) {
-        m_workers[i] = new LazyWorker(worker_inputs[i], NULL, worker_outputs[i], 
+        m_workers[i] = new LazyWorker(worker_inputs[i], feedbacks[i], worker_outputs[i], 
                                       i+1);
     }
-    m_scheduler =  new LazyScheduler(m_input_queue, NULL, worker_inputs, 
+    m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 1,
                                      (uint32_t)m_info->substantiate_threshold);
@@ -128,11 +133,12 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     uint32_t num_done = 0;
     uint32_t num_waits_done = 0;
     std::cout << "To wait: " << num_waits << "\n";
+    
     /*
     while (!m_input_queue->isEmpty())
         ;
     */
-
+    
     while (num_waits_done < num_waits) {
         for (int i = 0; i < num_workers; ++i) {
             Action *dummy;
@@ -144,7 +150,7 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
             }
         }
     }
-
+    
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
     if (num_done < num_waits_done) {
         std::cout << num_done << " " << num_waits_done << "\n";
@@ -197,6 +203,12 @@ LazyExperiment::InitializeTPCC() {
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, s_num_tables, 
                                      (uint32_t)m_info->substantiate_threshold);
+}
+
+// XXX: NOT YET IMPLEMENTED
+void
+LazyExperiment::RunPeak() {
+    assert(false);
 }
 
 TableInit*

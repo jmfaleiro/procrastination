@@ -18,8 +18,8 @@ protected:
     InitQueues(int num_queues, uint32_t size);
     
     virtual void RunTPCC() = 0;
-
     virtual void RunThroughput() = 0;
+    virtual void RunPeak() = 0;
 
 public:
     Experiment(ExperimentInfo *info);

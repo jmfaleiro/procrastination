@@ -12,10 +12,15 @@
 #include <time.h>
 #include <experiment.hh>
 #include <normal_generator.h>
+#include <uniform_generator.h>
+#include <eager_scheduler.hh>
+#include <iostream>
+#include <fstream>
 
 class EagerExperiment : public Experiment {
 private:
     LockManager			*m_lock_mgr;
+    EagerWorker			**m_workers;
 
     void
     InitializeTPCCLockManager();
@@ -26,7 +31,7 @@ private:
 
     EagerWorker**
     InitWorkers(int num_workers, SimpleQueue **input_queues, 
-                SimpleQueue **output_queues);
+                SimpleQueue **output_queues, int cpu_offset);
 
     void
     DoThroughputExperiment(EagerWorker **workers, SimpleQueue **output_queues, 
@@ -37,6 +42,17 @@ private:
 
     void
     RunThroughput();
+
+    void
+    RunPeak();
+    
+    void
+    WaitPeak(uint32_t duration,
+             EagerAction **input_actions, 
+             SimpleQueue *input_queue);
+
+    inline uint32_t
+    NumWorkerDone();
 
 public:
     EagerExperiment(ExperimentInfo *info);

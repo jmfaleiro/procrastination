@@ -2,6 +2,7 @@
 #define 	ONE_DIM_TABLE_HH_
 
 #include <table.hh>
+#include <cstdlib>
 
 template<class V>
 class OneDimTable : public Table<uint64_t, V> {

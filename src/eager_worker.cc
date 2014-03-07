@@ -103,10 +103,12 @@ EagerWorker::TryExec(EagerAction *txn) {
             TryExec(link);
         }
         else {
+            m_num_done += 1;
             m_output_queue->EnqueueBlocking((uint64_t)txn);
         }
     }    
     else {
+        m_num_done += 1;
         Enqueue(txn);
     }
 }
@@ -123,6 +125,7 @@ EagerWorker::DoExec(EagerAction *txn) {
         TryExec(link);
     }
     else {
+        m_num_done += 1;
         m_output_queue->EnqueueBlocking((uint64_t)txn);
     }
 }
@@ -132,17 +135,6 @@ EagerWorker::WorkerFunction() {
     EagerAction *txn;
     uint32_t i = 0;
 
-    /*
-    while (m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
-        m_lock_mgr->Lock(txn);
-        Enqueue(txn);
-    }
-    std::cout << "Done locking...\n";    
-    CheckReady();
-    std::cout << "Done processing!\n";
-    while (true)
-        ;
-    */
     while (true) {        
         CheckReady();
         if (m_num_elems < 1000 && m_txn_input_queue->Dequeue((uint64_t*)&txn)) {

@@ -1,5 +1,6 @@
 #include "uniform_generator.h"
 #include <simple_action.hh>
+#include <algorithm>
 
 using namespace simple;
 
@@ -129,7 +130,8 @@ EagerAction* EagerUniformGenerator::genNext() {
       to_add.record.m_key = record;
       ret->writeset.push_back(to_add);
     }    
-    
+    std::sort(ret->readset.begin(), ret->readset.end());
+    std::sort(ret->writeset.begin(), ret->writeset.end());
     return ret;    
 }
 

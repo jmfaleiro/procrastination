@@ -1,5 +1,6 @@
 #include "normal_generator.h"
 #include <simple_action.hh>
+#include <algorithm>
 
 using namespace simple;
 
@@ -74,7 +75,7 @@ Action* NormalGenerator::genNext() {
         to_add.record.m_key = record;
         ret->writeset.push_back(to_add);
     }
-
+    
     if ((rand() % m_freq) == 0) {
 		ret->materialize = true;
     }
@@ -154,6 +155,7 @@ EagerAction* EagerNormalGenerator::genNext() {
         to_add.record.m_key = record;
         ret->writeset.push_back(to_add);
     }
-    
+    std::sort(ret->readset.begin(), ret->readset.end());
+    std::sort(ret->writeset.begin(), ret->writeset.end());
     return ret;
 }

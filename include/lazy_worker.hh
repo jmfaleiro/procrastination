@@ -34,6 +34,8 @@ private:
     ActionNode 				*m_queue_tail;
     long	 				m_num_elems;		
 
+    volatile uint32_t		m_num_done;
+
     void
     CheckWaits();
 
@@ -76,6 +78,10 @@ public:
     LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue, 
                SimpleQueue *output_queue, int cpu);
     
+    uint32_t
+    NumDone() {
+        return m_num_done;
+    }
 };
 
 #endif 		//  LAZY_WORKER_HH_

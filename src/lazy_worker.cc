@@ -17,6 +17,7 @@ LazyWorker::LazyWorker(SimpleQueue *input_queue, SimpleQueue *feedback_queue,
     m_queue_head = NULL;
     m_queue_tail = NULL;
     m_num_elems = 0;
+    m_num_done = 0;
 }
 
 void
@@ -79,6 +80,8 @@ LazyWorker::RemoveQueue(ActionNode *txn) {
            (m_queue_head != NULL && m_queue_tail != NULL));
 }
 
+
+
 bool
 LazyWorker::ProcessFunction(Action *txn) {
     assert(txn != NULL);
@@ -101,6 +104,7 @@ LazyWorker::ProcessFunction(Action *txn) {
         return true;
     }
 }
+
 
 bool
 LazyWorker::processWrite(struct DependencyInfo *info) {
@@ -201,6 +205,7 @@ LazyWorker::ProcessTxn(Action *txn) {
             m_feedback_queue->Enqueue((uint64_t)next_link);
         }
         else {
+            m_num_done += 1;
             m_output_queue->Enqueue((uint64_t)txn);
         }
     }

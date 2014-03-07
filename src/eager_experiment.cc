@@ -68,11 +68,11 @@ EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, int num_
 
 EagerWorker**
 EagerExperiment::InitWorkers(int num_workers, SimpleQueue **input_queues, 
-                             SimpleQueue **output_queues) {
+                             SimpleQueue **output_queues, int cpu_offset) {
     EagerWorker **ret = new EagerWorker*[num_workers];
     for (int i = 0; i < num_workers; ++i) {
         ret[i] = new EagerWorker(m_lock_mgr, input_queues[i], output_queues[i], 
-                                 i);
+                                 i+cpu_offset);
     }
     return ret;
 }
@@ -135,7 +135,7 @@ EagerExperiment::RunTPCC() {
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
-                                        output_queues);
+                                        output_queues, 0);
 
     
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
@@ -143,10 +143,217 @@ EagerExperiment::RunTPCC() {
 }
 
 void
+EagerExperiment::RunPeak() {
+    TableInit table_init_params[1];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = m_info->num_records;
+    
+    // Use a uniform distribution on keys
+    EagerGenerator *gen = new EagerUniformGenerator(m_info->read_set_size, 
+                                                    m_info->write_set_size, 
+                                                    m_info->num_records, 
+                                                    m_info->substantiate_period);
+
+    // Generate the input actions
+    EagerAction **input_actions = 
+        (EagerAction**)malloc(sizeof(EagerAction*)*m_info->num_txns);
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        input_actions[i] = gen->genNext();
+    }
+
+    // Create the lock manager
+    m_lock_mgr = new LockManager(table_init_params, 1);    
+    
+    // Create the workers
+    SimpleQueue **input_queues = InitQueues(m_info->num_workers, SMALL_QUEUE);
+    SimpleQueue **output_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
+                                        output_queues, 1);
+    m_workers = workers;
+
+    // Create the scheduler
+    SimpleQueue **sched_input = InitQueues(1, SMALL_QUEUE);
+    EagerScheduler *sched = new EagerScheduler(m_lock_mgr, sched_input[0], 
+                                               input_queues, (uint32_t)m_info->num_workers,
+                                               0);
+    sched->Run();
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        workers[i]->Run();
+    }
+
+    // Do the experiment
+    WaitPeak(180, input_actions, sched_input[0]);
+}
+
+uint32_t 
+EagerExperiment::NumWorkerDone() {
+    uint64_t ret = 0;
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        ret += m_workers[i]->NumProcessed();
+    }
+    return ret;
+}
+
+void
+EagerExperiment::WaitPeak(uint32_t duration,
+                          EagerAction **input_actions, 
+                          SimpleQueue *input_queue) {
+
+    if (pin_thread(m_info->num_workers+1) == -1) {
+        std::cout << "Eager experiment: Client thread couldn't bind to cpu!!!";
+        std::cout << "\n";
+        exit(-1);
+    }
+
+    volatile uint64_t start_time = rdtsc();
+    volatile uint64_t phase_time; 
+    duration *= 100;
+
+    uint64_t* buckets_in = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_in, 0, sizeof(uint64_t)*duration);
+
+    uint64_t* buckets_out = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_out, 0, sizeof(uint64_t)*duration);
+        
+    uint64_t* buckets_done = 
+        (uint64_t*)numa_alloc_local(sizeof(uint64_t)*duration);
+    memset(buckets_done, 0, sizeof(uint64_t)*duration);
+        
+    volatile uint64_t start_count = NumWorkerDone();
+    
+    // Run easy input for the first third of the experiment
+    uint64_t input_index = 0;
+    uint32_t j = 0;
+    for (; j < duration/3; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            EagerAction *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }
+            else {
+                for (int i = 0; i < 110; ++i) {
+                    single_work();
+                }
+            }
+            phase_time = rdtsc();
+            if (phase_time - start_time >= (FREQUENCY/100)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+                break;
+            }            
+            for (int i = 0; i < 100000; ++i) {
+                single_work();
+            }
+        }
+    }
+    
+    // Run spike for the next third
+    for (; j < 2*duration/3; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            EagerAction *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }                
+            else {
+                for (int i = 0; i < 500; ++i) {
+                    single_work();
+                }
+            }
+                
+
+            phase_time = rdtsc();
+
+            // Check whether or not 1 second has elapsed. 
+            // XXX: The constant here is specific to smorz!!!
+            if (phase_time - start_time >= (FREQUENCY/100)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+
+                break;
+            }
+            for (int i = 0; i < 1500; ++i) {
+                single_work();
+            }
+        }
+    }
+    
+    // Run easy input for the final third
+    for (; j < duration; ++j) {
+        while (true) {
+            buckets_in[j] += 1;
+            EagerAction *action = input_actions[input_index++];
+            if (input_queue->Enqueue((uint64_t)action)) {
+                buckets_out[j] += 1;
+            }
+            else {
+                for (int i = 0; i < 110; ++i) {
+                    single_work();
+                }
+            }
+            phase_time = rdtsc();
+            if (phase_time - start_time >= (FREQUENCY/100)) {
+                start_time = phase_time;
+                volatile int end_count = NumWorkerDone();
+                buckets_done[j] = end_count - start_count;
+                start_count = end_count;
+                break;
+            }            
+            for (int i = 0; i < 100000; ++i) {
+                single_work();
+            }
+        }
+    }
+
+    ofstream client_try;
+    client_try.open("client_try.txt");
+    double cur = 0.0;
+    double diff = 1.0 / 100.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        uint64_t throughput = buckets_in[i]*100;
+        client_try << cur << " " << throughput << "\n";
+        cur += diff;
+    }
+
+    client_try.close();
+
+    ofstream client_success;
+    client_success.open("client_success.txt");
+    cur = 0.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        double percentage = 
+            ((double)buckets_out[i])/((double)buckets_in[i]);
+        percentage = percentage*100.0;
+        client_success << cur << " " << percentage << "\n";
+        cur += diff;
+    }
+    client_success.close();
+        
+    ofstream throughput_file;
+    throughput_file.open("client_throughput.txt");
+    cur = 0.0;
+    for (uint32_t i = 0; i < duration; ++i) {
+        uint64_t throughput = buckets_done[i]*100;
+        throughput_file << cur << " " << throughput << "\n";
+        cur += diff;
+    }
+    throughput_file.close();
+}
+
+void
 EagerExperiment::RunThroughput() {
     TableInit table_init_params[1];
     table_init_params[0].m_table_type = ONE_DIM_TABLE;
     table_init_params[0].m_params.m_one_params.m_dim1 = m_info->num_records;
+
+    m_lock_mgr = new LockManager(table_init_params, 1);
     
     SimpleQueue **input_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
     SimpleQueue **output_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
@@ -159,12 +366,15 @@ EagerExperiment::RunThroughput() {
                                        m_info->num_records, 
                                        m_info->substantiate_period, 
                                        m_info->std_dev);
-
+    }
+    else {
+        gen = new EagerUniformGenerator(m_info->read_set_size, 
+                                        m_info->write_set_size, m_info->num_records, 
+                                        m_info->substantiate_period);
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
-                                        output_queues);
-
+                                        output_queues, 0);
     
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
                            (uint32_t)m_info->num_txns);    
