@@ -17,7 +17,9 @@ enum ActionState {
 
 class ActionNode {
 public:
-    Action 				*action;
+    volatile uint64_t			start_time;
+    volatile uint64_t 			end_time;
+    Action 				*action;    
     ActionNode 			*prev;
     ActionNode 			*next;
 };
@@ -66,6 +68,12 @@ private:
 
     bool
     processWrite(struct DependencyInfo *info);
+    
+    bool
+    ProcessBlindInner(Action *action);
+
+    bool
+    ProcessBlind(Action *txn);
     
     bool
     ProcessFunction(Action *txn);

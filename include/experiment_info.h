@@ -15,7 +15,7 @@
 
 enum ExperimentType {
     THROUGHPUT,
-    LATENCY,
+    BLIND,
     PEAK_LOAD,
     TPCC,
 };
@@ -34,7 +34,7 @@ class ExperimentInfo {
 
  public:
     ExperimentInfo(int argc, char** argv) {
-
+    
         struct option long_options[] = {
             {"period", required_argument, NULL, 0},
             {"num_workers", required_argument, NULL, 1},
@@ -67,11 +67,11 @@ class ExperimentInfo {
         std_dev = -1;
 
         std::set<int> args_received;
-        std::stringstream stick_stream;
-        std::stringstream subst_stream;
+        std::stringstream throughput_stream;
+        std::stringstream latency_stream;
         
-        stick_stream << "eager";
-        subst_stream << "eager";
+        throughput_stream << "results/eager";
+        latency_stream << "results/eager";
 
         int exp_type = -1;
         blind_write_frequency = -1;
@@ -91,11 +91,11 @@ class ExperimentInfo {
                 serial = false;
                 
                 substantiate_period = atoi(optarg);
-                stick_stream.str("");
-                subst_stream.str("");
-
-                subst_stream << "lazy_" << substantiate_period << "_subst";
-                stick_stream << "lazy_" << substantiate_period << "_stick";
+                throughput_stream.str("");
+                latency_stream.str("");
+                
+                throughput_stream << "results/lazy";
+                latency_stream << "results/lazy";
                 break;
             case 1:
                 num_workers = atoi(optarg);
@@ -156,7 +156,7 @@ class ExperimentInfo {
             }
         }
         
-        if (exp_type != LATENCY && 
+        if (exp_type != BLIND && 
             exp_type != THROUGHPUT && 
             exp_type != PEAK_LOAD &&
             exp_type != TPCC) {
@@ -177,34 +177,54 @@ class ExperimentInfo {
         worker_bindings = new cpu_set_t[num_workers];
         scheduler_bindings = new cpu_set_t[2];		
         
-        if (!serial) {
-            subst_stream << "_threshold_" << substantiate_threshold;
-            stick_stream << "_threshold_" << substantiate_threshold;
+        if (experiment == TPCC) {
+            throughput_stream << "_tpcc_warhouses_" << warehouses;
+            latency_stream << "_tpcc_warehouses_" << warehouses;
         }
-
-        if (is_normal) {
-            subst_stream << "_normal_" << std_dev;
-            stick_stream << "_normal_" << std_dev;
+        
+        if (!serial) {
+            throughput_stream << "_threads_" << (num_workers+1);
+            latency_stream << "_threads_" << (num_workers+1);
         }
         else {
-            subst_stream << "_uniform";
-            stick_stream << "_uniform";
+            throughput_stream << "_threads_" << num_workers;
+            latency_stream << "_threads_" << num_workers;
         }
-	
-        if (blind_write_frequency != -1) {
-            subst_stream << "_blind_" << blind_write_frequency;
-            stick_stream << "_blind_" << blind_write_frequency;
-        }
-	
-        subst_stream << ".txt";
-        stick_stream << ".txt";
 
-        subst_file = subst_stream.str();
-        stick_file = stick_stream.str();        
+        if (!serial) {            
+            throughput_stream << "_threshold_" << substantiate_threshold;
+            latency_stream << "_threshold_" << substantiate_threshold;
+        }
+
+        if (experiment == THROUGHPUT) {
+            if (is_normal) {
+                throughput_stream << "_normal_" << std_dev;
+                latency_stream << "_normal_" << std_dev;
+            }
+            else {
+                throughput_stream << "_uniform";
+                latency_stream << "_uniform";
+            }
+        }
+	
+        if (experiment == BLIND && blind_write_frequency == -1) {
+            std::cout << "Missing blind write frequency!\n";
+            exit(-1);
+        }
+        if (blind_write_frequency != -1) {
+            throughput_stream << "_blind_" << blind_write_frequency;
+            latency_stream << "_blind_" << blind_write_frequency;
+        }
+        
+        throughput_stream << "_throughput.txt";
+        latency_stream << "_latency.txt";
+        
+        throughput_file = throughput_stream.str();
+        latency_file = latency_stream.str();        
         
         std::cout << "Experiment info:\n";
-        std::cout << subst_file << "\n";
-        std::cout << stick_file << "\n";
+        std::cout << throughput_file << "\n";
+        std::cout << latency_file << "\n";
     }
     
     int blind_write_frequency;
@@ -241,10 +261,10 @@ class ExperimentInfo {
     int substantiate_threshold;
     
     // File in which to dump substantiation throughput. 
-    std::string subst_file;
+    std::string throughput_file;
     
     // File in which to dump stickification throughput. 
-    std::string stick_file;
+    std::string latency_file;
 
     // Number of times to repeat our experiment. 
     int num_runs;
@@ -262,7 +282,8 @@ class ExperimentInfo {
     int items;
 
     bool given_split;
-
+    
+    char *experiment_string;
     uint32_t new_order;
     uint32_t district;
     uint32_t stock_level;

@@ -16,11 +16,14 @@
 #include <eager_scheduler.hh>
 #include <iostream>
 #include <fstream>
+#include <shopping_cart.h>
 
 class EagerExperiment : public Experiment {
 private:
     LockManager			*m_lock_mgr;
     EagerWorker			**m_workers;
+    EagerAction 		**m_actions;
+
 
     void
     InitializeTPCCLockManager();
@@ -41,10 +44,25 @@ private:
     RunTPCC();
 
     void
+    WriteBlindLatencies();
+
+    void
     RunThroughput();
 
     void
     RunPeak();
+
+    void
+    RunBlind();
+    
+    void
+    WriteStockCDF();
+
+    void
+    WriteNewOrderCDF();
+    
+    void
+    WriteLatencies();
     
     void
     WaitPeak(uint32_t duration,

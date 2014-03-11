@@ -86,9 +86,10 @@ EagerUniformGenerator::EagerUniformGenerator(int read_size,
     m_write_set_size = write_size;
     m_num_records = num_records;
     m_freq = freq;
+    m_last_used = 0;
 
     // Init rand number generator. 
-    srand(time(NULL));
+    srand(time(NULL));    
 }
 
 int EagerUniformGenerator::genUnique(std::set<int>* done) {
@@ -122,14 +123,16 @@ EagerAction* EagerUniformGenerator::genNext() {
         ret->readset.push_back(to_add);
     }
     
-    // Generate elements to write. 
+    // Generate elements to write.     
     for (int i = 0; i < m_write_set_size; ++i) {
-      int record = genUnique(&done);
+        //        int record = 100000*i + m_last_used % 8;
+        int record = genUnique(&done);
       struct EagerRecordInfo to_add;
       to_add.record.m_table = 0;
       to_add.record.m_key = record;
       ret->writeset.push_back(to_add);
     }    
+    m_last_used += 1;
     std::sort(ret->readset.begin(), ret->readset.end());
     std::sort(ret->writeset.begin(), ret->writeset.end());
     return ret;    

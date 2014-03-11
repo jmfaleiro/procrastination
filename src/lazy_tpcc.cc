@@ -128,7 +128,7 @@ NewOrderTxn::LaterPhase() {
     assert(composite.m_table == CUSTOMER);
     Customer *customer = s_customer_tbl->GetPtr(composite.m_key);
 
-    float c_discount = customer->c_discount;
+   float c_discount = customer->c_discount;
 
     // Create a NewOrder record. 
     // XXX: This is a potentially serializing call to malloc. Make sure to link
@@ -420,7 +420,7 @@ StockLevelTxn0::LaterPhase() {
         keys[2] = m_next_order_id - 2 -i;
         uint64_t open_order_key = TPCCKeyGen::create_new_order_key(keys);
         dep_info.record.m_key = open_order_key;
-        m_level1_txn->readset.push_back(dep_info);	// XXX: FIXME
+        m_level1_txn->readset.push_back(dep_info);
     }
 }
 

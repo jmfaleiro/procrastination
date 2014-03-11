@@ -86,8 +86,12 @@ bool
 LazyWorker::ProcessFunction(Action *txn) {
     assert(txn != NULL);
     if (txn->state != SUBSTANTIATED) {
+        if (txn->is_blind) {
+            return ProcessBlind(txn);
+        }
         if (cmp_and_swap(&txn->state, STICKY, PROCESSING)) {
             if (ProcessTxn(txn)) {
+                //                clock_gettime(CLOCK_REALTIME, &txn->end_time);
                 assert(txn->state == SUBSTANTIATED);
                 return true;
             }
@@ -130,6 +134,33 @@ LazyWorker::processWrite(struct DependencyInfo *info) {
         is_write = prev->readset[cur_index].is_write;
         index = prev->readset[cur_index].index;
         prev = prev->readset[cur_index].dependency;        
+    }
+    return true;
+}
+
+bool
+LazyWorker::ProcessBlindInner(Action *action) {
+    if (action->state != SUBSTANTIATED) {
+    xchgq(&action->state, SUBSTANTIATED);
+    for (size_t i = 0; i < action->writeset.size(); ++i) {
+        if (action->writeset[i].dependency != NULL && action->writeset[i].dependency->state != SUBSTANTIATED) {
+            ProcessBlindInner(action->writeset[i].dependency);
+        }
+    }
+    m_output_queue->Enqueue((uint64_t)action);
+    }
+    return true;
+}
+
+bool
+LazyWorker::ProcessBlind(Action *action) {
+    action->LaterPhase();
+    Action *link;
+    xchgq(&action->state, SUBSTANTIATED);
+    m_output_queue->EnqueueBlocking((uint64_t)action);
+
+    for (size_t i = 0; i < action->writeset.size(); ++i) {
+        ProcessBlindInner(action->writeset[i].dependency);
     }
     return true;
 }
@@ -230,8 +261,9 @@ void
 LazyWorker::StartWorking() {
     Action *txn;
     while (true) {
-
-        if (m_num_elems < 1000 && m_input_queue->Dequeue((uint64_t*)&txn)) {
+        if (m_num_elems < 100 && m_input_queue->Dequeue((uint64_t*)&txn)) {
+            //            clock_gettime(CLOCK_REALTIME, &txn->start_time);
+            //            clock_gettime(CLOCK_REALTIME, &txn->start_time);
             if (!ProcessFunction(txn)) {
                 ActionNode *wait_node = GetActionNode();
                 wait_node->action = txn;
@@ -246,12 +278,10 @@ LazyWorker::StartWorking() {
     }
 }
 
-// Return an ActionNode from the free-list of action nodes
 ActionNode*
 LazyWorker::GetActionNode() {
-    assert(m_free_list != NULL);
     ActionNode *ret = m_free_list;
-    m_free_list = m_free_list->next;
+    m_free_list = ret->next;
     ret->next = NULL;
     ret->prev = NULL;
     ret->action = NULL;

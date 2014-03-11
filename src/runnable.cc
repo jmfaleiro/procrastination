@@ -16,7 +16,6 @@ Runnable::Run() {
     // initialized
     while (!m_start_signal)
         ;    
-
 }
 
 void*

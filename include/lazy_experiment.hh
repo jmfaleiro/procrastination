@@ -15,6 +15,8 @@
 #include <uniform_generator.h>
 #include <iostream>
 #include <fstream>
+#include <shopping_cart.h>
+
 
 class LazyExperiment : public Experiment {
 private:
@@ -22,6 +24,8 @@ private:
     LazyScheduler 			*m_scheduler;
     SimpleQueue 			*m_input_queue;
     SimpleQueue 			**m_output_queues;
+    Action					**m_actions;
+
 
     uint32_t
     InitInputs(SimpleQueue *input_queue, int num_inputs, 
@@ -47,9 +51,17 @@ private:
     WaitPeak(uint32_t duration, Action **input_actions, 
              SimpleQueue *input_queue);
     
+    void
+    WriteLatencies();
 
     uint32_t 
     NumWorkerDone();
+
+    void
+    WriteStockCDF();
+
+    void
+    WriteNewOrderCDF();
     
 protected:
 
@@ -61,6 +73,9 @@ protected:
     
     virtual void
     RunPeak();
+
+    virtual void
+    RunBlind();
     
 public:
     LazyExperiment(ExperimentInfo *info);    

@@ -7,6 +7,7 @@
 #include "machine.h"
 #include "util.h"
 #include <pthread.h>
+#include <time.h>
 
 class Action;
 
@@ -134,9 +135,13 @@ struct DependencyInfo {
 class Action {
 
  public:  
-  bool is_checkout;
-  uint32_t materialize;
-  int is_blind;
+  bool materialize;
+  bool is_blind;  
+  timespec start_time;
+  timespec end_time;
+
+  uint64_t start_rdtsc_time;
+  uint64_t end_rdtsc_time;
 
   //  volatile uint64_t start_time;
   //  volatile uint64_t end_time;
@@ -151,7 +156,6 @@ class Action {
   //  volatile uint64_t __attribute__((aligned(CACHE_LINE))) lock_word;
 
   volatile uint64_t __attribute__((aligned(CACHE_LINE))) state;
-  uint64_t owner;
   
   virtual bool NowPhase() { return true; }
   virtual void LaterPhase() { }
@@ -175,6 +179,12 @@ class EagerAction {
     volatile uint64_t __attribute__((aligned(CACHE_LINE))) num_dependencies;
     std::vector<struct EagerRecordInfo> writeset;
     std::vector<struct EagerRecordInfo> readset;
+
+    timespec start_time;
+    timespec end_time;
+
+    uint64_t start_rdtsc_time;
+    uint64_t end_rdtsc_time;
 
     virtual bool IsRoot() { return false; }
     virtual bool IsLinked(EagerAction **ret) { *ret = NULL; return false; };

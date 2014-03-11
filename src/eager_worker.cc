@@ -104,6 +104,8 @@ EagerWorker::TryExec(EagerAction *txn) {
         }
         else {
             m_num_done += 1;
+            //            clock_gettime(CLOCK_REALTIME, &txn->end_time);
+            //            txn->end_rdtsc_time = rdtsc();
             m_output_queue->EnqueueBlocking((uint64_t)txn);
         }
     }    
@@ -126,6 +128,8 @@ EagerWorker::DoExec(EagerAction *txn) {
     }
     else {
         m_num_done += 1;
+        //        clock_gettime(CLOCK_REALTIME, &txn->end_time);
+        //        txn->end_rdtsc_time = rdtsc();
         m_output_queue->EnqueueBlocking((uint64_t)txn);
     }
 }
@@ -137,7 +141,9 @@ EagerWorker::WorkerFunction() {
 
     while (true) {        
         CheckReady();
-        if (m_num_elems < 1000 && m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
+        if (m_num_elems < 100 && m_txn_input_queue->Dequeue((uint64_t*)&txn)) {
+            //            clock_gettime(CLOCK_REALTIME, &txn->start_time);
+            //            txn->start_rdtsc_time = rdtsc();
             TryExec(txn);
         }
     }

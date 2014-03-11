@@ -385,9 +385,6 @@ StockLevelEager0::StockLevelEager0(uint32_t warehouse_id, uint32_t district_id,
         info.record.m_key = TPCCKeyGen::create_district_key(keys);
         readset.push_back(info);
         uint32_t temp = TPCCKeyGen::get_district_key(readset[0].record.m_key);
-        if (temp != m_district_id) {
-            std::cout << "blah!\n";
-        }
         assert(temp == m_district_id);
     }
 }
@@ -427,6 +424,7 @@ StockLevelEager0::PostExec() {
         dep_info.record.m_key = open_order_key;
         m_level1_txn->readset.push_back(dep_info);
     }
+    assert(m_level1_txn->readset.size() == 20);
 }
 
 StockLevelEager1::StockLevelEager1(uint32_t warehouse_id, uint32_t district_id, 
@@ -615,7 +613,6 @@ OrderStatusEager1::Execute() {
 
 void
 OrderStatusEager1::PostExec() {
-
 }
 
 DeliveryEager0::DeliveryEager0(uint32_t w_id, uint32_t d_id, 

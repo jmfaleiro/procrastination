@@ -6,6 +6,10 @@
 #include <machine.h>
 #include <time.h>
 #include <tpcc.hh>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 class Experiment {
 protected:
@@ -20,6 +24,13 @@ protected:
     virtual void RunTPCC() = 0;
     virtual void RunThroughput() = 0;
     virtual void RunPeak() = 0;
+    virtual void RunBlind() = 0;
+    
+    void
+    WriteCDF(double *times, int count);
+    
+    void
+    WriteThroughput(timespec time, uint32_t num_procs);
 
 public:
     Experiment(ExperimentInfo *info);

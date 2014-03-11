@@ -16,6 +16,7 @@
 using namespace std;
 
 namespace cc_params {
+
     enum TableType {
         HASH_TABLE = 0,
         CONCURRENT_HASH_TABLE,

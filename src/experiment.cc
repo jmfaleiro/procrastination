@@ -1,5 +1,8 @@
 #include <experiment.hh>
 #include <simple_action.hh>
+#include <algorithm>
+
+using namespace std;
 
 Experiment::Experiment(ExperimentInfo *info) {
     m_info = info;
@@ -52,7 +55,36 @@ Experiment::Run() {
 
     case PEAK_LOAD:
         simple::do_simple_init(m_info->num_records);
-        assert(simle::s_simple_table != NULL);
+        assert(simple::s_simple_table != NULL);
         RunPeak();
+        break;
+    case BLIND:
+        shopping::do_shopping_init(2000, 1000000);
+        RunBlind();
+        break;
     }
+}
+
+void
+Experiment::WriteThroughput(timespec time, uint32_t num_processed) {
+    ofstream throughput_file;
+    throughput_file.open(m_info->throughput_file.c_str(), ios::app | ios::out);
+    throughput_file << time.tv_sec << "." << time.tv_nsec;
+    throughput_file <<  "  " << num_processed << "\n";
+    throughput_file.close();
+}
+
+void
+Experiment::WriteCDF(double *times, int count) {
+    ofstream cdf_file;
+    cdf_file.open(m_info->latency_file.c_str(), ios::out);
+
+    std::sort(&times[0], &times[count]);
+    double fraction = 0.0;
+    double diff = 1.0/(count*1.0);    
+    for (int i = 0; i < count; ++i) {
+        cdf_file << fraction << " " << times[i] << "\n";
+        fraction  += diff;        
+    }
+    cdf_file.close();
 }

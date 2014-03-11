@@ -8,15 +8,26 @@ uint32_t
 LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs, 
                            WorkloadGenerator *gen) {
     uint32_t num_waits = 0;
-
+    m_actions = (Action**)malloc(sizeof(Action*)*num_inputs);
+    timespec zero_time;
+    zero_time.tv_sec = 0;
+    zero_time.tv_nsec = 0;
     for (int i = 0; i < num_inputs; ++i) {
+        //        std::cout << i << "\n";
         Action *txn = gen->genNext();
-        if (i >= num_inputs - m_info->num_workers -1) {
-            txn->materialize = true;
+        if (m_info->blind_write_frequency == -1) {
+            if (i >= num_inputs - m_info->num_workers -1) {
+                txn->materialize = true;
+            }
         }
         if (txn->materialize) {
             num_waits += 1;
         }
+        m_actions[i] = txn;
+        m_actions[i]->start_time = zero_time;
+        m_actions[i]->end_time = zero_time;
+        m_actions[i]->start_rdtsc_time = 0;
+        m_actions[i]->end_rdtsc_time = 0;
         input_queue->EnqueueBlocking((uint64_t)txn);
     }
     return num_waits;
@@ -60,6 +71,7 @@ LazyExperiment::RunThroughput() {
     
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, gen);
     DoThroughputExperiment(m_info->num_workers, num_waits);
+    WriteLatencies();
 }
 
 /*
@@ -95,6 +107,71 @@ LazyExperiment::RunYCSB() {
 */
 
 void
+LazyExperiment::RunBlind() {
+    TableInit table_init_params[2];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = 2000;
+
+    table_init_params[1].m_table_type = ONE_DIM_TABLE;
+    table_init_params[1].m_params.m_one_params.m_dim1 = 1000000;
+
+    SimpleQueue **input_queue = InitQueues(1, LARGE_QUEUE);
+    m_input_queue = input_queue[0];
+    
+    SimpleQueue **worker_inputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **worker_outputs = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **feedbacks = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    m_output_queues = worker_outputs;
+    m_workers = (LazyWorker**)malloc(sizeof(LazyWorker*)*m_info->num_workers);
+
+    for (int i = 0; i < m_info->num_workers; ++i) {
+        m_workers[i] = new LazyWorker(worker_inputs[i], feedbacks[i], worker_outputs[i], 
+                                      i+1);
+    }
+    m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
+                                     (uint32_t)m_info->num_workers, 0, 
+                                     table_init_params, 2,
+                                     (uint32_t)m_info->substantiate_threshold);
+
+    WorkloadGenerator *gen = new ShoppingCart(2000, 1000000, 20, m_info->blind_write_frequency, 0);
+    uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, gen);
+    DoThroughputExperiment(m_info->num_workers, num_waits);
+    WriteLatencies();
+}
+
+void
+LazyExperiment::WriteStockCDF() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (dynamic_cast<StockLevelTxn0*>(m_actions[i]) != NULL) {
+            StockLevelTxn0 *level0 = (StockLevelTxn0*)m_actions[i];
+            Action *level1, *level2;
+            level0->IsLinked(&level1);
+            level1->IsLinked(&level2);
+            assert((level0->start_time.tv_sec != 0 || level0->start_time.tv_nsec != 0) &&
+                   (level2->start_time.tv_sec != 0 || level2->start_time.tv_nsec != 0));                   
+            timespec diff = diff_time(level2->end_time, level0->start_time);
+            times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
+        }
+    }
+    WriteCDF(times, count);
+}
+
+void
+LazyExperiment::WriteNewOrderCDF() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (dynamic_cast<NewOrderTxn*>(m_actions[i]) != NULL) {
+            assert(m_actions[i]->end_rdtsc_time != 0 && m_actions[i]->start_rdtsc_time != 0);
+            times[count++] = (1.0*(m_actions[i]->end_rdtsc_time - m_actions[i]->start_rdtsc_time)) / 1996.0;
+        }
+    }
+    WriteCDF(times, count);
+}
+
+void
 LazyExperiment::RunTPCC() {
     InitializeTPCC();
     assert(m_workers != NULL);
@@ -114,7 +191,9 @@ LazyExperiment::RunTPCC() {
         txn_generator = new TPCCGenerator(45, 43, 5, 5, 5);
     }
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, txn_generator);
-    DoThroughputExperiment(m_info->num_workers, num_waits);    
+    DoThroughputExperiment(m_info->num_workers, num_waits);
+    //    WriteStockCDF();
+    //    WriteNewOrderCDF();
 }
 
 void
@@ -150,14 +229,33 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
             }
         }
     }
-    
+
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
     if (num_done < num_waits_done) {
         std::cout << num_done << " " << num_waits_done << "\n";
     }
     assert(num_done >= num_waits_done);
     timespec diff = diff_time(end_time, start_time);
+    WriteThroughput(diff, num_done);
     std::cout << num_done << " " << diff.tv_sec << "." << diff.tv_nsec << "\n";
+}
+
+void
+LazyExperiment::WriteLatencies() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (m_actions[i]->materialize && 
+            (m_actions[i]->start_time.tv_sec != 0 || m_actions[i]->start_time.tv_nsec != 0) && 
+            (m_actions[i]->end_time.tv_sec != 0 || m_actions[i]->end_time.tv_nsec != 0)) {
+         
+            timespec diff = diff_time(m_actions[i]->end_time, m_actions[i]->start_time);            
+            if (diff.tv_sec >= 0 && diff.tv_nsec >= 0) {
+                times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
+            }
+        }
+    }
+    WriteCDF(times, count);    
 }
 
 void
@@ -275,7 +373,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
 
     volatile uint64_t start_time = rdtsc();
     volatile uint64_t phase_time; 
-    duration *= 100;
+    duration *= 10;
 
     uint64_t* buckets_in = 
         (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
@@ -313,7 +411,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
                 }
             }
             phase_time = rdtsc();
-            if (phase_time - start_time >= (FREQUENCY/100)) {
+            if (phase_time - start_time >= (FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -349,7 +447,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
 
             // Check whether or not 1 second has elapsed. 
             // XXX: The constant here is specific to smorz!!!
-            if (phase_time - start_time >= (FREQUENCY/100)) {
+            if (phase_time - start_time >= (FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -381,7 +479,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
                 }
             }
             phase_time = rdtsc();
-            if (phase_time - start_time >= (uint64_t)(FREQUENCY/100.0)) {
+            if (phase_time - start_time >= (uint64_t)(FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -401,9 +499,9 @@ LazyExperiment::WaitPeak(uint32_t duration,
     ofstream client_try;
     client_try.open("lazy_client_try.txt");
     double cur = 0.0;
-    double diff = 1.0 / 100.0;
+    double diff = 1.0 / 10.0;
     for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
-        uint64_t throughput = buckets_in[i]*100;
+        uint64_t throughput = buckets_in[i]*10;
         client_try << cur << " " << throughput << "\n";
         cur += diff;
     }
@@ -414,7 +512,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     stick_file.open("lazy_client_stickification.txt");
     cur = 0.0;
     for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
-        uint64_t stick = buckets_stick[i]*100;
+        uint64_t stick = buckets_stick[i]*10;
         stick_file << cur << " " << stick << "\n";
         cur += diff;
     }
@@ -436,7 +534,7 @@ LazyExperiment::WaitPeak(uint32_t duration,
     throughput_file.open("lazy_client_throughput.txt");
     cur = 0.0;
     for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
-        uint64_t throughput = buckets_done[i]*100;
+        uint64_t throughput = buckets_done[i]*10;
         throughput_file << cur << " " << throughput << "\n";
         cur += diff;
     }

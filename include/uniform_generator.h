@@ -35,6 +35,8 @@ class EagerUniformGenerator : public EagerGenerator {
     int m_num_records;
     int m_freq;
 
+    int m_last_used;
+
     virtual int genUnique(std::set<int>* done);
 
  public:

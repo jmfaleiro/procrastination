@@ -1,4 +1,11 @@
 #include <eager_experiment.hh>
+#include <string>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <algorithm>
+
+using namespace std;
 
 EagerExperiment::EagerExperiment(ExperimentInfo *info) 
     : Experiment(info) {
@@ -61,8 +68,19 @@ void
 EagerExperiment::InitInputs(SimpleQueue **input_queues, int num_inputs, int num_workers,
                             EagerGenerator *gen) {
     //    uint32_t no, pay, stock, 
+    timespec zero_time;
+    zero_time.tv_sec = 0;
+    zero_time.tv_nsec = 0;
+    
+    m_actions = (EagerAction**)malloc(sizeof(EagerAction*)*num_inputs);
     for (int i = 0; i < num_inputs; ++i) {
-        input_queues[i%num_workers]->EnqueueBlocking((uint64_t)gen->genNext());
+        EagerAction *txn = gen->genNext();
+        m_actions[i] = txn;
+        m_actions[i]->start_time = zero_time;
+        m_actions[i]->end_time = zero_time;
+        m_actions[i]->start_rdtsc_time = 0;
+        m_actions[i]->end_rdtsc_time = 0;        
+        input_queues[i%num_workers]->EnqueueBlocking((uint64_t)txn);
     }
 }
 
@@ -110,7 +128,65 @@ EagerExperiment::DoThroughputExperiment(EagerWorker **workers,
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end_time);
     
     timespec diff = diff_time(end_time, start_time);
+    WriteThroughput(diff, num_waits);
     std::cout << diff.tv_sec << "." << diff.tv_nsec << "\n";
+}
+
+void
+EagerExperiment::WriteStockCDF() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (dynamic_cast<StockLevelEager0*>(m_actions[i]) != NULL) {
+            StockLevelEager0 *level0 = (StockLevelEager0*)m_actions[i];
+            EagerAction *level1, *level2;
+            level0->IsLinked(&level1);
+            level1->IsLinked(&level2);
+            assert((level0->start_time.tv_sec != 0 || level0->start_time.tv_nsec != 0) &&
+                   (level2->start_time.tv_sec != 0 || level2->start_time.tv_nsec != 0));                   
+            timespec diff = diff_time(level2->end_time, level0->start_time);
+            times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
+        }
+    }
+    stringstream no_file;
+    no_file << "results/eager_" << m_info->warehouses << "_threads_" << m_info->num_workers << "_stock.txt";
+    ofstream cdf_file;
+    cdf_file.open(no_file.str(), ios::out);
+
+    std::sort(&times[0], &times[count]);
+    double fraction = 0.0;
+    double diff = 1.0/(count*1.0);    
+    for (int i = 0; i < count; ++i) {
+        cdf_file << fraction << " " << times[i] << "\n";
+        fraction  += diff;        
+    }
+    cdf_file.close();
+}
+
+void
+EagerExperiment::WriteNewOrderCDF() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (dynamic_cast<NewOrderEager*>(m_actions[i]) != NULL) {
+            assert(m_actions[i]->end_rdtsc_time != 0 && m_actions[i]->start_rdtsc_time != 0);
+            times[count++] = (1.0*(m_actions[i]->end_rdtsc_time - m_actions[i]->start_rdtsc_time)) / 1996.0;
+        }
+    }
+
+    stringstream no_file;
+    no_file << "results/eager_" << m_info->warehouses << "_threads_" << m_info->num_workers << "_neworder.txt";
+    ofstream cdf_file;
+    cdf_file.open(no_file.str(), ios::out);
+
+    std::sort(&times[0], &times[count]);
+    double fraction = 0.0;
+    double diff = 1.0/(count*1.0);    
+    for (int i = 0; i < count; ++i) {
+        cdf_file << fraction << " " << times[i] << "\n";
+        fraction  += diff;        
+    }
+    cdf_file.close();
 }
 
 
@@ -130,7 +206,6 @@ EagerExperiment::RunTPCC() {
                                            m_info->order_status);
     }
     else {
-        // txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
         txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
@@ -140,6 +215,33 @@ EagerExperiment::RunTPCC() {
     
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
                            (uint32_t)m_info->num_txns);    
+    //    WriteNewOrderCDF();
+    //    WriteStockCDF();
+}
+
+void
+EagerExperiment::RunBlind() {
+    TableInit table_init_params[2];
+    table_init_params[0].m_table_type = ONE_DIM_TABLE;
+    table_init_params[0].m_params.m_one_params.m_dim1 = 2000;
+
+    table_init_params[1].m_table_type = ONE_DIM_TABLE;
+    table_init_params[1].m_params.m_one_params.m_dim1 = 1000000;
+
+    m_lock_mgr = new LockManager(table_init_params, 2);
+    
+    SimpleQueue **input_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    SimpleQueue **output_queues = InitQueues(m_info->num_workers, LARGE_QUEUE);
+    
+    // Initialize the workload generator
+    EagerGenerator *gen = new EagerShoppingCart(2000, 1000000, 20, m_info->blind_write_frequency, 0);
+    EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
+                                        output_queues, 0);
+
+    InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);
+    DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
+                           (uint32_t)m_info->num_txns);    
+    WriteBlindLatencies();    
 }
 
 void
@@ -207,7 +309,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
 
     volatile uint64_t start_time = rdtsc();
     volatile uint64_t phase_time; 
-    duration *= 100;
+    duration *= 10;
 
     uint64_t* buckets_in = 
         (uint64_t*)numa_alloc_local(sizeof(uint64_t)*(duration+2*duration/3));
@@ -239,7 +341,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
                 }
             }
             phase_time = rdtsc();
-            if (phase_time - start_time >= (FREQUENCY/100)) {
+            if (phase_time - start_time >= (FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -271,7 +373,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
 
             // Check whether or not 1 second has elapsed. 
             // XXX: The constant here is specific to smorz!!!
-            if (phase_time - start_time >= (FREQUENCY/100)) {
+            if (phase_time - start_time >= (FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -299,7 +401,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
                 }
             }
             phase_time = rdtsc();
-            if (phase_time - start_time >= (uint64_t)(FREQUENCY/100.0)) {
+            if (phase_time - start_time >= (uint64_t)(FREQUENCY/10)) {
                 start_time = phase_time;
                 volatile int end_count = NumWorkerDone();
                 buckets_done[j] = end_count - start_count;
@@ -315,9 +417,9 @@ EagerExperiment::WaitPeak(uint32_t duration,
     ofstream client_try;
     client_try.open("client_try.txt");
     double cur = 0.0;
-    double diff = 1.0 / 100.0;
+    double diff = 1.0 / 10.0;
     for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
-        uint64_t throughput = buckets_in[i]*100;
+        uint64_t throughput = buckets_in[i]*10;
         client_try << cur << " " << throughput << "\n";
         cur += diff;
     }
@@ -340,7 +442,7 @@ EagerExperiment::WaitPeak(uint32_t duration,
     throughput_file.open("client_throughput.txt");
     cur = 0.0;
     for (uint32_t i = 0; i < (duration+2*duration/3); ++i) {
-        uint64_t throughput = buckets_done[i]*100;
+        uint64_t throughput = buckets_done[i]*10;
         throughput_file << cur << " " << throughput << "\n";
         cur += diff;
     }
@@ -386,4 +488,32 @@ EagerExperiment::RunThroughput() {
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, gen);
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
                            (uint32_t)m_info->num_txns);    
+    WriteLatencies();        
+}
+
+void
+EagerExperiment::WriteLatencies() {
+
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+            timespec diff = diff_time(m_actions[i]->end_time, m_actions[i]->start_time);            
+            times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
+    }
+    WriteCDF(times, count);
+}
+
+
+void
+EagerExperiment::WriteBlindLatencies() {
+    double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
+    int count = 0;
+    for (int i = 0; i < m_info->num_txns; ++i) {
+        if (dynamic_cast<shopping::EagerCheckout*>(m_actions[i]) != NULL || 
+            dynamic_cast<shopping::EagerClearCart*>(m_actions[i]) != NULL) {
+            timespec diff = diff_time(m_actions[i]->end_time, m_actions[i]->start_time);            
+            times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
+        }
+    }
+    WriteCDF(times, count);
 }

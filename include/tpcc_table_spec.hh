@@ -85,6 +85,7 @@ GetItemTableInit(TableInit *scratch) {
 
 static void
 GetStockTableInit(TableInit *scratch) {
+
     scratch->m_table_type = TWO_DIM_TABLE;
     scratch->m_params.m_two_params.m_dim1 = s_num_warehouses;
     scratch->m_params.m_two_params.m_dim2 = s_num_items;

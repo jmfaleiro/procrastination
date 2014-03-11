@@ -6,17 +6,20 @@
 #include <bulk_allocating_table.hh>
 #include <two_dim_table.hh>
 #include <three_dim_table.hh>
+#include <tpcc.hh>
 
+using namespace tpcc;
 using namespace std;
 
 LazyScheduler::LazyScheduler(SimpleQueue *input_queue, 
                              SimpleQueue **feedback_queues, 
                              SimpleQueue **worker_queues, int num_workers, 
                              int cpu_number, cc_params::TableInit *params, 
-                             int num_params, int max_chain) 
+                             int num_params, int max_chain)
     : Runnable(cpu_number) {
     m_tables = do_tbl_init<Heuristic>(params, num_params);
     assert(m_tables != NULL);
+    
     m_max_chain = max_chain;
     m_last_used = 0;
     
@@ -50,11 +53,13 @@ LazyScheduler::StartWorking() {
 
         // Check if there's any input
         if (m_input_queue->Dequeue((uint64_t*)&txn)) {
+            //            txn->start_rdtsc_time = rdtsc();
             m_num_stickified += 1;
             if (txn->NowPhase()) {
 
                 AddGraph(txn);
             }
+            //            txn->end_rdtsc_time = rdtsc();
         }        
     }
 }
@@ -121,6 +126,10 @@ void LazyScheduler::AddGraph(Action* action) {
 
     if (m_materialize_on && force_materialize) {
         int index = m_last_used % m_num_workers;
+        //        clock_gettime(CLOCK_REALTIME, &action->start_time);
+        if (action->is_blind) {
+            action->state = PROCESSING;
+        }
         if (!m_worker_queues[index]->Enqueue((uint64_t)action)) {
             m_materialize_counter = 0;
             m_materialize_on = false;

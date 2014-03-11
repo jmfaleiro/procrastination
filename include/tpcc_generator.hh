@@ -125,6 +125,7 @@ public:
                                            num_items, item_ids, supplier_wh_ids,
                                            quantities);
         ret->materialize = false;
+        ret->is_blind = false;
         return ret;
     }
     
@@ -157,6 +158,7 @@ public:
                               district_id, customer_d_id, customer_id, NULL, 
                               false);
         ret->materialize = false;
+        ret->is_blind = false;
         return ret;
     }
 
@@ -173,6 +175,11 @@ public:
                                                     threshold, level1);
         level1->materialize = true;
         level2->materialize = true;
+        level0->materialize = true;
+        
+        level1->is_blind = false;
+        level2->is_blind = false;
+        level0->is_blind = false;
         return level0;
     }
     
@@ -189,6 +196,10 @@ public:
         level1->materialize = true;
         level2->materialize = true;
         level0->materialize = false;
+
+        level1->is_blind = false;
+        level2->is_blind = false;
+        level0->is_blind = false;
         return level0;
     }
 
@@ -205,6 +216,9 @@ public:
                                                       customer_id, NULL, false, 
                                                       level1, true);        
         level0->materialize = true;
+
+        level1->is_blind = false;
+        level0->is_blind = false;
         return level0;
     }
 };
