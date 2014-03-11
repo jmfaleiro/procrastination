@@ -55,7 +55,7 @@ LazyExperiment::RunThroughput() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 1,
-                                     (uint32_t)m_info->substantiate_threshold);
+                                     (uint32_t)m_info->substantiate_threshold, false);
     
     WorkloadGenerator *gen = NULL;
     if (m_info->is_normal) {
@@ -131,7 +131,7 @@ LazyExperiment::RunBlind() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 2,
-                                     (uint32_t)m_info->substantiate_threshold);
+                                     (uint32_t)m_info->substantiate_threshold, false);
 
     WorkloadGenerator *gen = new ShoppingCart(2000, 1000000, 20, m_info->blind_write_frequency, 0);
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, gen);
@@ -273,7 +273,7 @@ LazyExperiment::InitializeTPCCWorkers(uint32_t num_workers,
     // Initialize the workers
     for (uint32_t i = 0; i < num_workers; ++i) {
         m_workers[i] = new LazyWorker((*inputs)[i], (*feedback)[i], (*outputs)[i], 
-                                   (int)i+1);
+                                   (int)i+2);
     }
 }
 
@@ -300,7 +300,7 @@ LazyExperiment::InitializeTPCC() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedback, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, s_num_tables, 
-                                     (uint32_t)m_info->substantiate_threshold);
+                                     (uint32_t)m_info->substantiate_threshold, true);
 }
 
 uint32_t 
@@ -349,7 +349,7 @@ LazyExperiment::RunPeak() {
     m_scheduler =  new LazyScheduler(sched_input[0], feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 1,
-                                     (uint32_t)m_info->substantiate_threshold);
+                                     (uint32_t)m_info->substantiate_threshold, false);
 
     // Do the experiment
     WaitPeak(180, input_actions, sched_input[0]);

@@ -7,6 +7,8 @@
 #include <two_dim_table.hh>
 #include <three_dim_table.hh>
 #include <tpcc.hh>
+#include <pthread.h>
+
 
 using namespace tpcc;
 using namespace std;
@@ -15,13 +17,14 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
                              SimpleQueue **feedback_queues, 
                              SimpleQueue **worker_queues, int num_workers, 
                              int cpu_number, cc_params::TableInit *params, 
-                             int num_params, int max_chain)
+                             int num_params, int max_chain, bool is_tpcc)
     : Runnable(cpu_number) {
     m_tables = do_tbl_init<Heuristic>(params, num_params);
     assert(m_tables != NULL);
     
     m_max_chain = max_chain;
     m_last_used = 0;
+    m_is_tpcc = is_tpcc;
     
     m_num_stickified = 0;
     m_num_workers = num_workers;
@@ -35,6 +38,17 @@ LazyScheduler::LazyScheduler(SimpleQueue *input_queue,
     assert(m_input_queue != NULL);
     //    assert(m_feedback_queues != NULL);
     assert(m_worker_queues != NULL);
+    
+    // If we're running tpcc, pipeline the execution of the now phase. 
+    if (is_tpcc) {
+        char *internal_queue_values = (char*)malloc(LARGE_QUEUE*CACHE_LINE);
+        memset(internal_queue_values, 0, LARGE_QUEUE);
+        m_internal_queue = new SimpleQueue(internal_queue_values, LARGE_QUEUE);
+        m_internal_flag = 0;
+        pthread_create(&m_pipeline_thread, NULL, Pipeline, this);
+        while (m_internal_flag == 0)
+            ;
+    }
 }
 
 void
@@ -46,7 +60,12 @@ LazyScheduler::StartWorking() {
         for (int i = 0; i < m_num_workers; ++i) {
             while (m_feedback_queues[i]->Dequeue((uint64_t*)&txn)) {
                 if (txn->NowPhase()) {
-                    AddGraph(txn);
+                    if (m_is_tpcc) {
+                        m_internal_queue->EnqueueBlocking((uint64_t)txn);
+                    }
+                    else {
+                        AddGraph(txn);
+                    }
                 }
             }
         }
@@ -56,14 +75,35 @@ LazyScheduler::StartWorking() {
             //            txn->start_rdtsc_time = rdtsc();
             m_num_stickified += 1;
             if (txn->NowPhase()) {
-
-                AddGraph(txn);
+                if (m_is_tpcc) {
+                    m_internal_queue->EnqueueBlocking((uint64_t)txn);
+                }
+                else {
+                    AddGraph(txn);
+                }
             }
             //            txn->end_rdtsc_time = rdtsc();
         }        
     }
 }
 
+void*
+LazyScheduler::Pipeline(void *arg) {
+    LazyScheduler *me = (LazyScheduler*)arg;
+    
+    // Pin the thread to a cpu
+    if (pin_thread(1) == -1) {
+        std::cout << "Couldn't bind to a cpu!\n";
+        exit(-1);
+    }    
+    xchgq(&me->m_internal_flag, 1);
+    
+    while (true) {
+        Action *action;
+        action = (Action*)me->m_internal_queue->DequeueBlocking();
+        me->AddGraph(action);
+    }
+}
 
 // Add the given action to the dependency graph. 
 void LazyScheduler::AddGraph(Action* action) {

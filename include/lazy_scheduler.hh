@@ -51,9 +51,16 @@ private:
     volatile uint64_t 					m_num_stickified;
     uint64_t 							m_materialize_counter;
     bool								m_materialize_on;
+    bool 								m_is_tpcc;
+    SimpleQueue 						*m_internal_queue;
+    volatile uint64_t					m_internal_flag;
+    pthread_t							m_pipeline_thread;
 
     void
     AddGraph(Action *txn);
+
+    static void*
+    Pipeline(void *arg);
 
 protected:
     virtual void
@@ -63,7 +70,7 @@ public:
     LazyScheduler(SimpleQueue *input_queue, SimpleQueue **feedback_queues, 
                   SimpleQueue **worker_queues, int num_workers, int cpu_number,
                   cc_params::TableInit *params, int num_params, 
-                  int max_chain);
+                  int max_chain, bool is_tpcc);
 
     uint64_t
     NumStickified();
