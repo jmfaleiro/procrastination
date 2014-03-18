@@ -39,7 +39,7 @@ class ShoppingCart : public WorkloadGenerator {
     m_next_client = 0;
     
 
-
+    std::cout << "frequency: " << m_freq << "\n";
     int last_client_index = 0;
     for (int i = 0; i < m_num_clients; ++i) {
       m_client_indices.push_back(last_client_index);
@@ -67,7 +67,7 @@ class ShoppingCart : public WorkloadGenerator {
     Action *ret = NULL;
 
     // Check-out if the cart size is now 20. 
-    if (cart->size() == 30) {
+    if (cart->size() == 40) {
 
       // Flip a coin, if we like the result, generate a blind-write.
       if (rand() % m_freq == 0) {
@@ -85,19 +85,23 @@ class ShoppingCart : public WorkloadGenerator {
           ret = new shopping::Checkout();
           ret->writeset.push_back(fake);
 
+          int cnt = 0;
           // Make sure that the check-out writes the records in the cart. 
           struct DependencyInfo blah;
           for (std::set<int>::iterator it = cart->begin();
                it != cart->end();
                ++it) {
+              if (cnt++ == 10) {
+                  break;
+              }
               blah.record.m_table = 1;
               blah.record.m_key = *it;
               ret->writeset.push_back(blah);
           }
+          ret->is_blind = false;
       }
       
-      ret->materialize = true;
-      ret->is_blind = false;
+      ret->materialize = true;     
       // In either case, make sure that the client-side shopping cart state  is
       // cleared. 
       cart->clear();
@@ -112,7 +116,7 @@ class ShoppingCart : public WorkloadGenerator {
         struct DependencyInfo temp;
         int record;
 
-        //        for (int i = 0; i < 20; ++i) {
+        for (int i = 0; i < 20; ++i) {
 	
             // Pick a random item that we want to buy, mark it as a read. 
             while (true) {
@@ -125,9 +129,9 @@ class ShoppingCart : public WorkloadGenerator {
 
             temp.record.m_table = 1;
             temp.record.m_key = record;
-            ret->readset.push_back(temp);
+            ((shopping::AddItemAction*)ret)->items.push_back(record);
             cart->insert(record);
-            //        }
+        }
     }
     return ret;
   }
@@ -189,7 +193,7 @@ class EagerShoppingCart : public EagerGenerator {
     fake.record.m_table = 0;
 
     // Check-out if the cart size is now 20. 
-    if (cart->size() == 30) {
+    if (cart->size() == 40) {
 
       // Flip a coin, if we like the result, generate a blind-write.
       if (rand() % m_freq == 0) {
@@ -207,9 +211,13 @@ class EagerShoppingCart : public EagerGenerator {
           ret->writeset.push_back(fake);
 
           // Make sure that the check-out writes the records in the cart. 
+          int cnt = 0;
           for (std::set<int>::iterator it = cart->begin();
                it != cart->end();
                ++it) {
+              if (cnt++ == 10) {
+                  break;
+              }
               fake.record.m_table = 1;
               fake.record.m_key = *it;
               ret->writeset.push_back(fake);
@@ -228,7 +236,7 @@ class EagerShoppingCart : public EagerGenerator {
 
         int record;
 
-        //        for (int i = 0; i < 20; ++i) {
+        for (int i = 0; i < 20; ++i) {
 	
             // Pick a random item that we want to buy, mark it as a read. 
             while (true) {
@@ -240,9 +248,9 @@ class EagerShoppingCart : public EagerGenerator {
             }
             fake.record.m_table = 1;
             fake.record.m_key = record;
-            ret->readset.push_back(fake);
+            ((shopping::EagerAddItemAction*)ret)->items.push_back(record);
             cart->insert(record);
-            //        }
+        }
     }
     
     std::sort(ret->readset.begin(), ret->readset.end());

@@ -90,8 +90,9 @@ LazyWorker::ProcessFunction(Action *txn) {
             return ProcessBlind(txn);
         }
         if (cmp_and_swap(&txn->state, STICKY, PROCESSING)) {
+
             if (ProcessTxn(txn)) {
-                //                clock_gettime(CLOCK_REALTIME, &txn->end_time);
+                clock_gettime(CLOCK_REALTIME, &txn->end_time);
                 assert(txn->state == SUBSTANTIATED);
                 return true;
             }
@@ -140,29 +141,35 @@ LazyWorker::processWrite(struct DependencyInfo *info) {
 
 bool
 LazyWorker::ProcessBlindInner(Action *action) {
-    if (action->state != SUBSTANTIATED) {
-    xchgq(&action->state, SUBSTANTIATED);
-    for (size_t i = 0; i < action->writeset.size(); ++i) {
-        if (action->writeset[i].dependency != NULL && action->writeset[i].dependency->state != SUBSTANTIATED) {
-            ProcessBlindInner(action->writeset[i].dependency);
+    if (action->materialize == false) {
+        xchgq(&action->state, SUBSTANTIATED);
+        for (size_t i = 0; i < action->writeset.size(); ++i) {
+            if (action->writeset[i].dependency != NULL && 
+                action->writeset[i].dependency->state != SUBSTANTIATED) {
+                ProcessBlindInner(action->writeset[i].dependency);
+            }
         }
+        m_output_queue->Enqueue((uint64_t)action);
     }
-    m_output_queue->Enqueue((uint64_t)action);
-    }
-    return true;
+    return true;    
 }
 
 bool
 LazyWorker::ProcessBlind(Action *action) {
-    action->LaterPhase();
-    Action *link;
-    xchgq(&action->state, SUBSTANTIATED);
-    m_output_queue->EnqueueBlocking((uint64_t)action);
-
-    for (size_t i = 0; i < action->writeset.size(); ++i) {
-        ProcessBlindInner(action->writeset[i].dependency);
+    if (cmp_and_swap(&action->state, STICKY, PROCESSING)) {
+        action->LaterPhase();
+        Action *link;
+        xchgq(&action->state, SUBSTANTIATED);
+        m_output_queue->EnqueueBlocking((uint64_t)action);
+        clock_gettime(CLOCK_REALTIME, &action->end_time);
+        for (size_t i = 0; i < action->writeset.size(); ++i) {
+            ProcessBlindInner(action->writeset[i].dependency);
+        }
+        return true;
     }
-    return true;
+    else {
+        return false;
+    }
 }
 
 bool
@@ -261,9 +268,8 @@ void
 LazyWorker::StartWorking() {
     Action *txn;
     while (true) {
-        if (m_num_elems < 100 && m_input_queue->Dequeue((uint64_t*)&txn)) {
-            //            clock_gettime(CLOCK_REALTIME, &txn->start_time);
-            //            clock_gettime(CLOCK_REALTIME, &txn->start_time);
+        if (m_num_elems < 1000 && m_input_queue->Dequeue((uint64_t*)&txn)) {
+            clock_gettime(CLOCK_REALTIME, &txn->start_time);
             if (!ProcessFunction(txn)) {
                 ActionNode *wait_node = GetActionNode();
                 wait_node->action = txn;

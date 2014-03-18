@@ -15,7 +15,11 @@ class UniformGenerator : public WorkloadGenerator {
     int m_num_records;
     int m_freq;
 
+    uint64_t **m_perfect_set;
+
     virtual int genUnique(std::set<int>* done);
+
+    virtual void gen_perfect_set(int num_threads);
 
  public:
     UniformGenerator(int read_size, 

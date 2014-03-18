@@ -6,6 +6,8 @@
 #include <random>
 #include <string.h>
 #include <stdlib.h>
+#include <vector>
+
 
 #define 	SIMPLE_RECORD_SIZE		1000
 
@@ -96,6 +98,7 @@ namespace shopping {
 
     class AddItemAction : public Action {
     public:
+        std::vector<uint64_t> items;
         AddItemAction() {
             materialize = false;
             is_blind = false;
@@ -110,8 +113,8 @@ namespace shopping {
         LaterPhase() {
             uint32_t read_data[250];
             memset(read_data, 0, 1000);
-            for (size_t i = 0; i < readset.size(); ++i) {
-                ShoppingData *item = s_item_table->GetPtr(readset[i].record.m_key);
+            for (size_t i = 0; i < items.size(); ++i) {
+                ShoppingData *item = s_item_table->GetPtr(items[i]);
                 for (int j = 0; j < 250; ++j) {
                     read_data[j] += item->value[j];
                 }
@@ -124,12 +127,13 @@ namespace shopping {
 
     class EagerAddItemAction : public EagerAction {
     public:
+        std::vector<uint64_t> items;
         virtual void
         Execute() {
             uint32_t read_data[250];
             memset(read_data, 0, 1000);
-            for (size_t i = 0; i < readset.size(); ++i) {
-                ShoppingData *item = s_item_table->GetPtr(readset[i].record.m_key);
+            for (size_t i = 0; i < items.size(); ++i) {
+                ShoppingData *item = s_item_table->GetPtr(items[i]);
                 for (int j = 0; j < 250; ++j) {
                     read_data[j] += item->value[j];
                 }

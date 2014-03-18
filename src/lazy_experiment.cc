@@ -15,7 +15,7 @@ LazyExperiment::InitInputs(SimpleQueue *input_queue, int num_inputs,
     for (int i = 0; i < num_inputs; ++i) {
         //        std::cout << i << "\n";
         Action *txn = gen->genNext();
-        if (m_info->blind_write_frequency == -1) {
+        if (m_info->experiment == BLIND) {
             if (i >= num_inputs - m_info->num_workers -1) {
                 txn->materialize = true;
             }
@@ -55,7 +55,7 @@ LazyExperiment::RunThroughput() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 1,
-                                     (uint32_t)m_info->substantiate_threshold, false);
+                                     (uint32_t)m_info->substantiate_threshold);
     
     WorkloadGenerator *gen = NULL;
     if (m_info->is_normal) {
@@ -113,7 +113,7 @@ LazyExperiment::RunBlind() {
     table_init_params[0].m_params.m_one_params.m_dim1 = 2000;
 
     table_init_params[1].m_table_type = ONE_DIM_TABLE;
-    table_init_params[1].m_params.m_one_params.m_dim1 = 1000000;
+    table_init_params[1].m_params.m_one_params.m_dim1 = 100000;
 
     SimpleQueue **input_queue = InitQueues(1, LARGE_QUEUE);
     m_input_queue = input_queue[0];
@@ -131,9 +131,9 @@ LazyExperiment::RunBlind() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 2,
-                                     (uint32_t)m_info->substantiate_threshold, false);
+                                     (uint32_t)m_info->substantiate_threshold);
 
-    WorkloadGenerator *gen = new ShoppingCart(2000, 1000000, 20, m_info->blind_write_frequency, 0);
+    WorkloadGenerator *gen = new ShoppingCart(2000, 100000, 20, m_info->blind_write_frequency, 0);
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, gen);
     DoThroughputExperiment(m_info->num_workers, num_waits);
     WriteLatencies();
@@ -155,7 +155,20 @@ LazyExperiment::WriteStockCDF() {
             times[count++] = (1000000.0*diff.tv_sec) + (diff.tv_nsec/1000.0);
         }
     }
-    WriteCDF(times, count);
+    
+    ofstream cdf_file;
+    stringstream filename;
+    filename << "results/lazy_" << m_info->warehouses << "_stock.txt";
+    cdf_file.open(filename.str(), ios::out);
+
+    std::sort(&times[0], &times[count]);
+    double fraction = 0.0;
+    double diff = 1.0/(count*1.0);    
+    for (int i = 0; i < count; ++i) {
+        cdf_file << fraction << " " << times[i] << "\n";
+        fraction  += diff;        
+    }
+    cdf_file.close();
 }
 
 void
@@ -168,7 +181,19 @@ LazyExperiment::WriteNewOrderCDF() {
             times[count++] = (1.0*(m_actions[i]->end_rdtsc_time - m_actions[i]->start_rdtsc_time)) / 1996.0;
         }
     }
-    WriteCDF(times, count);
+    ofstream cdf_file;
+    stringstream filename;
+    filename << "results/lazy_" << m_info->warehouses << "_neworder.txt";
+    cdf_file.open(filename.str(), ios::out);
+
+    std::sort(&times[0], &times[count]);
+    double fraction = 0.0;
+    double diff = 1.0/(count*1.0);    
+    for (int i = 0; i < count; ++i) {
+        cdf_file << fraction << " " << times[i] << "\n";
+        fraction  += diff;        
+    }
+    cdf_file.close();
 }
 
 void
@@ -188,12 +213,13 @@ LazyExperiment::RunTPCC() {
                                           m_info->order_status);
     }
     else {
-        txn_generator = new TPCCGenerator(45, 43, 5, 5, 5);
+        txn_generator = new TPCCGenerator(45, 43, 4, 4, 4);
     }
     uint32_t num_waits = InitInputs(m_input_queue, m_info->num_txns, txn_generator);
+    //    pin_thread(1+m_info->num_workers);
     DoThroughputExperiment(m_info->num_workers, num_waits);
-    //    WriteStockCDF();
-    //    WriteNewOrderCDF();
+    WriteStockCDF();
+    WriteNewOrderCDF();
 }
 
 void
@@ -205,6 +231,8 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     
     m_scheduler->Run();
 
+    pin_thread(m_info->num_workers+1);
+
     timespec start_time, end_time;
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_time);
 
@@ -212,12 +240,14 @@ LazyExperiment::DoThroughputExperiment(int num_workers, uint32_t num_waits) {
     uint32_t num_done = 0;
     uint32_t num_waits_done = 0;
     std::cout << "To wait: " << num_waits << "\n";
+   
     
     /*
     while (!m_input_queue->isEmpty())
         ;
     */
-    
+
+
     while (num_waits_done < num_waits) {
         for (int i = 0; i < num_workers; ++i) {
             Action *dummy;
@@ -245,6 +275,11 @@ LazyExperiment::WriteLatencies() {
     double *times = (double*)malloc(sizeof(double)*m_info->num_txns);
     int count = 0;
     for (int i = 0; i < m_info->num_txns; ++i) {
+        if (m_actions[i]->is_blind &&
+            !((m_actions[i]->start_time.tv_sec != 0 || m_actions[i]->start_time.tv_nsec != 0) && 
+              (m_actions[i]->end_time.tv_sec != 0 || m_actions[i]->end_time.tv_nsec != 0))) {
+            //            std::cout << "UNSUBSTANTIATED BLIND WRITE!!!\n";
+        }
         if (m_actions[i]->materialize && 
             (m_actions[i]->start_time.tv_sec != 0 || m_actions[i]->start_time.tv_nsec != 0) && 
             (m_actions[i]->end_time.tv_sec != 0 || m_actions[i]->end_time.tv_nsec != 0)) {
@@ -273,7 +308,7 @@ LazyExperiment::InitializeTPCCWorkers(uint32_t num_workers,
     // Initialize the workers
     for (uint32_t i = 0; i < num_workers; ++i) {
         m_workers[i] = new LazyWorker((*inputs)[i], (*feedback)[i], (*outputs)[i], 
-                                   (int)i+2);
+                                   (int)i+1);
     }
 }
 
@@ -300,7 +335,7 @@ LazyExperiment::InitializeTPCC() {
     m_scheduler =  new LazyScheduler(m_input_queue, feedback, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, s_num_tables, 
-                                     (uint32_t)m_info->substantiate_threshold, true);
+                                     (uint32_t)m_info->substantiate_threshold);
 }
 
 uint32_t 
@@ -349,7 +384,7 @@ LazyExperiment::RunPeak() {
     m_scheduler =  new LazyScheduler(sched_input[0], feedbacks, worker_inputs, 
                                      (uint32_t)m_info->num_workers, 0, 
                                      table_init_params, 1,
-                                     (uint32_t)m_info->substantiate_threshold, false);
+                                     (uint32_t)m_info->substantiate_threshold);
 
     // Do the experiment
     WaitPeak(180, input_actions, sched_input[0]);

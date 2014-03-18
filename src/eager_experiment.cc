@@ -206,7 +206,7 @@ EagerExperiment::RunTPCC() {
                                            m_info->order_status);
     }
     else {
-        txn_generator = EagerTPCCGenerator(45, 43, 5, 5, 5);
+        txn_generator = EagerTPCCGenerator(45, 43, 4, 4, 4);
     }
     InitInputs(input_queues, m_info->num_txns, m_info->num_workers, &txn_generator);    
     EagerWorker **workers = InitWorkers(m_info->num_workers, input_queues, 
@@ -215,8 +215,8 @@ EagerExperiment::RunTPCC() {
     
     DoThroughputExperiment(workers, output_queues, m_info->num_workers, 
                            (uint32_t)m_info->num_txns);    
-    //    WriteNewOrderCDF();
-    //    WriteStockCDF();
+    WriteNewOrderCDF();
+    WriteStockCDF();
 }
 
 void

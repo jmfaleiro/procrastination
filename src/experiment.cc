@@ -1,6 +1,9 @@
 #include <experiment.hh>
 #include <simple_action.hh>
 #include <algorithm>
+#include <time.h>
+#include <stdlib.h>
+
 
 using namespace std;
 
@@ -38,6 +41,7 @@ Experiment::diff_time(timespec end, timespec start) {
 void
 Experiment::Run() {
     using namespace tpcc;
+    srand(time(NULL));
     TPCCInit *tpcc_initializer = new TPCCInit(m_info->warehouses, 
                                               m_info->districts, 
                                               m_info->customers, m_info->items);
